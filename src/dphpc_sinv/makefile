@@ -1,20 +1,19 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -pedantic -std=c99
+CFLAGS = -Wall -Wextra -Wpedantic -std=c99
 LDFLAGS = -lm
 
-SRCS = rgf_denseblocks.c
-OBJS = $(SRCS:.c=.o)
-EXEC = rgf_denseblocks
+all: rgf_denseblock
 
-.PHONY: all clean
+rgf_denseblock: rgf_denseblock.o utils.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-all: $(EXEC)
+rgf_denseblock.o: rgf_denseblock.c utils.h
+	$(CC) $(CFLAGS) -c $<
 
-$(EXEC): $(OBJS)
-    $(CC) $(LDFLAGS) $^ -o $@
-
-%.o: %.c
-    $(CC) $(CFLAGS) -c $< -o $@
+utils.o: utils.c utils.h
+	$(CC) $(CFLAGS) -c $<
 
 clean:
-    $(RM) $(OBJS) $(EXEC)
+	rm -f rgf_denseblock *.o
+
+	

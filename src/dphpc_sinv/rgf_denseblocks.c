@@ -9,6 +9,8 @@ Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #include <stdlib.h>
 #include <complex.h>
 
+#include "/home/vmaillou/Documents/eigen/Eigen/Dense"
+
 //#include "utils.h"
 
 
@@ -76,6 +78,11 @@ int load_matrix_parameters(
 }
 
 
+
+
+
+
+
 int main() {
     // Get matrix parameters
     char f_matparam[] = "../../tests/tests_cases/mat_parameters_0.txt";
@@ -114,9 +121,11 @@ int main() {
 
     // ----- END OF INIT SECTION -----
 
+    Eigen::MatrixXcd eig_matrix_diagblk  = Eigen::Map<Eigen::MatrixXcd>(reinterpret_cast<std::complex<double>*>(matrix_diagblk), blocksize, matrice_size);
+    Eigen::MatrixXcd eig_matrix_upperblk = Eigen::Map<Eigen::MatrixXcd>(reinterpret_cast<std::complex<double>*>(matrix_upperblk), blocksize, matrice_size-blocksize);
+    Eigen::MatrixXcd eig_matrix_lowerblk = Eigen::Map<Eigen::MatrixXcd>(reinterpret_cast<std::complex<double>*>(matrix_lowerblk), blocksize, matrice_size-blocksize);
 
-
-
+    
 
 
 

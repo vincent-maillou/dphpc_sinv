@@ -10,6 +10,7 @@ int main() {
         A[i] = i;
     }
     int* ipiv = new int[N];
+    
     int info;
 
     // Perform the LU factorization

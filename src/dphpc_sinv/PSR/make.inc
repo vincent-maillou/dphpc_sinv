@@ -92,7 +92,7 @@ ifeq ($(BUILD_TYPE),ethz-gnu64)
 	MPIHOME	      = /usr/local/mpich-3.3.2/gcc/
 	INTEL64	      = /usr/pack/intel_compiler-2015.0.090-af/Linux-x86_64/
 	#MKLHOME       = $(INTEL64)/mkl/lib/intel64
-	MKLHOME       = /home/dleonard/Documents/installs/miniconda3/envs/almaeder_mkl/lib/
+	MKLHOME       = /home/dleonard/Documents/installs/miniconda3/envs/quatrex/lib/
         #NANOTCAD      = /home/nanotcad/sw
         #GNU64         = $(NANOTCAD)/gcc/4.8.2/dahu
 	#MPIHOME       = $(NANOTCAD)/mpich/3.1-gcc-4.8.2/dahu
@@ -182,7 +182,7 @@ LIB_TOP       = $(HOME)
 # Common include paths
 INCAZT        = -I$(LIB_TOP)/AZTEC/lib/
 INCMPI        = -I$(MPIHOME)/include/
-INCMKL        = -I/home/dleonard/Documents/installs/miniconda3/envs/almaeder_mkl/include/
+INCMKL        = -I/home/dleonard/Documents/installs/miniconda3/envs/quatrex/include/
 
 # Common library paths
 ARPACKLIB     = $(LIB_TOP)/ARPACK/libarpack_SUN4.a

@@ -1,19 +1,24 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -Wpedantic -std=c99
+CC = g++
+CFLAGS = -Wall -Wextra -Wpedantic -std=c++14
 LDFLAGS = -lm
+SOURCES= main.cpp utils.cpp
+OBJECTS=$(SOURCES:.cpp=.o)
+BINARY = main
 
-all: rgf_denseblock
+.PHONY: all
+all: $(SOURCES) $(BINARY)
 
-rgf_denseblock: rgf_denseblock.o utils.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+# todo make a nice makefile
+# create a nice makefile which compiles all the files to a binary
+# and cleans up the mess afterwards
+$(BINARY): $(OBJECTS)
+	$(CC) $(CFLAGS) $(OBJECTS) -o $@ $(LDFLAGS)
 
-rgf_denseblock.o: rgf_denseblock.c utils.h
-	$(CC) $(CFLAGS) -c $<
+.cpp.o:
+	$(CC) $(CFLAGS) -c $< -o $@
 
-utils.o: utils.c utils.h
-	$(CC) $(CFLAGS) -c $<
-
+.PHONY: clean
 clean:
-	rm -f rgf_denseblock *.o
+	rm -f main *.o
 
 	

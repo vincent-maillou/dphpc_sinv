@@ -1,0 +1,3 @@
+
+
+bool benchmark_manasa();

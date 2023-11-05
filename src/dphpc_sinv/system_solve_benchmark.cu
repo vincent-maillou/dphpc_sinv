@@ -1,7 +1,7 @@
 #include <string> 
 
 #include "utils.h"
-#include "mkl_lapack.h"
+#include "mkl.h"
 
 
 // todo I am not sure how to "corretly" compine .cu and .cpp
@@ -21,37 +21,58 @@ bool benchmark_manasa()
     printf("Matrix size: %d\n", matrice_size);
     printf("Number of nonzero: %d\n", number_of_nonzero);
 
-    double *dense_matrix;
-    double *data;
-    int *indices;
-    int *indptr;
-    double *rhs;
+    double *dense_matrix = (double*)malloc(matrice_size*matrice_size*sizeof(double));
+    double *data = (double*)malloc(number_of_nonzero*sizeof(double));
+    int *indices = (int*)malloc(number_of_nonzero*sizeof(int));
+    int *indptr = (int*)malloc((matrice_size+1)*sizeof(int));
+    double *rhs = (double*)malloc(matrice_size*sizeof(double));
+    double *dense_matrix_copy = (double*)malloc(matrice_size*matrice_size*sizeof(double));
+    double *rhs_copy = (double*)malloc(matrice_size*sizeof(double));
 
-    if(!load_text_vector<double>(path_data, &data, number_of_nonzero)){
+
+
+    if(!load_text_vector<double>(path_data, data, number_of_nonzero)){
         printf("Error loading data\n");
         return false;
     }
-    if(!load_text_vector<int>(path_indices, &indices, number_of_nonzero)){
+    if(!load_text_vector<int>(path_indices, indices, number_of_nonzero)){
         printf("Error loading indices\n");
         return false;
     }
-    if(!load_text_vector<int>(path_indptr, &indptr, matrice_size+1)){
+    if(!load_text_vector<int>(path_indptr, indptr, matrice_size+1)){
         printf("Error loading indptr\n");
         return false;
     }
-    if(!load_text_vector<double>(path_rhs, &rhs, matrice_size)){
+    if(!load_text_vector<double>(path_rhs, rhs, matrice_size)){
         printf("Error loading rhs\n");
         return false;
     }
 
     sparse_to_dense<double>(
-        &dense_matrix,
+        dense_matrix,
         data,
         indices,
         indptr,
         matrice_size);
 
+    //copy dense matrix
+    copy_array<double>(dense_matrix, dense_matrix_copy, matrice_size*matrice_size);
+    copy_array<double>(rhs, rhs_copy, matrice_size);
 
+    int ipiv[matrice_size];
+    int nrhs = 1;
+    int info;
+    dgesv(&matrice_size, &nrhs, dense_matrix, &matrice_size, ipiv, rhs_copy, &matrice_size, &info);
+
+    if(info != 0){
+        printf("Error in MKL dgesv\n");
+        printf("info: %d\n", info);
+        return false;
+    }
+
+
+    free(dense_matrix_copy);
+    free(rhs_copy);
     free(dense_matrix);
     free(data);
     free(indices);

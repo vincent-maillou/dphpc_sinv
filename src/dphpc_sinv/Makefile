@@ -2,8 +2,8 @@
 CC = nvcc
 CUDA_ROOT = /usr/local/cuda
 MKLROOT = /usr/pack/intel_compiler-2020-af/x64/compilers_and_libraries_2019.0.117/linux/mkl
-CFLAGS = -Xcompiler -Wall -Xcompiler -Wextra -std=c++14 -I${CUDA_ROOT}/include -I"${MKLROOT}/include"
-LDFLAGS = -L"${CUDA_ROOT}/lib64" -lcuda -lcudart -lcublas -lcusolver -lcusparse
+CFLAGS = -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -fopenmp -std=c++14 -I${CUDA_ROOT}/include -I"${MKLROOT}/include"
+LDFLAGS = -L"${CUDA_ROOT}/lib64" -L"${MKLROOT}/lib/intel64" -lcuda -lcudart -lcublas -lcusolver -lcusparse -lmkl_intel_lp64 -lmkl_sequential -lmkl_core
 SOURCES= main.cpp system_solve_benchmark.cu utils.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 BINARY = main

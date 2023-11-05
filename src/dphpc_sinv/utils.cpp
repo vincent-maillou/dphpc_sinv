@@ -35,38 +35,6 @@ bool load_binary_matrix(
     return true;
 }
 
-template<typename T>
-bool load_text_vector(
-    char *filename, 
-    T **matrix,
-    int number_of_elements)
-{
-
-    std::ifstream ifile(filename, std::ios::in);
-    if (!ifile.is_open()) {
-        std::printf("Error opening file\n");
-        return false;
-    }
-
-    *matrix = (T*) malloc(number_of_elements* sizeof(T));
-
-    T num = 0.0;
-    //keep storing values from the text file so long as data exists:
-    for (int i = 0; i < number_of_elements; i++) {
-        ifile >> num;
-        (*matrix)[i] = num;
-    }
-
-    ifile.close();
-
-    return true;
-}
-// Explicit instantiation of the template
-// else not found in compilation
-// other option would be to put the implementation in the header file
-template bool load_text_vector<double>(char* filename, double** matrix, int number_of_elements);
-template bool load_text_vector<int>(char* filename, int** matrix, int number_of_elements);
-
 
 void free_matrix(
     std::complex<double> *matrix)
@@ -109,33 +77,92 @@ bool load_matrix_parameters(
     return false;
 }
 
+
+template<typename T>
+bool load_text_vector(
+    char *filename, 
+    T *matrix,
+    int size)
+{
+
+    std::ifstream ifile(filename, std::ios::in);
+    if (!ifile.is_open()) {
+        std::printf("Error opening file\n");
+        return false;
+    }
+
+    T num = 0.0;
+    //keep storing values from the text file so long as data exists:
+    for (int i = 0; i < size; i++) {
+        ifile >> num;
+        matrix[i] = num;
+    }
+
+    ifile.close();
+
+    return true;
+}
+// Explicit instantiation of the template
+// else not found in compilation
+// other option would be to put the implementation in the header file
+template bool load_text_vector<double>(char* filename, double* matrix, int size);
+template bool load_text_vector<int>(char* filename, int* matrix, int size);
+
 template<typename T>
 void sparse_to_dense(
-    T **dense_matrix,
+    T *dense_matrix,
     T *data,
     int *indices,
     int *indptr,
     int matrice_size)
 {
 
-    *dense_matrix = (T*) malloc(matrice_size * matrice_size * sizeof(T));
-
     for (int i = 0; i < matrice_size; i++) {
         for (int j = 0; j < matrice_size; j++) {
             // this seems kinda illegal
-            (*dense_matrix)[i*matrice_size + j] = (T)0;
+            dense_matrix[i*matrice_size + j] = (T)0;
         }
     }
 
     for(int i = 0; i < matrice_size; i++){
         for(int j = indptr[i]; j < indptr[i+1]; j++){
-            (*dense_matrix)[i*matrice_size + indices[j]] = data[j];
+            dense_matrix[i*matrice_size + indices[j]] = data[j];
         }
     }
 }
 
-template void sparse_to_dense<double>(double **dense_matrix,
+template void sparse_to_dense<double>(double *dense_matrix,
     double *data,
     int *indices,
     int *indptr,
     int matrice_size);
+
+template<typename T>
+void copy_array(
+    T *array,
+    T *copy,
+    int size)
+{
+    #pragma omp parallel for
+    for (int i = 0; i < size; i++) {
+        copy[i] = array[i];
+    }
+}
+template void copy_array<double>(double *array, double *copy, int size);
+
+template<typename T>
+bool assert_same_array(
+    T *array1,
+    T *array2,
+    double epsilon,
+    int size)
+{
+    for (int i = 0; i < size; i++) {
+        if ( fabs(array1[i] - array2[i]) > epsilon) {
+            std::printf("Arrays are not the same at index %d\n", i);
+            return false;
+        }
+    }
+    return true;
+}
+template bool assert_same_array<double>(double *array1, double *array2, double epsilon, int size);

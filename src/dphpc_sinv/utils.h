@@ -1,25 +1,19 @@
-#include <cstdio>
 #include <cstdlib>
 #include <complex>
 #include <cstdio>
-#include <cstdlib>
-#include <complex>
+
 
 bool load_binary_matrix(
     char *filename, 
-    std::complex<double> **matrix, 
-    std::complex<double> **matrix, 
+    std::complex<double> *matrix, 
     int rows, 
     int cols);
 
 
-
 void free_matrix(
-    std::complex<double> *matrix);
     std::complex<double> *matrix);
 
 void print_matrix(
-    std::complex<double> *matrix, 
     std::complex<double> *matrix, 
     int rows, 
     int cols);
@@ -55,3 +49,9 @@ bool assert_same_array(
     T *array2,
     double epsilon,
     int size);
+
+bool are_equals(
+    std::complex<double> *A,
+    std::complex<double> *B,
+    unsigned int matrice_size, 
+    unsigned int blocksize);

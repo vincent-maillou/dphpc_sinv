@@ -15,7 +15,7 @@ Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 
 bool load_binary_matrix(
     char *filename, 
-    std::complex<double> **matrix, 
+    std::complex<double> *matrix, 
     int rows, 
     int cols)
 {
@@ -27,9 +27,7 @@ bool load_binary_matrix(
         return false;
     }
 
-    *matrix = (std::complex<double>*) malloc(rows * cols * sizeof(std::complex<double>));
-
-    std::fread(*matrix, sizeof(std::complex<double>), rows * cols, fp);
+    std::fread(matrix, sizeof(std::complex<double>), rows * cols, fp);
 
     std::fclose(fp);
     return true;
@@ -158,7 +156,7 @@ bool assert_same_array(
     int size)
 {
     for (int i = 0; i < size; i++) {
-        if ( fabs(array1[i] - array2[i]) > epsilon) {
+        if ( std::abs(array1[i] - array2[i]) > epsilon) {
             std::printf("Arrays are not the same at index %d\n", i);
             return false;
         }
@@ -166,3 +164,20 @@ bool assert_same_array(
     return true;
 }
 template bool assert_same_array<double>(double *array1, double *array2, double epsilon, int size);
+
+bool are_equals(
+    std::complex<double> *A,
+    std::complex<double> *B,
+    unsigned int matrice_size, 
+    unsigned int blocksize)
+{
+    // Check that the two parsed matrices are equals
+    for (unsigned int i = 0; i < matrice_size; i++) {
+        for (unsigned int j = 0; j < blocksize; j++) {
+            if (std::abs(A[i * matrice_size + j] - B[i * matrice_size + j]) > 1e-10) {
+                return false;
+            }
+        }
+    }
+    return true;
+}

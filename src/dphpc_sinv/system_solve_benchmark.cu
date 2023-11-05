@@ -9,10 +9,10 @@
 bool benchmark_manasa()
 {
     // Get matrix parameters
-    char path_data[] = "/scratch/sem23f28/manasa_kmc/test_matrices/matrix_sparse_data0.txt";
-    char path_indices[] = "/scratch/sem23f28/manasa_kmc/test_matrices/matrix_sparse_indices0.txt";
-    char path_indptr[] = "/scratch/sem23f28/manasa_kmc/test_matrices/matrix_sparse_indptr0.txt";
-    char path_rhs[] = "/scratch/sem23f28/manasa_kmc/test_matrices/rhs_0.txt";
+    char path_data[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/matrix_sparse_data0.txt";
+    char path_indices[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/matrix_sparse_indices0.txt";
+    char path_indptr[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/matrix_sparse_indptr0.txt";
+    char path_rhs[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/rhs_0.txt";
     int matrice_size = 7165;
     int number_of_nonzero = 182287;
 
@@ -70,6 +70,7 @@ bool benchmark_manasa()
         return false;
     }
 
+    printf("MKL dgesv done\n");
 
     free(dense_matrix_copy);
     free(rhs_copy);
@@ -78,5 +79,6 @@ bool benchmark_manasa()
     free(indices);
     free(indptr);
     free(rhs);
+
     return true;
 }

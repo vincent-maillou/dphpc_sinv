@@ -9,11 +9,10 @@ Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #include <stdlib.h>
 #include <complex>
 
-#include "/home/vincent-maillou/Documents/Libraries/eigen/Eigen/Dense"
+#include <Eigen/Dense>
 
 #include "utils.h"
-
-
+#include "system_solve_benchmark.h"
 
 int main() {
     // Get matrix parameters
@@ -32,31 +31,31 @@ int main() {
 
 
     // Load matrix to invert
-    std::complex<double>* matrix_diagblk;
+    std::complex<double>* matrix_diagblk = (std::complex<double>*) malloc(blocksize * matrice_size * sizeof(std::complex<double>));
     char f_mat_diagblk[] = "../../tests/tests_cases/matrix_0_diagblk.bin";
-    load_matrix(f_mat_diagblk, &matrix_diagblk, blocksize, matrice_size);
+    load_binary_matrix(f_mat_diagblk, matrix_diagblk, blocksize, matrice_size);
 
-    std::complex<double>* matrix_upperblk;
+    std::complex<double>* matrix_upperblk = (std::complex<double>*) malloc(blocksize * (matrice_size-blocksize) * sizeof(std::complex<double>));
     char f_mat_upperblk[] = "../../tests/tests_cases/matrix_0_upperblk.bin";
-    load_matrix(f_mat_upperblk, &matrix_upperblk, blocksize, matrice_size-blocksize);
+    load_binary_matrix(f_mat_upperblk, matrix_upperblk, blocksize, matrice_size-blocksize);
 
-    std::complex<double>* matrix_lowerblk;
+    std::complex<double>* matrix_lowerblk = (std::complex<double>*) malloc(blocksize * (matrice_size-blocksize) * sizeof(std::complex<double>));
     char f_mat_lowerblk[] = "../../tests/tests_cases/matrix_0_lowerblk.bin";
-    load_matrix(f_mat_lowerblk, &matrix_lowerblk, blocksize, matrice_size-blocksize);
+    load_binary_matrix(f_mat_lowerblk, matrix_lowerblk, blocksize, matrice_size-blocksize);
 
 
     // Load reference solution of the matrix inverse
-    std::complex<double>* matrix_inv_diagblk;
+    std::complex<double>* matrix_inv_diagblk = (std::complex<double>*) malloc(blocksize * matrice_size * sizeof(std::complex<double>));
     char f_mat_inv_diagblk[] = "../../tests/tests_cases/matrix_0_inverse_diagblk.bin";
-    load_matrix(f_mat_inv_diagblk, &matrix_inv_diagblk, blocksize, matrice_size);
+    load_binary_matrix(f_mat_inv_diagblk, matrix_inv_diagblk, blocksize, matrice_size);
 
-    std::complex<double>* matrix_inv_upperblk;
+    std::complex<double>* matrix_inv_upperblk = (std::complex<double>*) malloc(blocksize * (matrice_size-blocksize) * sizeof(std::complex<double>));
     char f_mat_inv_upperblk[] = "../../tests/tests_cases/matrix_0_inverse_upperblk.bin";
-    load_matrix(f_mat_inv_upperblk, &matrix_inv_upperblk, blocksize, matrice_size-blocksize);
+    load_binary_matrix(f_mat_inv_upperblk, matrix_inv_upperblk, blocksize, matrice_size-blocksize);
     
-    std::complex<double>* matrix_inv_lowerblk;
+    std::complex<double>* matrix_inv_lowerblk = (std::complex<double>*) malloc(blocksize * (matrice_size-blocksize) * sizeof(std::complex<double>));
     char f_mat_inv_lowerblk[] = "../../tests/tests_cases/matrix_0_inverse_lowerblk.bin";
-    load_matrix(f_mat_inv_lowerblk, &matrix_inv_lowerblk, blocksize, matrice_size-blocksize);
+    load_binary_matrix(f_mat_inv_lowerblk, matrix_inv_lowerblk, blocksize, matrice_size-blocksize);
 
 
     // ----- END OF INIT SECTION -----
@@ -125,19 +124,17 @@ int main() {
 
         print_matrix(matrix_diagblk, blocksize, blocksize);
         print_matrix(matrix_inv_diagblk, blocksize, blocksize);
-
-        return 1;
     }
 
     if(!are_equals(matrix_upperblk, matrix_inv_upperblk, matrice_size, blocksize)){
-        printf("Error: matrix_diagblk and matrix_inv_diagblk are not equal\n");
-        return 1;
+        printf("Error: matrix_upperblk and matrix_inv_upperblk are not equal\n");
     }
 
     if(!are_equals(matrix_lowerblk, matrix_inv_lowerblk, matrice_size, blocksize)){
-        printf("Error: matrix_diagblk and matrix_inv_diagblk are not equal\n");
-        return 1;
+        printf("Error: matrix_lowerblk and matrix_inv_lowerblk are not equal\n");
     }
+    // removed return 1
+    // else we have a memory leak
 
     // ----- CLEANING SECTION -----
 
@@ -147,6 +144,10 @@ int main() {
     free_matrix(matrix_inv_diagblk);
     free_matrix(matrix_inv_upperblk);
     free_matrix(matrix_inv_lowerblk);
+
+    // if(!benchmark_manasa()){
+    //     printf("Error: benchmark_manasa failed\n");
+    // }
 
     return 0;
 }

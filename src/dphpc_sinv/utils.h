@@ -24,9 +24,15 @@ bool load_matrix_parameters(
     unsigned int *blocksize);
 
 template<typename T>
-bool load_text_vector(
+bool load_text_array(
     char *filename, 
-    T *matrix,
+    T *array,
+    int size);
+
+template <typename T>
+bool save_text_array(
+    char *filename,
+    const T* array,
     int size);
 
 template<typename T>

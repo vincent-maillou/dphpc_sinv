@@ -10,6 +10,7 @@ Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #include <complex>
 #include <fstream>
 #include <vector>
+#include <iostream>
 
 #include "utils.h"
 
@@ -77,9 +78,9 @@ bool load_matrix_parameters(
 
 
 template<typename T>
-bool load_text_vector(
+bool load_text_array(
     char *filename, 
-    T *matrix,
+    T *array,
     int size)
 {
 
@@ -89,11 +90,15 @@ bool load_text_vector(
         return false;
     }
 
-    T num = 0.0;
+    // problem on how the text file is saved
+    // i.e. savetxt from numpy does 1.123e01 instead of 11.23
+    // fix, but not possible for complex numbers
+    // i.e. templating brings no benefit:)
+    double num = 0.0;
     //keep storing values from the text file so long as data exists:
     for (int i = 0; i < size; i++) {
         ifile >> num;
-        matrix[i] = num;
+        array[i] = (T)num;
     }
 
     ifile.close();
@@ -103,8 +108,30 @@ bool load_text_vector(
 // Explicit instantiation of the template
 // else not found in compilation
 // other option would be to put the implementation in the header file
-template bool load_text_vector<double>(char* filename, double* matrix, int size);
-template bool load_text_vector<int>(char* filename, int* matrix, int size);
+template bool load_text_array<double>(char* filename, double* matrix, int size);
+template bool load_text_array<int>(char* filename, int* matrix, int size);
+
+template <typename T>
+bool save_text_array(
+    char *filename,
+    const T* array,
+    int size)
+{
+
+    std::ofstream file(filename);
+    if (file.is_open()) {
+        for(int i = 0; i < size; i++){
+            file << array[i] << " "; 
+        }
+        file.close();
+        std::printf("Array data written to file.\n");
+        return true;
+    } else {
+        std::printf("Unable to open the file for writing.\n");
+        return false;
+    }
+}
+template bool save_text_array<double>(char* filename, const double* array, int size);
 
 template<typename T>
 void sparse_to_dense(
@@ -117,8 +144,8 @@ void sparse_to_dense(
 
     for (int i = 0; i < matrice_size; i++) {
         for (int j = 0; j < matrice_size; j++) {
-            // this seems kinda illegal
-            dense_matrix[i*matrice_size + j] = (T)0;
+            // could not work for complex data type
+            dense_matrix[i*matrice_size + j] = T(0);
         }
     }
 

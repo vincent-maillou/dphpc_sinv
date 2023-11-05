@@ -31,19 +31,19 @@ bool benchmark_manasa()
 
 
 
-    if(!load_text_vector<double>(path_data, data, number_of_nonzero)){
+    if(!load_text_array<double>(path_data, data, number_of_nonzero)){
         printf("Error loading data\n");
         return false;
     }
-    if(!load_text_vector<int>(path_indices, indices, number_of_nonzero)){
+    if(!load_text_array<int>(path_indices, indices, number_of_nonzero)){
         printf("Error loading indices\n");
         return false;
     }
-    if(!load_text_vector<int>(path_indptr, indptr, matrice_size+1)){
+    if(!load_text_array<int>(path_indptr, indptr, matrice_size+1)){
         printf("Error loading indptr\n");
         return false;
     }
-    if(!load_text_vector<double>(path_rhs, rhs, matrice_size)){
+    if(!load_text_array<double>(path_rhs, rhs, matrice_size)){
         printf("Error loading rhs\n");
         return false;
     }
@@ -55,14 +55,23 @@ bool benchmark_manasa()
         indptr,
         matrice_size);
 
+
+    // char path_save[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test0.txt";
+    // if(!save_text_array<double>(path_save, dense_matrix, matrice_size*matrice_size)){
+    //     printf("Error saving dense matrix\n");
+    //     return false;
+    // }
+
     //copy dense matrix
     copy_array<double>(dense_matrix, dense_matrix_copy, matrice_size*matrice_size);
     copy_array<double>(rhs, rhs_copy, matrice_size);
 
+    printf("Start MKL dgesv\n");
+
     int ipiv[matrice_size];
     int nrhs = 1;
     int info;
-    dgesv(&matrice_size, &nrhs, dense_matrix, &matrice_size, ipiv, rhs_copy, &matrice_size, &info);
+    dgesv(&matrice_size, &nrhs, dense_matrix_copy, &matrice_size, ipiv, rhs_copy, &matrice_size, &info);
 
     if(info != 0){
         printf("Error in MKL dgesv\n");
@@ -71,6 +80,13 @@ bool benchmark_manasa()
     }
 
     printf("MKL dgesv done\n");
+
+    char path_save[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/x0.txt";
+    if(!save_text_array<double>(path_save, rhs_copy, matrice_size)){
+        printf("Error saving dense matrix\n");
+        return false;
+    }
+
 
     free(dense_matrix_copy);
     free(rhs_copy);

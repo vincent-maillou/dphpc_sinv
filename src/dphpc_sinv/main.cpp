@@ -9,7 +9,7 @@ Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #include <stdlib.h>
 #include <complex>
 
-// #include "/home/vmaillou/Documents/eigen/Eigen/Dense"
+#include "/home/vincent-maillou/Documents/Libraries/eigen/Eigen/Dense"
 
 #include "utils.h"
 
@@ -23,12 +23,12 @@ int main() {
 
     load_matrix_parameters(f_matparam, &matrice_size, &blocksize);
 
-    //print the matrix parameters
+    unsigned int n_blocks = matrice_size / blocksize;
+
+    // Print the matrix parameters
     printf("Matrix parameters:\n");
-    printf("Matrix size: %d\n", matrice_size);
-    printf("Block size: %d\n", blocksize);
-
-
+    printf("    Matrix size: %d\n", matrice_size);
+    printf("    Block size: %d\n", blocksize);
 
 
     // Load matrix to invert
@@ -61,17 +61,85 @@ int main() {
 
     // ----- END OF INIT SECTION -----
 
-    // Eigen::MatrixXcd eig_matrix_diagblk  = Eigen::Map<Eigen::MatrixXcd>(reinterpret_cast<std::complex<double>*>(matrix_diagblk), blocksize, matrice_size);
-    // Eigen::MatrixXcd eig_matrix_upperblk = Eigen::Map<Eigen::MatrixXcd>(reinterpret_cast<std::complex<double>*>(matrix_upperblk), blocksize, matrice_size-blocksize);
-    // Eigen::MatrixXcd eig_matrix_lowerblk = Eigen::Map<Eigen::MatrixXcd>(reinterpret_cast<std::complex<double>*>(matrix_lowerblk), blocksize, matrice_size-blocksize);
+    // Transform C style storage to vector of eigen matrices
+    std::vector<Eigen::MatrixXcd> eig_diagblk;
+    std::vector<Eigen::MatrixXcd> eig_upperblk;
+    std::vector<Eigen::MatrixXcd> eig_lowerblk;
 
-    
+    for (unsigned int i = 0; i < n_blocks; ++i) {
+        eig_diagblk.push_back(Eigen::Map<Eigen::MatrixXcd>(reinterpret_cast<std::complex<double>*>(matrix_diagblk + i*blocksize*blocksize), blocksize, blocksize));
+        if(i < n_blocks-1){
+            eig_upperblk.push_back(Eigen::Map<Eigen::MatrixXcd>(reinterpret_cast<std::complex<double>*>(matrix_upperblk + i*blocksize*(matrice_size-blocksize)), blocksize, blocksize));
+            eig_lowerblk.push_back(Eigen::Map<Eigen::MatrixXcd>(reinterpret_cast<std::complex<double>*>(matrix_lowerblk + i*blocksize*(matrice_size-blocksize)), blocksize, blocksize));
+        }
+    }
+
+    // Pre-allocate memory for the inverted blocks
+    std::vector<Eigen::MatrixXcd> eig_inv_diagblk(n_blocks);
+    std::vector<Eigen::MatrixXcd> eig_inv_upperblk(n_blocks-1);
+    std::vector<Eigen::MatrixXcd> eig_inv_lowerblk(n_blocks-1);
+
+    // Resize the inverted blocks to match the size of the original blocks
+    for (unsigned int i = 0; i < n_blocks; i++) {
+        eig_inv_diagblk[i].resize(blocksize, blocksize);
+        if(i < n_blocks-1){
+            eig_inv_upperblk[i].resize(blocksize, matrice_size-blocksize);
+            eig_inv_lowerblk[i].resize(blocksize, matrice_size-blocksize);
+        }
+    }
+
+    // 0. Inverse of the first block
+    eig_inv_diagblk[0] = eig_diagblk[0].inverse();
+
+    // 1. Forward substitution (performed left to right)
+    for (unsigned int i = 1; i < n_blocks; ++i) {
+        eig_inv_diagblk[i] = eig_diagblk[i] - eig_lowerblk[i-1] * eig_inv_diagblk[i-1] * eig_upperblk[i-1];
+    }
+
+    // 2. Backward substitution (performed right to left)
+    for(int i = n_blocks-2; i >= 0; --i){
+        Eigen::MatrixXcd tmp_lowerfactor = eig_inv_diagblk[i+1] * eig_lowerblk[i] * eig_inv_diagblk[i];
+
+        eig_inv_lowerblk[i] = -tmp_lowerfactor;
+        eig_inv_upperblk[i] = -eig_inv_diagblk[i] * eig_upperblk[i] * eig_inv_diagblk[i+1];
+
+        eig_inv_diagblk[i] += eig_inv_diagblk[i] * eig_upperblk[i] * tmp_lowerfactor;
+    }
+
+
+    // Store results back into C style storage
+    for(unsigned int i = 0; i < n_blocks; ++i){
+        memcpy(matrix_diagblk + i*blocksize*blocksize, eig_inv_diagblk[i].data(), blocksize*blocksize*sizeof(std::complex<double>));
+        if(i < n_blocks-1){
+            memcpy(matrix_upperblk + i*blocksize*(matrice_size-blocksize), eig_inv_upperblk[i].data(), blocksize*(matrice_size-blocksize)*sizeof(std::complex<double>));
+            memcpy(matrix_lowerblk + i*blocksize*(matrice_size-blocksize), eig_inv_lowerblk[i].data(), blocksize*(matrice_size-blocksize)*sizeof(std::complex<double>));
+        }
+    }
 
 
 
+    // ----- RESULT CHECKING SECTION -----
 
+    if(!are_equals(matrix_diagblk, matrix_inv_diagblk, matrice_size, blocksize)){
+        printf("Error: matrix_diagblk and matrix_inv_diagblk are not equal\n");
 
-    // ----- START OF CLEANING SECTION -----
+        print_matrix(matrix_diagblk, blocksize, blocksize);
+        print_matrix(matrix_inv_diagblk, blocksize, blocksize);
+
+        return 1;
+    }
+
+    if(!are_equals(matrix_upperblk, matrix_inv_upperblk, matrice_size, blocksize)){
+        printf("Error: matrix_diagblk and matrix_inv_diagblk are not equal\n");
+        return 1;
+    }
+
+    if(!are_equals(matrix_lowerblk, matrix_inv_lowerblk, matrice_size, blocksize)){
+        printf("Error: matrix_diagblk and matrix_inv_diagblk are not equal\n");
+        return 1;
+    }
+
+    // ----- CLEANING SECTION -----
 
     free_matrix(matrix_diagblk);
     free_matrix(matrix_upperblk);

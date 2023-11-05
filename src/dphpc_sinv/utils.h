@@ -20,3 +20,9 @@ int load_matrix_parameters(
     char *filename, 
     unsigned int *matrice_size, 
     unsigned int *blocksize);
+
+bool are_equals(
+    std::complex<double> *A,
+    std::complex<double> *B,
+    unsigned int matrice_size, 
+    unsigned int blocksize);

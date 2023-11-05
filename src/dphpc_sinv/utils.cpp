@@ -73,3 +73,20 @@ int load_matrix_parameters(
     return 0;
 }
 
+bool are_equals(
+    std::complex<double> *A,
+    std::complex<double> *B,
+    unsigned int matrice_size, 
+    unsigned int blocksize)
+{
+    // Check that the two parsed matrices are equals
+    for (unsigned int i = 0; i < matrice_size; i++) {
+        for (unsigned int j = 0; j < blocksize; j++) {
+            if (std::abs(A[i * matrice_size + j] - B[i * matrice_size + j]) > 1e-10) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+

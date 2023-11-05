@@ -30,8 +30,8 @@ void load_matrix(
 }
 
 int main() {
-    int N = 10; // Change this to the desired size of your NxN matrix
-    std::complex<double>* A = new std::complex<double>[N * N]; // Replace with your own matrix data
+    int N = 64; // Change this to the desired size of your NxN matrix
+    std::complex<double>* A = new std::complex<double>[N * N];
     std::complex<double>* A_inv = new std::complex<double>[N * N];
     std::string filename = "matrix_0_diagblk.bin";
     std::string filename_inv = "matrix_0_inverse_diagblk.bin";

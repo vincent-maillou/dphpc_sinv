@@ -1,9 +1,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <complex>
+#include <cstdio>
+#include <cstdlib>
+#include <complex>
 
 bool load_binary_matrix(
     char *filename, 
+    std::complex<double> **matrix, 
     std::complex<double> **matrix, 
     int rows, 
     int cols);
@@ -12,8 +16,10 @@ bool load_binary_matrix(
 
 void free_matrix(
     std::complex<double> *matrix);
+    std::complex<double> *matrix);
 
 void print_matrix(
+    std::complex<double> *matrix, 
     std::complex<double> *matrix, 
     int rows, 
     int cols);

@@ -19,6 +19,9 @@ def generate_random_matrix():
     matrix = np.random.rand(MAT_SIZE, MAT_SIZE) + 1j * \
         np.random.rand(MAT_SIZE, MAT_SIZE)
 
+    value_diag = np.sum(np.abs(matrix), axis=1)
+    np.fill_diagonal(matrix, value_diag)
+
     return matrix
 
 
@@ -39,7 +42,6 @@ def print_matrix(
     for i in range(matrix_size):
         for j in range(matrix_size):
             print(matrix[i, j], end=" ")
-        print()
 
 
 def show_matrix(
@@ -118,6 +120,11 @@ if __name__ == "__main__":
     # Generate random matrix
     matrix = generate_random_matrix()
 
+    # assert matrix to be invertible
+    assert np.allclose( np.linalg.inv(matrix) @ matrix, np.eye(MAT_SIZE) )
+    assert np.linalg.det(matrix) != 0
+
+
     # Compute inverse
     inv_matrix = np.linalg.inv(matrix)
 
@@ -128,32 +135,37 @@ if __name__ == "__main__":
     matrix_lower_blk = extract_offdiagonal_blocks(
         matrix, MAT_SIZE, BLOCKSIZE, -1)
 
-    matrix_diag_blk = extract_diagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE)
-    matrix_upper_blk = extract_offdiagonal_blocks(
+    matrix_inv_diag_blk = extract_diagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE)
+    matrix_inv_upper_blk = extract_offdiagonal_blocks(
         inv_matrix, MAT_SIZE, BLOCKSIZE, 1)
-    matrix_lower_blk = extract_offdiagonal_blocks(
+    matrix_inv_lower_blk = extract_offdiagonal_blocks(
         inv_matrix, MAT_SIZE, BLOCKSIZE, -1)
 
-    # Save matrices to file
-    path_to_file = "../../tests/tests_cases/"
+    # # Save matrices to file
+    # path_to_file = "../../tests/tests_cases/"
 
-    # create test folder if it does not exist
-    if not os.path.exists(path_to_file):
-        os.makedirs(path_to_file)
+    # # create test folder if it does not exist
+    # if not os.path.exists(path_to_file):
+    #     os.makedirs(path_to_file)
+
+    print(matrix)
+    print(matrix_diag_blk)
+    print(matrix_upper_blk)
+    print(matrix_lower_blk)
 
     filename = "matrix_0_diagblk.bin"
-    write_matrix_to_file(path_to_file+filename, matrix, MAT_SIZE, 1)
+    write_matrix_to_file(path_to_file+filename, matrix_diag_blk, MAT_SIZE, 1)
     filename = "matrix_0_upperblk.bin"
-    write_matrix_to_file(path_to_file+filename, matrix, MAT_SIZE, 1)
+    write_matrix_to_file(path_to_file+filename, matrix_upper_blk, MAT_SIZE, 1)
     filename = "matrix_0_lowerblk.bin"
-    write_matrix_to_file(path_to_file+filename, matrix, MAT_SIZE, 1)
+    write_matrix_to_file(path_to_file+filename, matrix_lower_blk, MAT_SIZE, 1)
 
     filename = "matrix_0_inverse_diagblk.bin"
-    write_matrix_to_file(path_to_file+filename, inv_matrix, MAT_SIZE, 1)
+    write_matrix_to_file(path_to_file+filename, matrix_inv_diag_blk, MAT_SIZE, 1)
     filename = "matrix_0_inverse_upperblk.bin"
-    write_matrix_to_file(path_to_file+filename, inv_matrix, MAT_SIZE, 1)
+    write_matrix_to_file(path_to_file+filename, matrix_inv_upper_blk, MAT_SIZE, 1)
     filename = "matrix_0_inverse_lowerblk.bin"
-    write_matrix_to_file(path_to_file+filename, inv_matrix, MAT_SIZE, 1)
+    write_matrix_to_file(path_to_file+filename, matrix_inv_lower_blk, MAT_SIZE, 1)
 
     filename = "mat_parameters_0.txt"
     write_matrix_parameters(path_to_file+filename, MAT_SIZE, BLOCKSIZE)

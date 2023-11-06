@@ -3,6 +3,18 @@
 #include <complex>
 #define MKL_Complex16 std::complex<double>
 #include <mkl.h>
+#include <mkl_lapacke.h>
+
+#define EIGEN_USE_MKL_ALL
+#include <Eigen/Dense>
+
+#include <omp.h>
+#include <mpi.h>
+#include <cuda.h>
+
+#include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
+
 
 
 void load_matrix(
@@ -11,7 +23,6 @@ void load_matrix(
     int rows, 
     int cols)
 {
-    FILE *fp;
     // Open the binary file for reading
     std::ifstream input(filename, std::ios::binary);
     if (input.is_open()) {
@@ -30,7 +41,7 @@ void load_matrix(
 }
 
 int main() {
-    int N = 64; // Change this to the desired size of your NxN matrix
+    const int N = 64; // Change this to the desired size of your NxN matrix
     std::complex<double>* A = new std::complex<double>[N * N];
     std::complex<double>* A_inv = new std::complex<double>[N * N];
     std::string filename = "matrix_0_diagblk.bin";
@@ -47,15 +58,16 @@ int main() {
     
     int info;
 
+
     // Perform the LU factorization
     info = LAPACKE_zgetrf(LAPACK_ROW_MAJOR, N, N, A, N, ipiv);
 
     if (info == 0) {
         // If factorization was successful, invert the matrix
         info = LAPACKE_zgetri(LAPACK_ROW_MAJOR, N, A, N, ipiv);
-        if (info) {
+        if (info){
             std::cerr << "Matrix inversion failed." << std::endl;
-        } 
+        }
     } else {
         std::cerr << "LU factorization failed." << std::endl;
     }
@@ -65,6 +77,26 @@ int main() {
         error += std::abs(A[i] - A_inv[i]);
     }
     std::cout << "Error: " << error << std::endl;
+
+    load_matrix("matrix_0_diagblk.bin", A, N, N);
+    Eigen::Map<Eigen::Matrix<std::complex<double>, N, N, Eigen::RowMajor>> eigenMatrix(A, N, N);
+    auto invertedMatrix = eigenMatrix.inverse();
+    auto invertedMatrix2 = eigenMatrix.inverse();
+
+    double error_eigen = 0.0;
+    for (int i = 0; i < N * N; i++) {
+        error_eigen += std::abs(invertedMatrix(i) - A_inv[i]);
+    }
+
+    std::cout << "Error Eigen: " << error_eigen << std::endl;
+
+    double error_eigen2 = 0.0;
+    #pragma omp parallel for reduction(+:error_eigen2)
+    for (int i = 0; i < N * N; i++) {
+        error_eigen2 += std::abs(invertedMatrix2(i) - A_inv[i]);
+    }
+
+    std::cout << "Error Eigen 2: " << error_eigen << std::endl;
 
     delete[] A;
     delete[] A_inv;

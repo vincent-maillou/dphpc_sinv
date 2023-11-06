@@ -40,7 +40,16 @@ void load_matrix(
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+
+    int rank, size;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank); // get current MPI-process ID. O, 1, ...
+    MPI_Comm_size(MPI_COMM_WORLD, &size); // get the total number of processes
+
+    std::cout << "Hello from process " << rank << " of " << size << std::endl;
+
     const int N = 64; // Change this to the desired size of your NxN matrix
     std::complex<double>* A = new std::complex<double>[N * N];
     std::complex<double>* A_inv = new std::complex<double>[N * N];
@@ -101,6 +110,8 @@ int main() {
     delete[] A;
     delete[] A_inv;
     delete[] ipiv;
+
+    MPI_Finalize();
 
     return 0;
 }

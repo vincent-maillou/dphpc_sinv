@@ -53,7 +53,7 @@ template<typename T>
 bool assert_same_array(
     T *array1,
     T *array2,
-    double epsilon,
+    double tolerance,
     int size);
 
 bool are_equals(

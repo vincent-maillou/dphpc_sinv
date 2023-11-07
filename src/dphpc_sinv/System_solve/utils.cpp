@@ -179,18 +179,19 @@ template<typename T>
 bool assert_same_array(
     T *array1,
     T *array2,
-    double epsilon,
+    double tolerance,
     int size)
 {
     for (int i = 0; i < size; i++) {
-        if ( std::abs(array1[i] - array2[i]) > epsilon) {
+        if (std::abs(array1[i] - array2[i]) > tolerance * std::abs(array1[i] - array2[i]) + tolerance) {
+            std::printf("%f %f\n", array1[i], array2[i]);
             std::printf("Arrays are not the same at index %d\n", i);
             return false;
         }
     }
     return true;
 }
-template bool assert_same_array<double>(double *array1, double *array2, double epsilon, int size);
+template bool assert_same_array<double>(double *array1, double *array2, double tolerance, int size);
 
 bool are_equals(
     std::complex<double> *A,

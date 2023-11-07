@@ -88,6 +88,9 @@ double solve_mkl_dgesv(
     if(info != 0){
         std::printf("Error in MKL dgesv\n");
         std::printf("info: %d\n", info);
+        if(info > 0){
+            std::printf("Singular");
+        }
         return -1.0;
     }
 
@@ -101,6 +104,54 @@ double solve_mkl_dgesv(
     }
     else{
         std::printf("MKL dgesv solution is the same as the reference solution\n");
+    }
+    return time;
+}
+
+
+double solve_mkl_dgbsv(
+    double *matrix_band,
+    double *rhs,
+    double *reference_solution,
+    int matrix_size,
+    int kl,
+    int ku,
+    double tolerance,
+    bool flag_verbose)
+{
+
+    double time = -1.0;
+
+
+    int ipiv[matrix_size];
+    int nrhs = 1;
+    int info;
+    int ldab = 2*kl + ku + 1;
+    time = -omp_get_wtime();
+    dgbsv(&matrix_size, &kl, &ku, &nrhs,
+            matrix_band, &ldab,
+            ipiv, rhs, &matrix_size, &info);
+    time += omp_get_wtime();
+
+    if(info != 0){
+        std::printf("Error in MKL dgbsv\n");
+        std::printf("info: %d\n", info);
+        if(info > 0){
+            std::printf("Singular");
+        }
+        return -1.0;
+    }
+
+    if(flag_verbose){
+        std::printf("MKL dgesv done\n");
+    }
+
+    if(!assert_same_array<double>(rhs, reference_solution, tolerance, matrix_size)){
+        std::printf("Error: MKL dgbsv solution is not the same as the reference solution\n");
+        return -1.0;
+    }
+    else{
+        std::printf("MKL dgbsv solution is the same as the reference solution\n");
     }
     return time;
 }

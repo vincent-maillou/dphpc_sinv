@@ -58,7 +58,7 @@ void print_matrix(
 
 bool load_matrix_parameters(
     char *filename, 
-    unsigned int *matrice_size, 
+    unsigned int *matrix_band, 
     unsigned int *blocksize)
 {
     FILE *fp;
@@ -69,7 +69,7 @@ bool load_matrix_parameters(
         return true;
     }
 
-    std::fscanf(fp, "%u %u", matrice_size, blocksize);
+    std::fscanf(fp, "%u %u", matrix_band, blocksize);
 
     std::fclose(fp);
 
@@ -139,19 +139,19 @@ void sparse_to_dense(
     T *data,
     int *indices,
     int *indptr,
-    int matrice_size)
+    int matrix_band)
 {
 
-    for (int i = 0; i < matrice_size; i++) {
-        for (int j = 0; j < matrice_size; j++) {
+    for (int i = 0; i < matrix_band; i++) {
+        for (int j = 0; j < matrix_band; j++) {
             // could not work for complex data type
-            dense_matrix[i*matrice_size + j] = T(0);
+            dense_matrix[i*matrix_band + j] = T(0);
         }
     }
 
-    for(int i = 0; i < matrice_size; i++){
+    for(int i = 0; i < matrix_band; i++){
         for(int j = indptr[i]; j < indptr[i+1]; j++){
-            dense_matrix[i*matrice_size + indices[j]] = data[j];
+            dense_matrix[i*matrix_band + indices[j]] = data[j];
         }
     }
 }
@@ -160,7 +160,7 @@ template void sparse_to_dense<double>(double *dense_matrix,
     double *data,
     int *indices,
     int *indptr,
-    int matrice_size);
+    int matrix_band);
 
 template<typename T>
 void copy_array(
@@ -196,16 +196,70 @@ template bool assert_same_array<double>(double *array1, double *array2, double t
 bool are_equals(
     std::complex<double> *A,
     std::complex<double> *B,
-    unsigned int matrice_size, 
+    unsigned int matrix_band, 
     unsigned int blocksize)
 {
     // Check that the two parsed matrices are equals
-    for (unsigned int i = 0; i < matrice_size; i++) {
+    for (unsigned int i = 0; i < matrix_band; i++) {
         for (unsigned int j = 0; j < blocksize; j++) {
-            if (std::abs(A[i * matrice_size + j] - B[i * matrice_size + j]) > 1e-10) {
+            if (std::abs(A[i * matrix_band + j] - B[i * matrix_band + j]) > 1e-10) {
                 return false;
             }
         }
     }
     return true;
 }
+
+template<typename T>
+void calc_bandwidth(
+    T * matrix,
+    int matrix_size,
+    int * ku,
+    int * kl)
+{
+    int ku_tmp = 1;
+    int kl_tmp = 1;
+    for(int i = 0; i < matrix_size; i++){
+        for(int j = 0; j < matrix_size; j++){
+            if(matrix[i*matrix_size + j] != T(0)){
+                if(i > j){
+                    if(kl_tmp < i - j){
+                        kl_tmp = i - j;
+                    }
+                }
+                else{
+                    if(ku_tmp < j - i){
+                        ku_tmp = j - i;
+                    }
+                }
+            }
+        }
+    }
+    *ku = ku_tmp;
+    *kl = kl_tmp;
+}
+template void calc_bandwidth<double>(double * matrix, int matrix_size, int * ku, int * kl);
+
+template<typename T>
+void dense_to_band_for_LU(
+    T *dense_matrix,
+    T *matrix_band,
+    int matrix_size,
+    int ku,
+    int kl)
+{
+    for(int i = 0; i<2*ku+1+kl;i++){
+        for(int j = 0; j < matrix_size;j++){
+            matrix_band[i*matrix_size + j] = T(0);
+        }
+    }
+
+    for(int i = 0; i < matrix_size; i++){
+        for(int j = 0; j < matrix_size; j++){
+            if(dense_matrix[matrix_size*i + j] != T(0)){
+                matrix_band[2*ku + i - j + j*(2*ku+kl+1)] = dense_matrix[matrix_size*i + j];
+            }
+        }
+    }
+}
+template void dense_to_band_for_LU<double>(double *dense_matrix, double *matrix_band, int matrix_size, int ku, int kl);

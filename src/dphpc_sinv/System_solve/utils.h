@@ -61,3 +61,18 @@ bool are_equals(
     std::complex<double> *B,
     unsigned int matrice_size, 
     unsigned int blocksize);
+
+template<typename T>
+void calc_bandwidth(
+    T * matrix,
+    int matrix_size,
+    int * ku,
+    int * kl);
+
+template<typename T>
+void dense_to_band_for_LU(
+    T *dense_matrix,
+    T *matrix_band,
+    int matrix_size,
+    int ku,
+    int kl);

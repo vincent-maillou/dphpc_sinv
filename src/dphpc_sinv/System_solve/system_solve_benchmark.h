@@ -1,5 +1,15 @@
 
 
+double solve_mkl_dgbsv(
+    double *matrix_band,
+    double *rhs,
+    double *reference_solution,
+    int matrix_size,
+    int kl,
+    int ku,
+    double tolerance,
+    bool flag_verbose);
+
 double solve_mkl_dgesv(
     double *matrix_dense,
     double *rhs,

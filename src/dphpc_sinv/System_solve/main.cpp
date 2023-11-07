@@ -90,23 +90,43 @@ int main() {
         //     return false;
         // }
 
-        //copy dense matrix
-        // copy_array<double>(dense_matrix, dense_matrix_copy, matrice_size*matrice_size);
-        // copy_array<double>(rhs, rhs_copy, matrice_size);
+        // copy dense matrix
+        copy_array<double>(dense_matrix, dense_matrix_copy, matrice_size*matrice_size);
+        copy_array<double>(rhs, rhs_copy, matrice_size);
 
-        // double time_mkl_dense = solve_mkl_dgesv(
-        //     dense_matrix_copy,
-        //     rhs_copy,
-        //     reference_solution,
-        //     matrice_size,
-        //     tolerance,
-        //     flag_verbose);
-        // if(time_mkl_dense < 0.0){
-        //     return false;
-        // }
-        // else{
-        //     printf("Time MKL dgesv: %f\n s", time_mkl_dense);
-        // }
+        double time_mkl_dense = solve_mkl_dgesv(
+            dense_matrix_copy,
+            rhs_copy,
+            reference_solution,
+            matrice_size,
+            tolerance,
+            flag_verbose);
+        if(time_mkl_dense < 0.0){
+            return false;
+        }
+        else{
+            printf("Time MKL dgesv: %f\n", time_mkl_dense);
+        }
+
+
+        copy_array<double>(rhs, rhs_copy, matrice_size);
+
+        double time_cusparse_ILU_CG = solve_cusparse_ILU_CG(
+            data,
+            indices,
+            indptr,
+            rhs_copy,
+            reference_solution,
+            number_of_nonzero,
+            matrice_size,
+            tolerance,
+            flag_verbose);
+        if((time_cusparse_ILU_CG < 0.0) && flag_verbose){
+            printf("Error in cusparse ILU CG\n");
+        }
+        else if (flag_verbose){
+            printf("Time cusparse ILU CG: %f\n", time_cusparse_ILU_CG);
+        }
 
 
         copy_array<double>(rhs, rhs_copy, matrice_size);
@@ -126,7 +146,7 @@ int main() {
             printf("Error in cusparse CG\n");
         }
         else if (flag_verbose){
-            printf("Time cusparse CG: %f\n s", time_cusparse_CG);
+            printf("Time cusparse CG: %f\n", time_cusparse_CG);
         }
 
         //copy dense matrix
@@ -147,11 +167,8 @@ int main() {
             printf("Time cusolver dense: %f\n s", time_cusolve_dense);
         }
 
-        // char path_save[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/x0.txt";
-        // if(!save_text_array<double>(path_save, rhs_copy, matrice_size)){
-        //     printf("Error saving dense matrix\n");
-        //     return false;
-        // }
+        
+
 
     }
     free(dense_matrix_copy);

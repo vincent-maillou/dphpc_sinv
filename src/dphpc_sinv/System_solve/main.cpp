@@ -8,6 +8,7 @@ Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #include <stdio.h>
 #include <stdlib.h>
 #include <complex>
+#include <fstream>
 
 #include <Eigen/Dense>
 
@@ -25,15 +26,15 @@ int main() {
     int matrix_size = 7165;
     int number_of_nonzero = 182287;
     double tolerance = 1e-10;
-    bool flag_verbose = true;
+    bool flag_verbose = false;
     bool flag_failed = false;
 
 
 
     //print the matrix parameters
-    printf("Matrix parameters:\n");
-    printf("Matrix size: %d\n", matrix_size);
-    printf("Number of nonzero: %d\n", number_of_nonzero);
+    std::printf("Matrix parameters:\n");
+    std::printf("Matrix size: %d\n", matrix_size);
+    std::printf("Number of nonzero: %d\n", number_of_nonzero);
 
     double *dense_matrix = (double*)malloc(matrix_size*matrix_size*sizeof(double));
     double *data = (double*)malloc(number_of_nonzero*sizeof(double));
@@ -48,39 +49,52 @@ int main() {
 
     if(!load_text_array<double>(path_data, data, number_of_nonzero)){
         if(flag_verbose){
-            printf("Error loading data\n");
+            std::printf("Error loading data\n");
         }
         flag_failed = true;
     }
     if(!load_text_array<int>(path_indices, indices, number_of_nonzero)){
         if(flag_verbose){
-            printf("Error loading indices\n");
+            std::printf("Error loading indices\n");
         }
         flag_failed = true;
     }
     if(!load_text_array<int>(path_indptr, indptr, matrix_size+1)){
         if(flag_verbose){
-            printf("Error loading indptr\n");
+            std::printf("Error loading indptr\n");
         }
         flag_failed = true;
     }
     if(!load_text_array<double>(path_rhs, rhs, matrix_size)){
         if(flag_verbose){
-            printf("Error loading rhs\n");
+            std::printf("Error loading rhs\n");
         }
         flag_failed = true;
     }
     if(!load_text_array<double>(path_reference_solution, reference_solution, matrix_size)){
         if(flag_verbose){
-            printf("Error loading reference solution\n");
+            std::printf("Error loading reference solution\n");
         }
         flag_failed = true;
     }
 
+    int number_measurements = 1;
 
-    
+
 
     if(!flag_failed){
+
+        bool correct_measurement = true;
+
+        double times_gesv[number_measurements];
+        double times_gbsv[number_measurements];
+        double times_cusparse_CG[number_measurements];
+        double times_cusparse_ILU_CG[number_measurements];
+        double times_cusolver_dense[number_measurements];
+        double times_cusolver_sparse[number_measurements];
+
+
+
         sparse_to_dense<double>(
             dense_matrix,
             data,
@@ -95,8 +109,8 @@ int main() {
             matrix_size,
             &ku,
             &kl);
-        printf("Upper Bandwidth: %d\n", ku);
-        printf("Lower Bandwidth: %d\n", kl);
+        std::printf("Upper Bandwidth: %d\n", ku);
+        std::printf("Lower Bandwidth: %d\n", kl);
 
         double *matrix_band = (double*)malloc((2*ku+kl+1)*matrix_size*sizeof(double));
         double *matrix_band_copy = (double*)malloc((2*ku+kl+1)*matrix_size*sizeof(double));
@@ -108,119 +122,181 @@ int main() {
             ku,
             kl);
 
+        for(int i = 0; i < number_measurements; i++){
+            copy_array<double>(matrix_band, matrix_band_copy, matrix_size*(2*ku+kl+1));
+            copy_array<double>(rhs, rhs_copy, matrix_size);
+            times_gbsv[i] = solve_mkl_dgbsv(
+                matrix_band_copy,
+                rhs_copy,
+                reference_solution,
+                matrix_size,
+                ku,
+                kl,
+                tolerance,
+                flag_verbose);
+            if(times_gbsv[i] < 0.0){
+                std::printf("Error in MKL gbsv\n");
+                correct_measurement = false;
+            }
+            else{
+                std::printf("Time MKL gbsv: %f\n", times_gbsv[i]);
+            }
 
-        copy_array<double>(matrix_band, matrix_band_copy, matrix_size*(2*ku+kl+1));
-        double time_mkl_gbsv = solve_mkl_dgbsv(
-            matrix_band_copy,
-            rhs,
-            reference_solution,
-            matrix_size,
-            ku,
-            kl,
-            tolerance,
-            flag_verbose);
-        if(time_mkl_gbsv < 0.0){
-            printf("Error in MKL gbsv\n");
         }
-        else{
-            printf("Time MKL gbsv: %f\n", time_mkl_gbsv);
+
+        for(int i = 0; i < number_measurements; i++){
+            copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
+            copy_array<double>(rhs, rhs_copy, matrix_size);
+
+            times_gesv[i] = solve_mkl_dgesv(
+                dense_matrix_copy,
+                rhs_copy,
+                reference_solution,
+                matrix_size,
+                tolerance,
+                flag_verbose);
+            if(times_gesv[i] < 0.0){
+                std::printf("Error in MKL dgesv\n");
+                correct_measurement = false;
+            }
+            else{
+                std::printf("Time MKL dgesv: %f\n", times_gesv[i]);
+            }
+
         }
-        
 
-        // copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
-        // copy_array<double>(rhs, rhs_copy, matrix_size);
 
-        // double time_mkl_dense = solve_mkl_dgesv(
-        //     dense_matrix_copy,
-        //     rhs_copy,
-        //     reference_solution,
-        //     matrix_size,
-        //     tolerance,
-        //     flag_verbose);
-        // if(time_mkl_dense < 0.0){
-        //     printf("Error in MKL dgesv\n");
+        for(int i = 0; i < number_measurements; i++){
+            copy_array<double>(rhs, rhs_copy, matrix_size);
+
+            times_cusparse_CG[i] = solve_cusparse_CG(
+                data,
+                indices,
+                indptr,
+                rhs_copy,
+                reference_solution,
+                number_of_nonzero,
+                matrix_size,
+                tolerance,
+                flag_verbose);
+            if(times_cusparse_CG[i] < 0.0){
+                std::printf("Error in cusparse CG\n");
+                correct_measurement = false;
+            }
+            else{
+                std::printf("Time cusparse CG: %f\n", times_cusparse_CG[i]);
+            }
+
+        }
+
+        for(int i = 0; i < number_measurements; i++){
+            copy_array<double>(rhs, rhs_copy, matrix_size);
+
+            times_cusparse_ILU_CG[i] = solve_cusparse_ILU_CG(
+                data,
+                indices,
+                indptr,
+                rhs_copy,
+                reference_solution,
+                number_of_nonzero,
+                matrix_size,
+                tolerance,
+                flag_verbose);
+            if(times_cusparse_ILU_CG[i] < 0.0){
+                std::printf("Error in cusparse ILU CG\n");
+                correct_measurement = false;
+            }
+            else{
+                std::printf("Time cusparse ILU CG: %f\n", times_cusparse_ILU_CG[i]);
+            }
+
+        }
+
+        for(int i = 0; i < number_measurements; i++){
+            copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
+            copy_array<double>(rhs, rhs_copy, matrix_size);
+
+            times_cusolver_dense[i] = solve_cusolver_LU(
+                dense_matrix_copy,
+                rhs_copy,
+                reference_solution,
+                matrix_size,
+                tolerance,
+                flag_verbose);
+            if(times_cusolver_dense[i] < 0.0){
+                std::printf("Error in cusolver dense\n");
+                correct_measurement = false;
+            }
+            else{
+                std::printf("Time cusolver dense: %f\n", times_cusolver_dense[i]);
+            }
+
+        }
+
+        for(int i = 0; i < number_measurements; i++){
+            copy_array<double>(rhs, rhs_copy, matrix_size);
+
+            times_cusolver_sparse[i] = solve_cusolver_CHOL(
+                data,
+                indices,
+                indptr,
+                rhs_copy,
+                reference_solution,
+                number_of_nonzero,
+                matrix_size,
+                tolerance,
+                flag_verbose);
+            if(times_cusolver_sparse[i] < 0.0){
+                std::printf("Error in cusolver sparse\n");
+                correct_measurement = false;
+            }
+            else{
+                std::printf("Time cusolver sparse: %f\n", times_cusolver_sparse[i]);
+            }
+
+            if(!correct_measurement){
+                std::printf("Error in one of the measurements\n");
+            }
+            else{
+                std::printf("All measurements correct\n");
+            }
+
+        }
+
+
+        // std::ofstream outputFile_times;
+        // outputFile_times.open("times.txt");
+
+        // if(outputFile_times.is_open()){
+        //     for(int i = 0; i < number_measurements; i++){
+        //         outputFile_times << times_gesv[i] << " ";
+        //     }
+        //     outputFile_times << '\n';
+        //     for(int i = 0; i < number_measurements; i++){
+        //         outputFile_times << times_gbsv[i] << " ";
+        //     }
+        //     outputFile_times << '\n';
+        //     for(int i = 0; i < number_measurements; i++){
+        //         outputFile_times << times_cusparse_CG[i] << " ";
+        //     }
+        //     outputFile_times << '\n';
+        //     for(int i = 0; i < number_measurements; i++){
+        //         outputFile_times << times_cusparse_ILU_CG[i] << " ";
+        //     }
+        //     outputFile_times << '\n';
+        //     for(int i = 0; i < number_measurements; i++){
+        //         outputFile_times << times_cusolver_dense[i] << " ";
+        //     }
+        //     outputFile_times << '\n';
+        //     for(int i = 0; i < number_measurements; i++){
+        //         outputFile_times << times_cusolver_sparse[i] << " ";
+        //     }
+        //     outputFile_times << '\n';
         // }
         // else{
-        //     printf("Time MKL dgesv: %f\n", time_mkl_dense);
+        //     std::printf("Error opening file\n");
         // }
 
-
-        // copy_array<double>(rhs, rhs_copy, matrix_size);
-
-        // double time_cusparse_ILU_CG = solve_cusparse_ILU_CG(
-        //     data,
-        //     indices,
-        //     indptr,
-        //     rhs_copy,
-        //     reference_solution,
-        //     number_of_nonzero,
-        //     matrix_size,
-        //     tolerance,
-        //     flag_verbose);
-        // if((time_cusparse_ILU_CG < 0.0) && flag_verbose){
-        //     printf("Error in cusparse ILU CG\n");
-        // }
-        // else if (flag_verbose){
-        //     printf("Time cusparse ILU CG: %f\n", time_cusparse_ILU_CG);
-        // }
-
-
-        // copy_array<double>(rhs, rhs_copy, matrix_size);
-
-        // double time_cusparse_CG = solve_cusparse_CG(
-        //     data,
-        //     indices,
-        //     indptr,
-        //     rhs_copy,
-        //     reference_solution,
-        //     number_of_nonzero,
-        //     matrix_size,
-        //     tolerance,
-        //     flag_verbose);
-
-        // if((time_cusparse_CG < 0.0) && flag_verbose){
-        //     printf("Error in cusparse CG\n");
-        // }
-        // else if (flag_verbose){
-        //     printf("Time cusparse CG: %f\n", time_cusparse_CG);
-        // }
-
-        // //copy dense matrix
-        // copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
-        // copy_array<double>(rhs, rhs_copy, matrix_size);
-
-        // double time_cusolve_dense = solve_cusolver_LU(
-        //     dense_matrix_copy,
-        //     rhs_copy,
-        //     reference_solution,
-        //     matrix_size,
-        //     tolerance,
-        //     flag_verbose);
-        // if((time_cusolve_dense < 0.0) && flag_verbose){
-        //     printf("Error in cusolver dense\n");
-        // }
-        // else if (flag_verbose){
-        //     printf("Time cusolver dense: %f\n s", time_cusolve_dense);
-        // }
-
-        // copy_array<double>(rhs, rhs_copy, matrix_size);
-
-        // double time_cusolve_sparse = solve_cusolver_CHOL(
-        //     data,
-        //     indices,
-        //     indptr,
-        //     rhs,
-        //     reference_solution,
-        //     number_of_nonzero,
-        //     matrix_size,
-        //     tolerance,
-        //     flag_verbose);
-        // if((time_cusolve_sparse < 0.0) && flag_verbose){
-        //     printf("Error in cusolver sparse\n");
-        // }
-        // else if (flag_verbose){
-        //     printf("Time cusolver sparse: %f\n", time_cusolve_sparse);
-        // }
 
         free(matrix_band);
         free(matrix_band_copy);

@@ -429,9 +429,9 @@ double solve_cusparse_CG(
         k++;
     }
 
-    if(flag_verbose){
-        std::printf("iteration = %3d, residual = %e\n", k, sqrt(r1));
-    }
+
+    std::printf("iteration = %3d, residual = %e\n", k, sqrt(r1));
+
 
     //end CG
     cudaErrchk(cudaDeviceSynchronize());
@@ -788,7 +788,7 @@ double solve_cusparse_ILU_CG(
         cublasErrchk(cublasDdot(cublasHandle, matrix_size, rhs_d, 1, rhs_d, 1, &r1));
     }
 
-    printf("  iteration = %3d, residual = %e \n", k, sqrt(r1));
+    std::printf("  iteration = %3d, residual = %e \n", k, sqrt(r1));
 
 
     //end CG
@@ -1008,11 +1008,11 @@ double solve_cusolver_CHOL(
 
 
     if(!assert_same_array<double>(rhs_h, reference_solution_h, tolerance, matrix_size)){
-        std::printf("Error: CG solution is not the same as the reference solution\n");
+        std::printf("Error: CHOL solution is not the same as the reference solution\n");
         return -1.0;
     }
     else{
-        std::printf("CG solution is the same as the reference solution\n");
+        std::printf("CHOL solution is the same as the reference solution\n");
     }
 
     //Destroy handles

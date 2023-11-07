@@ -37,3 +37,14 @@ double solve_cusparse_ILU_CG(
     int matrix_size,
     double tolerance,
     bool flag_verbose);
+
+double solve_cusolver_CHOL(
+    double *data_h,
+    int *col_indices_h,
+    int *row_indptr_h,
+    double *rhs_h,
+    double *reference_solution_h,
+    int nnz,
+    int matrix_size,
+    double tolerance,
+    bool flag_verbose);

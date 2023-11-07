@@ -83,14 +83,6 @@ int main() {
             indptr,
             matrice_size);
 
-
-        // char path_save[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test0.txt";
-        // if(!save_text_array<double>(path_save, dense_matrix, matrice_size*matrice_size)){
-        //     printf("Error saving dense matrix\n");
-        //     return false;
-        // }
-
-        // copy dense matrix
         copy_array<double>(dense_matrix, dense_matrix_copy, matrice_size*matrice_size);
         copy_array<double>(rhs, rhs_copy, matrice_size);
 
@@ -167,7 +159,24 @@ int main() {
             printf("Time cusolver dense: %f\n s", time_cusolve_dense);
         }
 
-        
+        copy_array<double>(rhs, rhs_copy, matrice_size);
+
+        double time_cusolve_sparse = solve_cusolver_CHOL(
+            data,
+            indices,
+            indptr,
+            rhs,
+            reference_solution,
+            number_of_nonzero,
+            matrice_size,
+            tolerance,
+            flag_verbose);
+        if((time_cusolve_sparse < 0.0) && flag_verbose){
+            printf("Error in cusolver sparse\n");
+        }
+        else if (flag_verbose){
+            printf("Time cusolver sparse: %f\n", time_cusolve_sparse);
+        }
 
 
     }

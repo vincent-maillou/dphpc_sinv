@@ -5,6 +5,7 @@
 
 #include "mkl.h"
 #include "cusolverDn.h"
+#include "cusolverSp.h"
 #include <cusparse.h>
 
 
@@ -871,3 +872,128 @@ double solve_cusparse_ILU_CG(
 }
 
 
+double solve_cusolver_CHOL(
+    double *data_h,
+    int *col_indices_h,
+    int *row_indptr_h,
+    double *rhs_h,
+    double *reference_solution_h,
+    int nnz,
+    int matrix_size,
+    double tolerance,
+    bool flag_verbose)
+{
+
+
+    cusolverSpHandle_t handle = NULL;
+    cusparseHandle_t cusparseHandle = NULL; /* used in residual evaluation */
+    cudaStream_t stream = NULL;
+    cusparseMatDescr_t descrA = NULL;
+
+    cudaErrchk(cudaStreamCreate(&stream));
+    cusolverErrchk(cusolverSpCreate(&handle));
+    cusparseErrchk(cusparseCreate(&cusparseHandle));
+
+    cusolverErrchk(cusolverSpSetStream(handle, stream));
+    cusparseErrchk(cusparseSetStream(cusparseHandle, stream));
+
+
+    double *data_d = NULL;
+    int *col_indices_d = NULL;
+    int *row_indptr_d = NULL;
+    double *rhs_d = NULL;
+    double *x_d = NULL;
+
+    const int reorder = 0;
+    int singularity = 0;
+    double tol = 1.e-12;
+    double time = -1.0;
+
+    cudaErrchk(cudaMalloc((void **)&row_indptr_d, sizeof(int) * (matrix_size + 1)));
+    cudaErrchk(cudaMalloc((void **)&col_indices_d, sizeof(int) * nnz));
+    cudaErrchk(cudaMalloc((void **)&data_d, sizeof(double) * nnz));
+    cudaErrchk(cudaMalloc((void **)&rhs_d, sizeof(double) * matrix_size));
+    cudaErrchk(cudaMalloc((void **)&x_d, sizeof(double) * matrix_size));
+
+    // load data to device
+    if(flag_verbose){
+        std::printf("Copy data to device\n");
+    }
+    cudaErrchk(cudaMemcpy(row_indptr_d, row_indptr_h, sizeof(int) * (matrix_size + 1), cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMemcpy(col_indices_d, col_indices_h, sizeof(int) * nnz, cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMemcpy(data_d, data_h, sizeof(double) * nnz, cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMemcpy(rhs_d, rhs_h, sizeof(double) * matrix_size, cudaMemcpyHostToDevice));
+
+    cudaErrchk(cudaMemset(x_d, 0.0, matrix_size*sizeof(double)))
+
+
+    cusparseErrchk(cusparseCreateMatDescr(&descrA));
+    cusparseErrchk(cusparseSetMatType(descrA, CUSPARSE_MATRIX_TYPE_GENERAL));
+    cusparseErrchk(cusparseSetMatIndexBase(descrA, CUSPARSE_INDEX_BASE_ZERO));
+
+    time = -omp_get_wtime();
+    if(flag_verbose){
+        std::printf("Cholesky factorization\n");
+    }
+    cudaErrchk(cudaStreamSynchronize(stream));
+
+    cusolverErrchk(cusolverSpDcsrlsvchol(
+        handle, matrix_size, nnz, descrA, data_d, row_indptr_d, col_indices_d,
+        rhs_d, tol, reorder, x_d, &singularity));
+
+    cudaErrchk(cudaStreamSynchronize(stream));
+    if(flag_verbose){
+        std::printf("Cholesky factorization done\n");
+    }
+    time += omp_get_wtime();
+
+    if (0 <= singularity) {
+        printf("WARNING: the matrix is singular at row %d under tol (%E)\n",
+            singularity, tol);
+    }
+
+
+    cudaErrchk(cudaMemcpy(rhs_h, x_d, matrix_size * sizeof(double), cudaMemcpyDeviceToHost));
+
+
+    if(!assert_same_array<double>(rhs_h, reference_solution_h, tolerance, matrix_size)){
+        std::printf("Error: CG solution is not the same as the reference solution\n");
+        return -1.0;
+    }
+    else{
+        std::printf("CG solution is the same as the reference solution\n");
+    }
+
+    //Destroy handles
+    if(handle) {
+        cusolverErrchk(cusolverSpDestroy(handle));
+    }
+    if(cusparseHandle) {
+        cusparseErrchk(cusparseDestroy(cusparseHandle));
+    }
+    if(stream) {
+        cudaErrchk(cudaStreamDestroy(stream));
+    }
+    if(descrA) {
+        cusparseErrchk(cusparseDestroyMatDescr(descrA));
+    }
+
+    //Destroy buffers
+    if(data_d){
+        cudaErrchk(cudaFree(data_d));
+    }
+    if(col_indices_d){
+        cudaErrchk(cudaFree(col_indices_d));
+    }
+    if(row_indptr_d){
+        cudaErrchk(cudaFree(row_indptr_d));
+    }
+    if(rhs_d){
+        cudaErrchk(cudaFree(rhs_d));
+    }
+    if(x_d){
+        cudaErrchk(cudaFree(x_d));
+    }
+
+    return time;
+}

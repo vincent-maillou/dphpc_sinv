@@ -9,6 +9,7 @@ Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #include <stdlib.h>
 #include <complex>
 #include <fstream>
+#include <mkl.h>
 
 #include <Eigen/Dense>
 
@@ -25,10 +26,13 @@ int main() {
     char path_reference_solution[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/x_ref0.txt";
     int matrix_size = 7165;
     int number_of_nonzero = 182287;
-    double tolerance = 1e-10;
+    double abstol = 1e-16;
+    double reltol = 1e-14;
+    double residual_tol_CG = 5e-18;
+    double residual_tol_ILU_CG = 5e-18;
     bool flag_verbose = false;
     bool flag_failed = false;
-
+    int number_measurements = 110;
 
 
     //print the matrix parameters
@@ -78,16 +82,17 @@ int main() {
         flag_failed = true;
     }
 
-    int number_measurements = 1;
 
 
 
+    mkl_set_num_threads(14);
     if(!flag_failed){
 
         bool correct_measurement = true;
 
         double times_gesv[number_measurements];
         double times_gbsv[number_measurements];
+        double times_pbsv[number_measurements];
         double times_cusparse_CG[number_measurements];
         double times_cusparse_ILU_CG[number_measurements];
         double times_cusolver_dense[number_measurements];
@@ -109,30 +114,45 @@ int main() {
             matrix_size,
             &ku,
             &kl);
+        if(ku != kl && !assert_symmetric<double>(dense_matrix, matrix_size, abstol, reltol)){
+            std::printf("Error: matrix is not symmetric\n");
+            correct_measurement = false;
+        }
+        else{
+            std::printf("Matrix is symmetric\n");
+        }
+
+        
+        int kd = ku;
         std::printf("Upper Bandwidth: %d\n", ku);
         std::printf("Lower Bandwidth: %d\n", kl);
 
-        double *matrix_band = (double*)malloc((2*ku+kl+1)*matrix_size*sizeof(double));
-        double *matrix_band_copy = (double*)malloc((2*ku+kl+1)*matrix_size*sizeof(double));
+        double *matrix_band_LU = (double*)malloc((2*ku+kl+1)*matrix_size*sizeof(double));
+        double *matrix_band_LU_copy = (double*)malloc((2*ku+kl+1)*matrix_size*sizeof(double));
+        double *matrix_band_CHOL = (double*)malloc((kd+1)*matrix_size*sizeof(double));
+        double *matrix_band_CHOL_copy = (double*)malloc((kd+1)*matrix_size*sizeof(double));
+
 
         dense_to_band_for_LU<double>(
             dense_matrix,
-            matrix_band,
+            matrix_band_LU,
             matrix_size,
             ku,
             kl);
 
+
         for(int i = 0; i < number_measurements; i++){
-            copy_array<double>(matrix_band, matrix_band_copy, matrix_size*(2*ku+kl+1));
+            copy_array<double>(matrix_band_LU, matrix_band_LU_copy, matrix_size*(2*ku+kl+1));
             copy_array<double>(rhs, rhs_copy, matrix_size);
             times_gbsv[i] = solve_mkl_dgbsv(
-                matrix_band_copy,
+                matrix_band_LU_copy,
                 rhs_copy,
                 reference_solution,
                 matrix_size,
                 ku,
                 kl,
-                tolerance,
+                abstol,
+                reltol,
                 flag_verbose);
             if(times_gbsv[i] < 0.0){
                 std::printf("Error in MKL gbsv\n");
@@ -141,7 +161,33 @@ int main() {
             else{
                 std::printf("Time MKL gbsv: %f\n", times_gbsv[i]);
             }
+        }
+        
+        dense_to_band_for_U_CHOL<double>(
+            dense_matrix,
+            matrix_band_CHOL,
+            matrix_size,
+            kd);
 
+        for(int i = 0; i < number_measurements; i++){
+            copy_array<double>(matrix_band_CHOL, matrix_band_CHOL_copy, matrix_size*(kd+1));
+            copy_array<double>(rhs, rhs_copy, matrix_size);
+            times_pbsv[i] = solve_mkl_dpbsv(
+                matrix_band_CHOL_copy,
+                rhs_copy,
+                reference_solution,
+                matrix_size,
+                kd,
+                abstol,
+                reltol,
+                flag_verbose);
+            if(times_pbsv[i] < 0.0){
+                std::printf("Error in MKL gbsv\n");
+                correct_measurement = false;
+            }
+            else{
+                std::printf("Time MKL pbsv: %f\n", times_pbsv[i]);
+            }
         }
 
         for(int i = 0; i < number_measurements; i++){
@@ -153,7 +199,8 @@ int main() {
                 rhs_copy,
                 reference_solution,
                 matrix_size,
-                tolerance,
+                abstol,
+                reltol,
                 flag_verbose);
             if(times_gesv[i] < 0.0){
                 std::printf("Error in MKL dgesv\n");
@@ -177,7 +224,9 @@ int main() {
                 reference_solution,
                 number_of_nonzero,
                 matrix_size,
-                tolerance,
+                abstol,
+                reltol,
+                residual_tol_CG,
                 flag_verbose);
             if(times_cusparse_CG[i] < 0.0){
                 std::printf("Error in cusparse CG\n");
@@ -200,7 +249,9 @@ int main() {
                 reference_solution,
                 number_of_nonzero,
                 matrix_size,
-                tolerance,
+                abstol,
+                reltol,
+                residual_tol_ILU_CG,
                 flag_verbose);
             if(times_cusparse_ILU_CG[i] < 0.0){
                 std::printf("Error in cusparse ILU CG\n");
@@ -221,7 +272,8 @@ int main() {
                 rhs_copy,
                 reference_solution,
                 matrix_size,
-                tolerance,
+                abstol,
+                reltol,
                 flag_verbose);
             if(times_cusolver_dense[i] < 0.0){
                 std::printf("Error in cusolver dense\n");
@@ -244,7 +296,8 @@ int main() {
                 reference_solution,
                 number_of_nonzero,
                 matrix_size,
-                tolerance,
+                abstol,
+                reltol,
                 flag_verbose);
             if(times_cusolver_sparse[i] < 0.0){
                 std::printf("Error in cusolver sparse\n");
@@ -264,42 +317,48 @@ int main() {
         }
 
 
-        // std::ofstream outputFile_times;
-        // outputFile_times.open("times.txt");
+        std::ofstream outputFile_times;
+        outputFile_times.open("times.txt");
 
-        // if(outputFile_times.is_open()){
-        //     for(int i = 0; i < number_measurements; i++){
-        //         outputFile_times << times_gesv[i] << " ";
-        //     }
-        //     outputFile_times << '\n';
-        //     for(int i = 0; i < number_measurements; i++){
-        //         outputFile_times << times_gbsv[i] << " ";
-        //     }
-        //     outputFile_times << '\n';
-        //     for(int i = 0; i < number_measurements; i++){
-        //         outputFile_times << times_cusparse_CG[i] << " ";
-        //     }
-        //     outputFile_times << '\n';
-        //     for(int i = 0; i < number_measurements; i++){
-        //         outputFile_times << times_cusparse_ILU_CG[i] << " ";
-        //     }
-        //     outputFile_times << '\n';
-        //     for(int i = 0; i < number_measurements; i++){
-        //         outputFile_times << times_cusolver_dense[i] << " ";
-        //     }
-        //     outputFile_times << '\n';
-        //     for(int i = 0; i < number_measurements; i++){
-        //         outputFile_times << times_cusolver_sparse[i] << " ";
-        //     }
-        //     outputFile_times << '\n';
-        // }
-        // else{
-        //     std::printf("Error opening file\n");
-        // }
+        if(outputFile_times.is_open()){
+            for(int i = 0; i < number_measurements; i++){
+                outputFile_times << times_gesv[i] << " ";
+            }
+            outputFile_times << '\n';
+            for(int i = 0; i < number_measurements; i++){
+                outputFile_times << times_gbsv[i] << " ";
+            }
+            outputFile_times << '\n';
+            for(int i = 0; i < number_measurements; i++){
+                outputFile_times << times_pbsv[i] << " ";
+            }
+            outputFile_times << '\n';
+            for(int i = 0; i < number_measurements; i++){
+                outputFile_times << times_cusparse_CG[i] << " ";
+            }
+            outputFile_times << '\n';
+            for(int i = 0; i < number_measurements; i++){
+                outputFile_times << times_cusparse_ILU_CG[i] << " ";
+            }
+            outputFile_times << '\n';
+            for(int i = 0; i < number_measurements; i++){
+                outputFile_times << times_cusolver_dense[i] << " ";
+            }
+            outputFile_times << '\n';
+            for(int i = 0; i < number_measurements; i++){
+                outputFile_times << times_cusolver_sparse[i] << " ";
+            }
+            outputFile_times << '\n';
+        }
+        else{
+            std::printf("Error opening file\n");
+        }
 
 
-        free(matrix_band);
-        free(matrix_band_copy);
+        free(matrix_band_LU);
+        free(matrix_band_LU_copy);
+        free(matrix_band_CHOL);
+        free(matrix_band_CHOL_copy);
     }
     free(dense_matrix_copy);
     free(rhs_copy);

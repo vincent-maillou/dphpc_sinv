@@ -6,7 +6,7 @@ EIGENROOT = /usr/scratch/mont-fort17/almaeder/libraries/eigen/
 
 CXXFLAGS = -Wall -Wextra -fopenmp -std=c++14 -I${EIGENROOT} -I"${MKLROOT}/include" 
 NVCCFLAGS = -arch=sm_60 -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -std=c++14 -Xcompiler -fopenmp -I${CUDA_ROOT}/include -I"${MKLROOT}/include" -I${EIGENROOT} 
-LDFLAGS = -L"${CUDA_ROOT}/lib64" -L"${MKLROOT}/lib/intel64" -lcuda -lcudart -lcublas -lcusolver -lcusparse -lmkl_intel_lp64 -lmkl_sequential -lmkl_core
+LDFLAGS = -L"${CUDA_ROOT}/lib64" -L"${MKLROOT}/lib/intel64" -lcuda -lcudart -lcublas -lcusolver -lcusparse -lmkl_intel_lp64 -lmkl_gnu_thread -lm -lmkl_core
 SOURCES= main.cpp utils.cpp system_solve_benchmark.cu
 
 CPP_SOURCES = $(filter %.cpp, $(SOURCES))

@@ -176,22 +176,62 @@ void copy_array(
 template void copy_array<double>(double *array, double *copy, int size);
 
 template<typename T>
-bool assert_same_array(
-    T *array1,
-    T *array2,
-    double tolerance,
+bool assert_array_elementwise(
+    T *array_test,
+    T *array_ref,
+    double abstol,
+    double reltol,
     int size)
 {
     for (int i = 0; i < size; i++) {
-        if (std::abs(array1[i] - array2[i]) > tolerance * std::abs(array1[i] - array2[i]) + tolerance) {
-            std::printf("%f %f\n", array1[i], array2[i]);
-            std::printf("Arrays are not the same at index %d\n", i);
+        if (std::abs(array_test[i] - array_ref[i]) > reltol * std::abs(array_ref[i]) + abstol) {
+            std::printf("%f %f\n", array_test[i], array_ref[i]);
+            std::printf("Arrays are not the same\n");
             return false;
         }
     }
     return true;
 }
-template bool assert_same_array<double>(double *array1, double *array2, double tolerance, int size);
+template bool assert_array_elementwise<double>(
+    double *array_test,
+    double *array_ref,
+    double abstol,
+    double reltol,
+    int size);
+
+
+template<typename T>
+bool assert_array_magnitude(
+    T *array_test,
+    T *array_ref,
+    double abstol,
+    double reltol,
+    int size)
+{
+    double sum_difference = 0.0;
+    double sum_ref = 0.0;
+    for (int i = 0; i < size; i++) {
+        sum_difference += std::abs(array_test[i] - array_ref[i]);
+        sum_ref += std::abs(array_ref[i]);
+
+    }
+    if (sum_difference > reltol * sum_ref + abstol) {
+        std::printf("Arrays are not the same\n");
+        std::cout << sum_difference << std::endl;
+        std::cout << reltol * sum_ref + abstol << std::endl;
+        return false;
+    }
+
+    return true;
+}
+template bool assert_array_magnitude<double>(
+    double *array_test,
+    double *array_ref,
+    double abstol,
+    double reltol,
+    int size);
+
+
 
 bool are_equals(
     std::complex<double> *A,
@@ -263,3 +303,50 @@ void dense_to_band_for_LU(
     }
 }
 template void dense_to_band_for_LU<double>(double *dense_matrix, double *matrix_band, int matrix_size, int ku, int kl);
+
+template<typename T>
+void dense_to_band_for_U_CHOL(
+    T *dense_matrix,
+    T *matrix_band,
+    int matrix_size,
+    int kd)
+{
+    for(int i = 0; i<1+kd;i++){
+        for(int j = 0; j < matrix_size;j++){
+            matrix_band[i*matrix_size + j] = T(0);
+        }
+    }
+
+    for(int i = 0; i < matrix_size; i++){
+        for(int j = 0; j < matrix_size; j++){
+            if(dense_matrix[matrix_size*i + j] != T(0) && j-i >= 0){
+                matrix_band[kd + i - j + j*(kd+1)] = dense_matrix[matrix_size*i + j];
+            }
+        }
+    }
+}
+template void dense_to_band_for_U_CHOL<double>(double *dense_matrix, double *matrix_band, int matrix_size, int kd);
+
+template<typename T>
+bool assert_symmetric(
+    T *dense_matrix,
+    int matrix_size,
+    double abstol,
+    double reltol)
+{
+    bool symmetric = true;
+    for(int i = 0; i< matrix_size;i++){
+        for(int j = 0; j < matrix_size;j++){
+            if( std::abs(dense_matrix[i*matrix_size + j]-dense_matrix[j*matrix_size + i]) 
+                > std::abs(dense_matrix[j*matrix_size + i]) * reltol + abstol){
+                symmetric = false;
+            }
+        }
+    }
+    return symmetric;
+}
+template bool assert_symmetric<double>(
+    double *dense_matrix,
+    int matrix_size,
+    double abstol,
+    double reltol);

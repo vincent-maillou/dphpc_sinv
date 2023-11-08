@@ -7,7 +7,8 @@ double solve_mkl_dgbsv(
     int matrix_size,
     int kl,
     int ku,
-    double tolerance,
+    double abstol,
+    double reltol,
     bool flag_verbose);
 
 double solve_mkl_dgesv(
@@ -15,7 +16,18 @@ double solve_mkl_dgesv(
     double *rhs,
     double *reference_solution,
     int matrix_size,
-    double tolerance,
+    double abstol,
+    double reltol,
+    bool flag_verbose);
+
+double solve_mkl_dpbsv(
+    double *matrix_band,
+    double *rhs,
+    double *reference_solution,
+    int matrix_size,
+    int kd,
+    double abstol,
+    double reltol,
     bool flag_verbose);
 
 double solve_cusolver_LU(
@@ -23,7 +35,8 @@ double solve_cusolver_LU(
     double *rhs_h,
     double *reference_solution_h,
     int matrix_size,
-    double tolerance,
+    double abstol,
+    double reltol,
     bool flag_verbose);
 
 double solve_cusparse_CG(
@@ -34,7 +47,9 @@ double solve_cusparse_CG(
     double *reference_solution_h,
     int nnz,
     int matrix_size,
-    double tolerance,
+    double abstol,
+    double reltol,
+    double residual_tol,
     bool flag_verbose);
 
 double solve_cusparse_ILU_CG(
@@ -45,7 +60,9 @@ double solve_cusparse_ILU_CG(
     double *reference_solution_h,
     int nnz,
     int matrix_size,
-    double tolerance,
+    double abstol,
+    double reltol,
+    double residual_tol,
     bool flag_verbose);
 
 double solve_cusolver_CHOL(
@@ -56,5 +73,6 @@ double solve_cusolver_CHOL(
     double *reference_solution_h,
     int nnz,
     int matrix_size,
-    double tolerance,
+    double abstol,
+    double reltol,
     bool flag_verbose);

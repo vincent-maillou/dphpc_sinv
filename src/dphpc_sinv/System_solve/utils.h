@@ -50,10 +50,19 @@ void copy_array(
     int size);
 
 template<typename T>
-bool assert_same_array(
-    T *array1,
-    T *array2,
-    double tolerance,
+bool assert_array_elementwise(
+    T *array_test,
+    T *array_ref,
+    double abstol,
+    double reltol,
+    int size);
+
+template<typename T>
+bool assert_array_magnitude(
+    T *array_test,
+    T *array_ref,
+    double abstol,
+    double reltol,
     int size);
 
 bool are_equals(
@@ -76,3 +85,18 @@ void dense_to_band_for_LU(
     int matrix_size,
     int ku,
     int kl);
+
+template<typename T>
+void dense_to_band_for_U_CHOL(
+    T *dense_matrix,
+    T *matrix_band,
+    int matrix_size,
+    int kd);
+
+template<typename T>
+bool assert_symmetric(
+    T *dense_matrix,
+    int matrix_size,
+    double abstol,
+    double reltol);
+

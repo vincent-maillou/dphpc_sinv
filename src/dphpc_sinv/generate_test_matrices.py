@@ -179,12 +179,12 @@ if __name__ == "__main__":
     # Save matrices to file
     path_to_file = "../../tests/tests_cases/"
 
-    """ import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
     plt.matshow(matrix.real)
     plt.matshow(matrix_diag_blk.real)
     plt.matshow(matrix_upper_blk.real)
     plt.matshow(matrix_lower_blk.real)
-    plt.show() """
+    plt.show()
     
     filename = "matrix_0_diagblk.bin"
     write_matrix_to_file(path_to_file+filename, matrix_diag_blk, MAT_SIZE, 1)

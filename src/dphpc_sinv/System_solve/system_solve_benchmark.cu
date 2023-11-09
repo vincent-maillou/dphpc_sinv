@@ -114,6 +114,59 @@ double solve_mkl_dgesv(
     return time;
 }
 
+double solve_mkl_dposv(
+    double *matrix_dense,
+    double *rhs,
+    double *reference_solution,
+    int matrix_size,
+    double abstol,
+    double reltol,
+    bool flag_verbose)
+{
+
+    double time = -1.0;
+
+
+    int nrhs = 1;
+    int info;
+    time = -omp_get_wtime();
+    char uplo = 'U';
+    info = LAPACKE_dposv(LAPACK_COL_MAJOR,
+                        uplo,
+                        matrix_size,
+                        nrhs,
+                        matrix_dense,
+                        matrix_size,
+                        rhs,
+                        matrix_size);
+    time += omp_get_wtime();
+
+    if(info != 0){
+        std::printf("Error in MKL dposv\n");
+        std::printf("info: %d\n", info);
+        if(info > 0){
+            std::printf("Singular");
+        }
+        return -1.0;
+    }
+
+    if(flag_verbose){
+        std::printf("MKL dposv done\n");
+    }
+
+    if(!assert_array_magnitude<double>(rhs,
+            reference_solution, 
+            abstol,
+            reltol,
+            matrix_size)){
+        std::printf("Error: MKL dposv solution is not the same as the reference solution\n");
+        return -1.0;
+    }
+    else{
+        std::printf("MKL dposv solution is the same as the reference solution\n");
+    }
+    return time;
+}
 
 double solve_mkl_dgbsv(
     double *matrix_band,
@@ -327,11 +380,11 @@ double solve_cusolver_LU(
             abstol,
             reltol,
             matrix_size)){
-        std::printf("Error: CuSolver solution is not the same as the reference solution\n");
+        std::printf("Error: CuSolver LU solution is not the same as the reference solution\n");
         return -1.0;
     }
     else{
-        std::printf("CuSolver solution is the same as the reference solution\n");
+        std::printf("CuSolver LU solution is the same as the reference solution\n");
     }
 
 
@@ -360,12 +413,142 @@ double solve_cusolver_LU(
 }
 
 
+double solve_cusolver_CHOL(
+    double *matrix_dense_h,
+    double *rhs_h,
+    double *reference_solution_h,
+    int matrix_size,
+    double abstol,
+    double reltol,
+    bool flag_verbose)
+{
+
+    double time = -1.0;
+    cudaStream_t stream = NULL;
+    cusolverDnHandle_t handle = CreateCusolverDnHandle(0);
+    cudaErrchk(cudaStreamCreate(&stream));
+    cusolverErrchk(cusolverDnSetStream(handle, stream));
+
+
+
+    int info_h = 0;
+    int bufferSize = 0;
+
+    double *matrix_dense_d = NULL;
+    double *rhs_d = NULL;
+    int *info_d = NULL;
+    double *buffer = NULL;
+    cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;
+
+    //allocate memory on device
+    cudaErrchk(cudaMalloc((void**)&info_d, sizeof(int)))
+    cudaErrchk(cudaMalloc((void**)&matrix_dense_d, matrix_size*matrix_size*sizeof(double)));
+    cudaErrchk(cudaMalloc((void**)&rhs_d, matrix_size*sizeof(double)));
+
+
+    //copy data to device
+    if(flag_verbose){
+        std::printf("Copy data to device\n");
+    }
+    cudaErrchk(cudaMemcpy(matrix_dense_d, matrix_dense_h, matrix_size*matrix_size*sizeof(double), cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMemset(info_d, 0, sizeof(int)));
+    cudaErrchk(cudaMemcpy(rhs_d, rhs_h, matrix_size*sizeof(double), cudaMemcpyHostToDevice));
+
+
+    //figure out extra amount of memory needed
+    cusolverErrchk(cusolverDnDpotrf_bufferSize(handle, uplo, matrix_size,
+                                            (double *)matrix_dense_d,
+                                              matrix_size, &bufferSize));
+    cudaErrchk(cudaMalloc(&buffer, sizeof(double) * bufferSize));
+
+    //LU factorization
+    if(flag_verbose){
+        std::printf("CHOL factorization\n");
+    }
+    time = -omp_get_wtime();
+    cudaErrchk(cudaDeviceSynchronize());
+    cudaErrchk(cudaStreamSynchronize(stream));
+    cusolverErrchk(cusolverDnDpotrf(handle, uplo, matrix_size,
+                                matrix_dense_d, matrix_size, buffer, bufferSize, info_d));
+    
+    //copy info to host
+    cudaErrchk(cudaMemcpy(&info_h, info_d, sizeof(int), cudaMemcpyDeviceToHost));
+
+    if (info_h != 0) {
+        fprintf(stderr, "Error: CHOL factorization failed\n");
+    }
+    else{
+        std::printf("CHOL factorization done\n");
+    }
+
+    if(flag_verbose){
+        std::printf("Back substitution\n");
+    }
+    //back substitution
+    cusolverErrchk(cusolverDnDpotrs(handle, uplo, matrix_size,
+                                    1, matrix_dense_d, matrix_size,
+                                    rhs_d, matrix_size, info_d));
+    cudaErrchk(cudaStreamSynchronize(stream));
+    cudaErrchk(cudaDeviceSynchronize());
+    time += omp_get_wtime();
+
+
+    cudaErrchk(cudaMemcpy(&info_h, info_d, sizeof(int), cudaMemcpyDeviceToHost));
+    if (info_h != 0) {
+        fprintf(stderr, "Error: Back substitution failed\n");
+    }
+    else{
+        std::printf("Back substitution done\n");
+    }
+
+    //copy solution to host
+    if(flag_verbose){
+        std::printf("Copy solution to host\n");
+    }
+    cudaErrchk(cudaMemcpy(rhs_h, rhs_d, matrix_size*sizeof(double), cudaMemcpyDeviceToHost));
+
+    if(!assert_array_magnitude<double>(rhs_h,
+            reference_solution_h,
+            abstol,
+            reltol,
+            matrix_size)){
+        std::printf("Error: CuSolver CHOL solution is not the same as the reference solution\n");
+        return -1.0;
+    }
+    else{
+        std::printf("CuSolver CHOL solution is the same as the reference solution\n");
+    }
+
+
+    if (info_d) {
+        cudaErrchk(cudaFree(info_d));
+    }
+    if (buffer) {
+        cudaErrchk(cudaFree(buffer));
+    }
+    if (matrix_dense_d) {
+        cudaErrchk(cudaFree(matrix_dense_d));
+    }
+
+
+    if (handle) {
+        cusolverErrchk(cusolverDnDestroy(handle));
+    }
+    if (stream) {
+        cudaErrchk(cudaStreamDestroy(stream));
+    }
+
+    return time;
+}
+
+
 double solve_cusparse_CG(
     double *data_h,
     int *col_indices_h,
     int *row_indptr_h,
     double *rhs_h,
     double *reference_solution_h,
+    double *starting_guess_h,
     int nnz,
     int matrix_size,
     double abstol,
@@ -445,10 +628,7 @@ double solve_cusparse_CG(
     cudaErrchk(cudaMemcpy(col_indices_d, col_indices_h, nnz * sizeof(int), cudaMemcpyHostToDevice));
     cudaErrchk(cudaMemcpy(row_indptr_d, row_indptr_h, (matrix_size + 1) * sizeof(int), cudaMemcpyHostToDevice));
     cudaErrchk(cudaMemcpy(data_d, data_h, nnz * sizeof(double), cudaMemcpyHostToDevice));
-    
-    // setting starting guess to zero
-    cudaErrchk(cudaMemset(x_d, 0.0, matrix_size*sizeof(double)))
-    
+    cudaErrchk(cudaMemcpy(x_d, starting_guess_h, matrix_size * sizeof(double), cudaMemcpyHostToDevice));    
 
     //figure out extra amount of memory needed
     if(flag_verbose){

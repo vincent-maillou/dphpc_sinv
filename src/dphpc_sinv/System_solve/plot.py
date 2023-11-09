@@ -4,21 +4,20 @@ import scipy.stats as st
 from matplotlib.ticker import ScalarFormatter, LogLocator, FormatStrFormatter, FixedFormatter, FixedLocator
 
 if __name__ == "__main__":
-    times = np.loadtxt("/home/sem23f28/Documents/dphpc_sinv/src/dphpc_sinv/System_solve/times.txt", dtype=np.float64)[:, 10:]
-
+    warmup = 10
+    times = np.loadtxt("/home/sem23f28/Documents/dphpc_sinv/src/dphpc_sinv/System_solve/times.txt", dtype=np.float64)[:, warmup:]
 
     stds = np.std(times, axis=1)
-    means = np.mean(times, axis=1)
+    means = np.median(times, axis=1)
     confidence = 0.95
     interval = np.empty((2, times.shape[0]))
     for i in range(times.shape[0]):
         interval[:, i] = st.t.interval(confidence=confidence, df=len(times[i])-1,
-                                       loc=np.mean(times[i]),
+                                       loc=np.median(times[i]),
                                        scale=st.sem(times[i]))
 
-    num_bars = 7
 
-    yer = [interval[:, i].reshape((2,-1)) for i in range(num_bars)]
+    yer = [interval[:, i].reshape((2,-1)) for i in range(times.shape[0])]
     for i in range(times.shape[0]):
         yer[i][0] = -yer[i][0] + means[i]
         yer[i][1] = yer[i][1] - means[i]
@@ -34,35 +33,23 @@ if __name__ == "__main__":
     fig, ax = plt.subplots()
     fig.set_size_inches(16, 12)
 
-    # Create blue bars
-    ax.bar(position1[0], means[0], width=barWidth, color="blue",
-            edgecolor="black", yerr=yer[0], capsize=7, label="MKL gesv (14 Threads)")
+    colors =["blue", "cyan", "olive", "red", "green", "orange", "purple", "gray", "brown"]
 
-    # Create cyan bars
-    ax.bar(position1[1], means[1], width=barWidth, color="cyan",
-            edgecolor="black", yerr=yer[1], capsize=7, label="MKL gbsv (14 Threads)")
+    labels =[
+        "MKL gesv (14 Threads)",
+        "MKL posv (14 Threads)",
+        "MKL gbsv (14 Threads)",
+        "MKL pbsv (14 Threads)",
+        "CuSparse CG (1843 Steps)",
+        "ILU + CuSparse CG (43 Steps)",
+        "CuSolver dense LU",
+        "CuSolver dense Cholesky",
+        "CuSolver sparse Cholesky"
+    ]
 
-    # Create olive bars
-    ax.bar(position1[2], means[2], width=barWidth, color="olive",
-            edgecolor="black", yerr=yer[2], capsize=7, label="MKL pbsv (14 Threads)")
-
-    # Create blue bars
-    ax.bar(position1[3], means[3], width=barWidth, color="red",
-            edgecolor="black", yerr=yer[3], capsize=7, label="CuSparse CG (1843 Steps)")
-
-    # Create cyan bars
-    ax.bar(position1[4], means[4], width=barWidth, color="green",
-            edgecolor="black", yerr=yer[4], capsize=7, label="ILU + CuSparse CG (43 Steps)")
-
-    # Create cyan bars
-    ax.bar(position1[5], means[5], width=barWidth, color="orange",
-            edgecolor="black", yerr=yer[5], capsize=7, label="CuSolver dense")
-
-    # Create cyan bars
-    ax.bar(position1[6], means[6], width=barWidth, color="purple",
-            edgecolor="black", yerr=yer[6], capsize=7, label="CuSolver sparse Cholesky")
-
-
+    for i in range(times.shape[0]):
+        ax.bar(position0[i], means[i], width=barWidth, color=colors[i],
+                edgecolor="black", yerr=yer[i], capsize=7, label=labels[i])
 
     # general layout
     ax.tick_params(
@@ -89,5 +76,5 @@ if __name__ == "__main__":
     ax.set_ylabel("Time [s]")
     ax.set_xlabel("Methods")
     ax.legend()
-    
+
     plt.savefig("plot.png",bbox_inches='tight', dpi=300)

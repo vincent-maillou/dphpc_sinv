@@ -1,24 +1,35 @@
-#include <iostream>
-#include <fstream>
-#include <array>
-#include <complex>
-#define MKL_Complex16 std::complex<double>
-#include <mkl.h>
-#include <mkl_lapacke.h>
-
-#define EIGEN_USE_MKL_ALL
-#include <Eigen/Dense>
-#include <Eigen/PardisoSupport>
-
-#include <omp.h>
-#include <mpi.h>
-#include <cuda.h>
-
-#include <cuda_runtime.h>
-#include <cuda_runtime_api.h>
+#include "PSR.h"
 
 
+std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_topleftcorner(
+    Eigen::MatrixXcd& A,
+    int start_blockrow,
+    int partition_blocksize,
+    int blocksize
+) {
+    Eigen::MatrixXcd L = Eigen::MatrixXcd::Zero(A.rows(), A.cols());
+    Eigen::MatrixXcd U = Eigen::MatrixXcd::Zero(A.rows(), A.cols());
 
+    for (int i_blockrow = start_blockrow + 1; i_blockrow < start_blockrow + partition_blocksize; ++i_blockrow) {
+        int im1_rowindice = (i_blockrow - 1) * blocksize;
+        int i_rowindice = i_blockrow * blocksize;
+        int ip1_rowindice = (i_blockrow + 1) * blocksize;
+
+        Eigen::MatrixXcd A_inv_im1_im1 = A.block(im1_rowindice, im1_rowindice, blocksize, blocksize).inverse();
+
+        L.block(i_rowindice, im1_rowindice, blocksize, blocksize) =
+            A.block(i_rowindice, im1_rowindice, blocksize, blocksize) * A_inv_im1_im1;
+
+        U.block(im1_rowindice, i_rowindice, blocksize, blocksize) =
+            A_inv_im1_im1 * A.block(im1_rowindice, i_rowindice, blocksize, blocksize);
+
+        A.block(i_rowindice, i_rowindice, blocksize, blocksize) -=
+            L.block(i_rowindice, im1_rowindice, blocksize, blocksize) *
+            A.block(im1_rowindice, i_rowindice, blocksize, blocksize);
+    }
+
+    return std::make_tuple(A, L, U);
+}
 
 void load_matrix(
     std::string filename, 

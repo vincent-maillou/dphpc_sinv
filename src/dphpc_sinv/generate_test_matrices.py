@@ -142,7 +142,7 @@ if __name__ == "__main__":
         inv_matrix, MAT_SIZE, BLOCKSIZE, -1)
 
     # # Save matrices to file
-    # path_to_file = "../../tests/tests_cases/"
+    path_to_file = "../../tests/tests_cases/"
 
     # # create test folder if it does not exist
     # if not os.path.exists(path_to_file):

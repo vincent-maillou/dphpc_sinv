@@ -1,8 +1,8 @@
 NVCC = nvcc
-CXX = /usr/sepp/bin/g++
-CUDA_ROOT = /usr/local/cuda-11.8
+CXX = /usr/bin/g++
+CUDA_ROOT = /opt/nvidia/hpc_sdk/Linux_x86_64/23.9/cuda/12.2
 MKLROOT = /usr/pack/intel_compiler-2020-af/x64/compilers_and_libraries_2019.0.117/linux/mkl
-EIGENROOT = /usr/scratch/mont-fort17/almaeder/libraries/eigen/
+EIGENROOT = /home/vincent-maillou/Documents/Libraries/eigen/
 
 CXXFLAGS = -Wall -Wextra -fopenmp -std=c++14 -I${EIGENROOT}
 NVCCFLAGS = -arch=sm_60 -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -std=c++14 -Xcompiler -fopenmp -I${CUDA_ROOT}/include

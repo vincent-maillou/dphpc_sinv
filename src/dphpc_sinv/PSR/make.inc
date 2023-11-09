@@ -89,7 +89,7 @@ ifeq ($(BUILD_TYPE),ethz-gnu64)
 	#GNU64	      = /usr/pack/gcc-8.2.0-af/linux-x64/
 	GNU64	      = /usr/pack/gcc-11.2.0-af/linux-x64/
 	#MPIHOME      = /usr/pack/mpich-3.2.1-af/linux-x64/
-	MPIHOME	      = /usr/local/mpich-3.3.2/gcc/
+	MPIHOME	      = /usr/local/mpich-4.0.2/gcc11/
 	INTEL64	      = /usr/pack/intel_compiler-2015.0.090-af/Linux-x86_64/
 	#MKLHOME       = $(INTEL64)/mkl/lib/intel64
 	MKLHOME       = /home/dleonard/Documents/installs/miniconda3/envs/quatrex/lib/
@@ -113,8 +113,8 @@ ifeq ($(BUILD_TYPE),ethz-gnu64)
 	NVCC	      = $(CUDAHOME)/bin/nvcc
         CCFLAGS       = -O3 -ffast-math -funroll-loops
         CC_FLAGS      = -O3 -ffast-math -funroll-loops 
-	#CXXFLAGS      = -O3 -ffast-math -funroll-loops -DMPICH_IGNORE_CXX_SEEK
-	CXXFLAGS      = -O2 -funroll-loops -DMPICH_IGNORE_CXX_SEEK
+	CXXFLAGS      = -O3 -ffast-math -funroll-loops -DMPICH_IGNORE_CXX_SEEK
+	#CXXFLAGS      = -O2 -funroll-loops -DMPICH_IGNORE_CXX_SEEK
         F77FLAGS      = -O3 -ffast-math -funroll-loops
         F77_FLAGS     = -O3 -ffast-math -funroll-loops
         F90FLAGS      = -O3 -ffast-math -funroll-loops

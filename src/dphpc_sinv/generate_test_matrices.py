@@ -25,6 +25,43 @@ def generate_random_matrix():
     return matrix
 
 
+def generateBandedDiagonalMatrix(
+    is_complex: bool = False, 
+    is_symmetric: bool = False,
+    seed: int = None
+) -> np.ndarray:
+    """ Generate a banded diagonal matrix of shape: matrice_size^2 with a 
+    bandwidth = matrice_bandwidth, filled with random numbers.
+
+    Parameters
+    ----------
+    matrice_size : int
+        Size of the matrice to generate.
+    matrice_bandwidth : int
+        Bandwidth of the matrice to generate.
+    is_complex : bool, optional
+        Whether the matrice should be complex or real valued. The default is False.
+    is_symmetric : bool, optional
+        Whether the matrice should be symmetric or not. The default is False.
+    seed : int, optional
+        Seed for the random number generator. The default is no seed.
+        
+    Returns
+    -------
+    A : np.ndarray
+        The generated matrice.
+    """
+    np.random.seed(SEED)
+    A = np.random.rand(MAT_SIZE, MAT_SIZE) + 1j*np.random.rand(MAT_SIZE, MAT_SIZE)
+    
+    for i in range(MAT_SIZE):
+        for j in range(MAT_SIZE):
+            if i - j >= BLOCKSIZE or j - i >= BLOCKSIZE:
+                A[i, j] = 0
+
+    return A
+
+
 def write_matrix_to_file(
     path_to_file: str,
     matrix: np.ndarray,
@@ -118,7 +155,8 @@ def write_matrix_parameters(
 
 if __name__ == "__main__":
     # Generate random matrix
-    matrix = generate_random_matrix()
+    matrix = generateBandedDiagonalMatrix()
+    #matrix = generate_random_matrix()
 
     # assert matrix to be invertible
     assert np.allclose( np.linalg.inv(matrix) @ matrix, np.eye(MAT_SIZE) )
@@ -130,29 +168,24 @@ if __name__ == "__main__":
 
     # Extract diagonal and off-diagonal blocks
     matrix_diag_blk = extract_diagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE)
-    matrix_upper_blk = extract_offdiagonal_blocks(
-        matrix, MAT_SIZE, BLOCKSIZE, 1)
-    matrix_lower_blk = extract_offdiagonal_blocks(
-        matrix, MAT_SIZE, BLOCKSIZE, -1)
+    matrix_upper_blk = extract_offdiagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE, 1)
+    matrix_lower_blk = extract_offdiagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE, -1)
 
     matrix_inv_diag_blk = extract_diagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE)
-    matrix_inv_upper_blk = extract_offdiagonal_blocks(
-        inv_matrix, MAT_SIZE, BLOCKSIZE, 1)
-    matrix_inv_lower_blk = extract_offdiagonal_blocks(
-        inv_matrix, MAT_SIZE, BLOCKSIZE, -1)
+    matrix_inv_upper_blk = extract_offdiagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE, 1)
+    matrix_inv_lower_blk = extract_offdiagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE, -1)
 
-    # # Save matrices to file
+
+    # Save matrices to file
     path_to_file = "../../tests/tests_cases/"
 
-    # # create test folder if it does not exist
-    # if not os.path.exists(path_to_file):
-    #     os.makedirs(path_to_file)
-
-    print(matrix)
-    print(matrix_diag_blk)
-    print(matrix_upper_blk)
-    print(matrix_lower_blk)
-
+    """ import matplotlib.pyplot as plt
+    plt.matshow(matrix.real)
+    plt.matshow(matrix_diag_blk.real)
+    plt.matshow(matrix_upper_blk.real)
+    plt.matshow(matrix_lower_blk.real)
+    plt.show() """
+    
     filename = "matrix_0_diagblk.bin"
     write_matrix_to_file(path_to_file+filename, matrix_diag_blk, MAT_SIZE, 1)
     filename = "matrix_0_upperblk.bin"

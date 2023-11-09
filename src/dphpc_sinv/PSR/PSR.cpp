@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <array>
 #include <complex>
 #define MKL_Complex16 std::complex<double>
 #include <mkl.h>
@@ -7,6 +8,7 @@
 
 #define EIGEN_USE_MKL_ALL
 #include <Eigen/Dense>
+#include <Eigen/PardisoSupport>
 
 #include <omp.h>
 #include <mpi.h>
@@ -14,6 +16,7 @@
 
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
+
 
 
 
@@ -50,7 +53,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Hello from process " << rank << " of " << size << std::endl;
 
-    const int N = 64; // Change this to the desired size of your NxN matrix
+    const int N = 120; // Change this to the desired size of your NxN matrix
     std::complex<double>* A = new std::complex<double>[N * N];
     std::complex<double>* A_inv = new std::complex<double>[N * N];
     std::string filename = "matrix_0_diagblk.bin";
@@ -88,7 +91,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Error: " << error << std::endl;
 
     load_matrix("matrix_0_diagblk.bin", A, N, N);
-    Eigen::Map<Eigen::Matrix<std::complex<double>, N, N, Eigen::RowMajor>> eigenMatrix(A, N, N);
+    Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> eigenMatrix(A, N, N);
     auto invertedMatrix = eigenMatrix.inverse();
     auto invertedMatrix2 = eigenMatrix.inverse();
 

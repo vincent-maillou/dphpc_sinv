@@ -9,8 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 SEED = 63
-MAT_SIZE = 10
-BLOCKSIZE = 2
+MAT_SIZE =  120
+BLOCKSIZE = 8
 
 
 
@@ -19,6 +19,43 @@ def generate_random_matrix():
     matrix = np.random.rand(MAT_SIZE, MAT_SIZE) + 1j*np.random.rand(MAT_SIZE, MAT_SIZE)
     
     return matrix
+
+
+def generateBandedDiagonalMatrix(
+    is_complex: bool = False, 
+    is_symmetric: bool = False,
+    seed: int = None
+) -> np.ndarray:
+    """ Generate a banded diagonal matrix of shape: matrice_size^2 with a 
+    bandwidth = matrice_bandwidth, filled with random numbers.
+
+    Parameters
+    ----------
+    matrice_size : int
+        Size of the matrice to generate.
+    matrice_bandwidth : int
+        Bandwidth of the matrice to generate.
+    is_complex : bool, optional
+        Whether the matrice should be complex or real valued. The default is False.
+    is_symmetric : bool, optional
+        Whether the matrice should be symmetric or not. The default is False.
+    seed : int, optional
+        Seed for the random number generator. The default is no seed.
+        
+    Returns
+    -------
+    A : np.ndarray
+        The generated matrice.
+    """
+    np.random.seed(SEED)
+    A = np.random.rand(MAT_SIZE, MAT_SIZE) + 1j*np.random.rand(MAT_SIZE, MAT_SIZE)
+    
+    for i in range(MAT_SIZE):
+        for j in range(MAT_SIZE):
+            if i - j >= BLOCKSIZE or j - i >= BLOCKSIZE:
+                A[i, j] = 0
+
+    return A
 
 
 def write_matrix_to_file(
@@ -113,7 +150,8 @@ def write_matrix_parameters(
     
 if __name__ == "__main__":
     # Generate random matrix
-    matrix = generate_random_matrix()
+    matrix = generateBandedDiagonalMatrix()
+    #matrix = generate_random_matrix()
 
     # Compute inverse
     inv_matrix = np.linalg.inv(matrix)
@@ -130,7 +168,8 @@ if __name__ == "__main__":
 
 
     # Save matrices to file
-    path_to_file = "../../tests/tests_cases/"
+    #path_to_file = "../../tests/tests_cases/"
+    path_to_file = "./src/dphpc_sinv/PSR/"
     
     filename = "matrix_0_diagblk.bin"
     write_matrix_to_file(path_to_file+filename, matrix, MAT_SIZE, 1)

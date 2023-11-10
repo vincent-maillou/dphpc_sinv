@@ -1,9 +1,4 @@
-/*
-@author: Vincent Maillou (vmaillou@iis.ee.ethz.ch)
-@date: 2023-09
-
-Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
-*/
+// Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,7 +14,6 @@ int main() {
     char f_matparam[] = "../../../tests/tests_cases/mat_parameters_0.txt";
     unsigned int matrix_size;
     unsigned int blocksize;
-    bool verif = false;
 
     load_matrix_parameters(f_matparam, &matrix_size, &blocksize);
 
@@ -45,30 +39,6 @@ int main() {
     char f_mat_lowerblk[] = "../../../tests/tests_cases/matrix_0_lowerblk.bin";
     load_binary_matrix(f_mat_lowerblk, matrix_lowerblk, blocksize, off_diag_size);
 
-
-    if(verif){
-        for(unsigned int i = 0; i < blocksize; i++){
-            for(unsigned int j = 0; j < matrix_size; j++){
-                std::cout << "matrix_diagblk[" << i << "][" << j << "] = " << matrix_diagblk[i*matrix_size+j] << std::endl;
-            }
-        }
-
-        for(unsigned int i = 0; i < blocksize; i++){
-            for(unsigned int j = 0; j < off_diag_size; j++){
-                std::cout << "matrix_upperblk[" << i << "][" << j << "] = " << matrix_upperblk[i*off_diag_size+j] << std::endl;
-            }
-        }
-
-        for(unsigned int i = 0; i < blocksize; i++){
-            for(unsigned int j = 0; j < off_diag_size; j++){
-                std::cout << "matrix_lowerblk[" << i << "][" << j << "] = " << matrix_lowerblk[i*off_diag_size+j] << std::endl;
-            }
-        }
-    }
-
-
-    // ----- END OF INIT SECTION -----
-
     // Transform C style storage to vector of eigen matrices
     std::vector<Eigen::MatrixXcd> eig_diagblk;
     std::vector<Eigen::MatrixXcd> eig_upperblk;
@@ -88,55 +58,7 @@ int main() {
         }
     }
 
-    // print eigen matrices
-    if(verif){
-        for (unsigned int i = 0; i < n_blocks; ++i) {
-            std::cout << "eig_diagblk[" << i << "] = " << std::endl << eig_diagblk[i] << std::endl << std::endl;
-            if(i < n_blocks-1){
-                std::cout << "eig_upperblk[" << i << "] = " << std::endl << eig_upperblk[i] << std::endl << std::endl;
-                std::cout << "eig_lowerblk[" << i << "] = " << std::endl << eig_lowerblk[i] << std::endl << std::endl;
-            }
-        }
-    }
-
-
-    /* // Pre-allocate memory for the inverted blocks
-    std::vector<Eigen::MatrixXcd> eig_inv_diagblk(n_blocks);
-    std::vector<Eigen::MatrixXcd> eig_inv_upperblk(n_blocks-1);
-    std::vector<Eigen::MatrixXcd> eig_inv_lowerblk(n_blocks-1);
-
-    // Resize the inverted blocks to match the size of the original blocks
-    for (unsigned int i = 0; i < n_blocks; i++) {
-        eig_inv_diagblk[i].resize(blocksize, blocksize);
-        if(i < n_blocks-1){
-            eig_inv_upperblk[i].resize(blocksize, off_diag_size);
-            eig_inv_lowerblk[i].resize(blocksize, off_diag_size);
-        }
-    }
-
-    
-
-    // 0. Inverse of the first block
-    eig_inv_diagblk[0] = eig_diagblk[0].inverse();
-
-    // 1. Forward substitution (performed left to right)
-    for (unsigned int i = 1; i < n_blocks; ++i) {
-        eig_inv_diagblk[i] = (eig_diagblk[i] - eig_lowerblk[i-1] * eig_inv_diagblk[i-1] * eig_upperblk[i-1]).inverse();
-    }
-
-    // 2. Backward substitution (performed right to left)
-    for(int i = n_blocks-2; i >= 0; --i){
-        Eigen::MatrixXcd tmp_lowerfactor = eig_inv_diagblk[i+1] * eig_lowerblk[i] * eig_inv_diagblk[i];
-
-        eig_inv_lowerblk[i] = -tmp_lowerfactor;
-        eig_inv_upperblk[i] = -eig_inv_diagblk[i] * eig_upperblk[i] * eig_inv_diagblk[i+1];
-
-        eig_inv_diagblk[i] += eig_inv_diagblk[i] * eig_upperblk[i] * tmp_lowerfactor;
-    } */
-
-
-
-
+    // ----- END OF INIT SECTION -----
 
 
 
@@ -165,25 +87,10 @@ int main() {
 
 
 
-
-
-
-
-    /* // Store results back into C style storage
-    for(unsigned int i = 0; i < n_blocks; ++i){
-        memcpy(matrix_diagblk + i*blocksize*blocksize, eig_inv_diagblk[i].data(), blocksize*blocksize*sizeof(std::complex<double>));
-        if(i < n_blocks-1){
-            memcpy(matrix_upperblk + i*blocksize*(off_diag_size), eig_inv_upperblk[i].data(), blocksize*(off_diag_size)*sizeof(std::complex<double>));
-            memcpy(matrix_lowerblk + i*blocksize*(off_diag_size), eig_inv_lowerblk[i].data(), blocksize*(off_diag_size)*sizeof(std::complex<double>));
-        }
-    } */
-
-
-
     // ----- RESULT CHECKING SECTION -----
 
     // Load reference solution of the matrix inverse
-    /* std::complex<double>* matrix_inv_diagblk = (std::complex<double>*) malloc(blocksize * matrix_size * sizeof(std::complex<double>));
+    std::complex<double>* matrix_inv_diagblk = (std::complex<double>*) malloc(blocksize * matrix_size * sizeof(std::complex<double>));
     char f_mat_inv_diagblk[] = "../../../tests/tests_cases/matrix_0_inverse_diagblk.bin";
     load_binary_matrix(f_mat_inv_diagblk, matrix_inv_diagblk, blocksize, matrix_size);
 
@@ -193,46 +100,56 @@ int main() {
     
     std::complex<double>* matrix_inv_lowerblk = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
     char f_mat_inv_lowerblk[] = "../../../tests/tests_cases/matrix_0_inverse_lowerblk.bin";
-    load_binary_matrix(f_mat_inv_lowerblk, matrix_inv_lowerblk, blocksize, off_diag_size); */
+    load_binary_matrix(f_mat_inv_lowerblk, matrix_inv_lowerblk, blocksize, off_diag_size);
 
 
-    /* if(!are_equals(matrix_diagblk, matrix_inv_diagblk, matrix_size, blocksize)){
-        printf("Error: matrix_diagblk and matrix_inv_diagblk are not equal\n");
+    // Convert back std::vector<Eigen::Matrix> to std::vector<std::complex<double>>
+    std::complex<double>* eigen_inverted_diagblk = (std::complex<double>*) malloc(blocksize * matrix_size * sizeof(std::complex<double>));
+    std::complex<double>* eigen_inverted_upperblk = (std::complex<double>*) malloc(blocksize * off_diag_size * sizeof(std::complex<double>));
+    std::complex<double>* eigen_inverted_lowerblk = (std::complex<double>*) malloc(blocksize * off_diag_size * sizeof(std::complex<double>));
 
-        print_matrix(matrix_diagblk, blocksize, blocksize);
+    for(unsigned int i = 0; i < blocksize; i++){
+        for(unsigned int j = 0; j < blocksize; j++){
+            for(unsigned int k = 0; k < n_blocks; ++k){
+                //std::cout << "vectorized eig_inv_diagblk[" << i << "][" << j+k*blocksize << "] = " << eig_inv_diagblk[k].data()[i+j*blocksize] << std::endl;
+                unsigned int row = i*matrix_size;
+                unsigned int col = j+k*blocksize;
+                eigen_inverted_diagblk[row+col] = eig_inv_diagblk[k].data()[i+j*blocksize];
+            }
+
+            for(unsigned int k = 0; k < n_blocks-1; ++k){
+                unsigned int row = i*off_diag_size;
+                unsigned int col = j+k*blocksize;
+                eigen_inverted_upperblk[row+col] = eig_inv_upperblk[k].data()[i+j*blocksize];
+                eigen_inverted_lowerblk[row+col] = eig_inv_lowerblk[k].data()[i+j*blocksize];
+            }
+        }
+    }
+
+
+    if(!are_equals(eigen_inverted_diagblk, matrix_inv_diagblk, matrix_size, blocksize)){
+        printf("Error: eigen_inverted_diagblk and matrix_inv_diagblk are not equal\n");
+
+        print_matrix(eigen_inverted_diagblk, blocksize, blocksize);
         print_matrix(matrix_inv_diagblk, blocksize, blocksize);
     }
     else{
-        printf("matrix_diagblk and matrix_inv_diagblk are equal\n");
+        printf("eigen_inverted_diagblk and matrix_inv_diagblk are equal\n");
     }
 
-    if(!are_equals(matrix_upperblk, matrix_inv_upperblk, matrix_size, blocksize)){
-        printf("Error: matrix_upperblk and matrix_inv_upperblk are not equal\n");
-    }
-    else{
-        printf("matrix_upperblk and matrix_inv_upperblk are equal\n");
-    }
-
-    if(!are_equals(matrix_lowerblk, matrix_inv_lowerblk, matrix_size, blocksize)){
-        printf("Error: matrix_lowerblk and matrix_inv_lowerblk are not equal\n");
+    if(!are_equals(eigen_inverted_upperblk, matrix_inv_upperblk, off_diag_size, blocksize)){
+        printf("Error: eigen_inverted_upperblk and matrix_inv_upperblk are not equal\n");
     }
     else{
-        printf("matrix_lowerblk and matrix_inv_lowerblk are equal\n");
-    } */
+        printf("eigen_inverted_upperblk and matrix_inv_upperblk are equal\n");
+    }
 
-
-    // removed return 1
-    // else we have a memory leak
-
-    // ----- CLEANING SECTION -----
-
-    /*free_matrix(matrix_diagblk);
-    free_matrix(matrix_upperblk);
-    free_matrix(matrix_lowerblk);
-    free_matrix(matrix_inv_diagblk);
-    free_matrix(matrix_inv_upperblk);
-    free_matrix(matrix_inv_lowerblk);*/
-
+    if(!are_equals(eigen_inverted_lowerblk, matrix_inv_lowerblk, off_diag_size, blocksize)){
+        printf("Error: eigen_inverted_lowerblk and matrix_inv_lowerblk are not equal\n");
+    }
+    else{
+        printf("eigen_inverted_lowerblk and matrix_inv_lowerblk are equal\n");
+    }
 
     return 0;
 }

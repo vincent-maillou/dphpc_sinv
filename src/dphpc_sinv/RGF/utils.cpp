@@ -1,9 +1,4 @@
-/*
-@author: Vincent Maillou (vmaillou@iis.ee.ethz.ch)
-@date: 2023-09
-
-Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
-*/
+// Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 
 #include <cstdio>
 #include <cstdlib>
@@ -192,16 +187,18 @@ bool assert_same_array(
 }
 template bool assert_same_array<double>(double *array1, double *array2, double epsilon, int size);
 
+
+
 bool are_equals(
     std::complex<double> *A,
     std::complex<double> *B,
     unsigned int matrice_size, 
     unsigned int blocksize)
 {
-    // Check that the two parsed matrices are equals
-    for (unsigned int i = 0; i < matrice_size; i++) {
-        for (unsigned int j = 0; j < blocksize; j++) {
-            if (std::abs(A[i * matrice_size + j] - B[i * matrice_size + j]) > 1e-10) {
+    for(unsigned int i = 0; i < blocksize; i++){
+        for(unsigned int j = 0; j < matrice_size; j++){
+            if (std::abs(A[i*matrice_size+j] - B[i*matrice_size+j]) > 1e-10) {
+                std::cout << "A[" << i << "][" << j << "] = " << A[i * matrice_size + j] << std::endl;
                 return false;
             }
         }

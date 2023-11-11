@@ -11,81 +11,46 @@ Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #include <fstream>
 #include <vector>
 #include <iostream>
+#include <string>
+#include <iomanip>
 
 #include "utils.h"
 
-bool load_binary_matrix(
-    char *filename, 
-    std::complex<double> *matrix, 
-    int rows, 
-    int cols)
+
+template<typename T>
+bool load_binary_array(
+    std::string filename, 
+    T *array, 
+    int size)
 {
     std::FILE *fp;
 
-    fp = std::fopen(filename, "rb");
+    fp = std::fopen(filename.c_str(), "rb");
     if (fp == nullptr) {
         std::printf("Error opening file\n");
         return false;
     }
 
-    std::fread(matrix, sizeof(std::complex<double>), rows * cols, fp);
+    std::fread(array, sizeof(T), size, fp);
 
     std::fclose(fp);
     return true;
 }
+template bool load_binary_array<double>(std::string filename, double *array, int size);
+template bool load_binary_array<int>(std::string filename, int *array, int size);
 
-
-void free_matrix(
-    std::complex<double> *matrix)
-{
-    free(matrix);
-}
-
-
-void print_matrix(
-    std::complex<double> *matrix, 
-    int rows, 
-    int cols)
-{
-    // Access matrix elements
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++)
-            std::printf("%f + %fi ", std::real(matrix[i * cols + j]), std::imag(matrix[i * cols + j]));
-        std::printf("\n");
-    }
-}
-
-
-bool load_matrix_parameters(
-    char *filename, 
-    unsigned int *matrix_band, 
-    unsigned int *blocksize)
-{
-    FILE *fp;
-
-    fp = std::fopen(filename, "r");
-    if (fp == NULL) {
-        std::printf("Error opening file\n");
-        return true;
-    }
-
-    std::fscanf(fp, "%u %u", matrix_band, blocksize);
-
-    std::fclose(fp);
-
-    return false;
-}
 
 
 template<typename T>
 bool load_text_array(
-    char *filename, 
+    std::string filename, 
     T *array,
     int size)
 {
 
     std::ifstream ifile(filename, std::ios::in);
     if (!ifile.is_open()) {
+        std::cout << filename << std::endl;
         std::printf("Error opening file\n");
         return false;
     }
@@ -108,12 +73,12 @@ bool load_text_array(
 // Explicit instantiation of the template
 // else not found in compilation
 // other option would be to put the implementation in the header file
-template bool load_text_array<double>(char* filename, double* matrix, int size);
-template bool load_text_array<int>(char* filename, int* matrix, int size);
+template bool load_text_array<double>(std::string filename, double* matrix, int size);
+template bool load_text_array<int>(std::string filename, int* matrix, int size);
 
 template <typename T>
 bool save_text_array(
-    char *filename,
+    std::string filename,
     const T* array,
     int size)
 {
@@ -131,7 +96,7 @@ bool save_text_array(
         return false;
     }
 }
-template bool save_text_array<double>(char* filename, const double* array, int size);
+template bool save_text_array<double>(std::string filename, const double* array, int size);
 
 template<typename T>
 void sparse_to_dense(
@@ -185,8 +150,8 @@ bool assert_array_elementwise(
 {
     for (int i = 0; i < size; i++) {
         if (std::abs(array_test[i] - array_ref[i]) > reltol * std::abs(array_ref[i]) + abstol) {
-            std::printf("%f %f\n", array_test[i], array_ref[i]);
-            std::printf("Arrays are not the same\n");
+            std::cout << std::fixed << std::setprecision(12) << array_test[i] << " " << array_ref[i] << std::endl;
+            std::printf("Arrays are elementwise not the same\n");
             return false;
         }
     }
@@ -216,9 +181,9 @@ bool assert_array_magnitude(
 
     }
     if (sum_difference > reltol * sum_ref + abstol) {
-        std::printf("Arrays are not the same\n");
-        std::cout << sum_difference << std::endl;
-        std::cout << reltol * sum_ref + abstol << std::endl;
+        std::printf("Arrays are in magnitude not the same\n");
+        // std::cout << sum_difference << std::endl;
+        // std::cout << reltol * sum_ref + abstol << std::endl;
         return false;
     }
 

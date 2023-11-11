@@ -39,7 +39,7 @@ double solve_mkl_dpbsv(
     double reltol,
     bool flag_verbose);
 
-double solve_cusolver_LU(
+double solve_cusolver_dense_LU(
     double *matrix_dense_h,
     double *rhs_h,
     double *reference_solution_h,
@@ -48,7 +48,7 @@ double solve_cusolver_LU(
     double reltol,
     bool flag_verbose);
 
-double solve_cusolver_CHOL(
+double solve_cusolver_dense_CHOL(
     double *matrix_dense_h,
     double *rhs_h,
     double *reference_solution_h,
@@ -84,7 +84,7 @@ double solve_cusparse_ILU_CG(
     double residual_tol,
     bool flag_verbose);
 
-double solve_cusolver_CHOL(
+double solve_cusolver_sparse_CHOL(
     double *data_h,
     int *col_indices_h,
     int *row_indptr_h,

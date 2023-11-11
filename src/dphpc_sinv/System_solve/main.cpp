@@ -10,7 +10,9 @@ Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #include <complex>
 #include <fstream>
 #include <string>
+#include <iostream>
 #include <mkl.h>
+
 
 #include <Eigen/Dense>
 
@@ -28,9 +30,9 @@ char* getCmdOption(char ** begin, char ** end, const std::string & option)
     return 0;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]){
 
-    if(argc != 5){
+    if(argc != 9){
         std::printf("Usage: ./system_solve_benchmark -nmeas <number of measurements> -step <kmc step to measure>\n");
         return 0;
     }
@@ -47,30 +49,62 @@ int main(int argc, char *argv[]) {
     std::printf("Number of measurements: %d\n", nmeas);
     std::printf("KMC step to measure: %d\n", step_to_measure);
 
-    if(step_to_measure == 0){
-        std::printf("No previous step exists\n");
+    double abstol = std::stod(getCmdOption(argv, argv + argc, "-abstol"));
+    double reltol = std::stod(getCmdOption(argv, argv + argc, "-reltol"));
+    if(abstol < 0){
+        std::printf("Absolute tolerance must be positive\n");
         return 0;
     }
+    else{
+        std::printf("Absolute tolerance: %f\n", abstol);
+    }
+    if(reltol < 0){
+        std::printf("Relative tolerance must be positive\n");
+        return 0;
+    }
+    else{
+        std::printf("Relative tolerance: %f\n", reltol);
+    }
 
+    // if(step_to_measure == 0){
+    //     std::printf("No previous step exists\n");
+    //     return 0;
+    // }
+    int step_to_measure_previous = step_to_measure - 1;
 
     // Get matrix parameters
-    char path_data[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/matrix_sparse_data0.txt";
-    char path_indices[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/matrix_sparse_indices0.txt";
-    char path_indptr[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/matrix_sparse_indptr0.txt";
-    char path_rhs[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/rhs_0.txt";
-    char path_reference_solution[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/x_ref0.txt";
-    
-    char path_reference_solution_previous_step[] = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/x_ref0.txt";
-    
+    std::string base_path = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/";
+    std::string path_data = base_path + "matrix_sparse_data";
+    std::string path_indices = base_path + "matrix_sparse_indices";
+    std::string path_indptr = base_path + "matrix_sparse_indptr";
+    std::string path_rhs = base_path + "rhs_";
+    std::string path_reference_solution = base_path + "x_ref";
+    std::string path_reference_solution_previous_step = base_path + "x_ref";
+    std::string path_dense = base_path + "matrix_dense";
+
+    path_data += std::to_string(step_to_measure) + ".bin";
+    path_indices += std::to_string(step_to_measure) + ".txt";
+    path_indptr += std::to_string(step_to_measure) + ".txt";
+    path_rhs += std::to_string(step_to_measure) + ".bin";
+    path_reference_solution += std::to_string(step_to_measure) + ".bin";
+    path_reference_solution_previous_step += std::to_string(step_to_measure) + ".bin";
+    path_dense += std::to_string(step_to_measure) + ".bin";
+
+    std::cout << path_data << std::endl;
+    std::cout << path_indices << std::endl;
+    std::cout << path_indptr << std::endl;
+    std::cout << path_rhs << std::endl;
+    std::cout << path_reference_solution << std::endl;
+    std::cout << path_reference_solution_previous_step << std::endl;
+
+
+
     int matrix_size = 7165;
     int number_of_nonzero = 182287;
-    double abstol = 1e-16;
-    double reltol = 1e-14;
     double residual_tol_CG = 5e-18;
     double residual_tol_ILU_CG = 5e-18;
     bool flag_verbose = false;
     bool flag_failed = false;
-    int number_measurements = 210;
 
 
     //print the matrix parameters
@@ -79,6 +113,7 @@ int main(int argc, char *argv[]) {
     std::printf("Number of nonzero: %d\n", number_of_nonzero);
 
     double *dense_matrix = (double*)malloc(matrix_size*matrix_size*sizeof(double));
+    double *dense_matrix_ref = (double*)malloc(matrix_size*matrix_size*sizeof(double));
     double *data = (double*)malloc(number_of_nonzero*sizeof(double));
     int *indices = (int*)malloc(number_of_nonzero*sizeof(int));
     int *indptr = (int*)malloc((matrix_size+1)*sizeof(int));
@@ -86,10 +121,10 @@ int main(int argc, char *argv[]) {
     double *dense_matrix_copy = (double*)malloc(matrix_size*matrix_size*sizeof(double));
     double *rhs_copy = (double*)malloc(matrix_size*sizeof(double));
     double *reference_solution = (double*)malloc(matrix_size*sizeof(double));
-    
+    double *previous_solution = (double*)malloc(matrix_size*sizeof(double));
 
 
-    if(!load_text_array<double>(path_data, data, number_of_nonzero)){
+    if(!load_binary_array<double>(path_data, data, number_of_nonzero)){
         if(flag_verbose){
             std::printf("Error loading data\n");
         }
@@ -107,19 +142,30 @@ int main(int argc, char *argv[]) {
         }
         flag_failed = true;
     }
-    if(!load_text_array<double>(path_rhs, rhs, matrix_size)){
+    if(!load_binary_array<double>(path_rhs, rhs, matrix_size)){
         if(flag_verbose){
             std::printf("Error loading rhs\n");
         }
         flag_failed = true;
     }
-    if(!load_text_array<double>(path_reference_solution, reference_solution, matrix_size)){
+    if(!load_binary_array<double>(path_reference_solution, reference_solution, matrix_size)){
         if(flag_verbose){
             std::printf("Error loading reference solution\n");
         }
         flag_failed = true;
     }
-
+    if(!load_binary_array<double>(path_reference_solution_previous_step, previous_solution, matrix_size)){
+        if(flag_verbose){
+            std::printf("Error loading reference solution previous step\n");
+        }
+        flag_failed = true;
+    }
+    if(!load_binary_array<double>(path_dense, dense_matrix_ref, matrix_size*matrix_size)){
+        if(flag_verbose){
+            std::printf("Error loading dense matrix\n");
+        }
+        flag_failed = true;
+    }
 
 
 
@@ -128,16 +174,16 @@ int main(int argc, char *argv[]) {
 
         bool correct_measurement = true;
 
-        double times_gesv[number_measurements];
-        double times_posv[number_measurements];
-        double times_gbsv[number_measurements];
-        double times_pbsv[number_measurements];
-        double times_cusparse_CG[number_measurements];
-        double times_cusparse_ILU_CG[number_measurements];
-        double times_cusparse_CG_guess[number_measurements];
-        double times_cusolver_dense_LU[number_measurements];
-        double times_cusolver_dense_CHOL[number_measurements];
-        double times_cusolver_sparse_CHOL[number_measurements];
+        double times_gesv[nmeas];
+        double times_posv[nmeas];
+        double times_gbsv[nmeas];
+        double times_pbsv[nmeas];
+        double times_cusparse_CG[nmeas];
+        double times_cusparse_ILU_CG[nmeas];
+        double times_cusparse_CG_guess[nmeas];
+        double times_cusolver_dense_LU[nmeas];
+        double times_cusolver_dense_CHOL[nmeas];
+        double times_cusolver_sparse_CHOL[nmeas];
         
 
 
@@ -148,6 +194,18 @@ int main(int argc, char *argv[]) {
             indices,
             indptr,
             matrix_size);
+
+        if(!assert_array_elementwise<double>(dense_matrix,
+                                    dense_matrix_ref,
+                                    abstol,
+                                    reltol,
+                                    matrix_size*matrix_size)){
+            std::printf("Error: dense matrix is not the same as reference\n");
+            correct_measurement = false;
+        }
+        else{
+            std::printf("Dense matrix is the same as reference\n");
+        }
 
         int ku = 0;
         int kl = 0;
@@ -175,6 +233,51 @@ int main(int argc, char *argv[]) {
         double *matrix_band_CHOL_copy = (double*)malloc((kd+1)*matrix_size*sizeof(double));
 
 
+
+        for(int i = 0; i < nmeas; i++){
+            copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
+            copy_array<double>(rhs, rhs_copy, matrix_size);
+
+            times_gesv[i] = solve_mkl_dgesv(
+                dense_matrix_ref,
+                rhs_copy,
+                reference_solution,
+                matrix_size,
+                abstol,
+                reltol,
+                flag_verbose);
+            if(times_gesv[i] < 0.0){
+                std::printf("Error in MKL dgesv\n");
+                correct_measurement = false;
+            }
+            else{
+                std::printf("Time MKL dgesv: %f\n", times_gesv[i]);
+            }
+        }
+
+
+        for(int i = 0; i < nmeas; i++){
+            copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
+            copy_array<double>(rhs, rhs_copy, matrix_size);
+
+            times_posv[i] = solve_mkl_dposv(
+                dense_matrix_copy,
+                rhs_copy,
+                reference_solution,
+                matrix_size,
+                abstol,
+                reltol,
+                flag_verbose);
+            if(times_posv[i] < 0.0){
+                std::printf("Error in MKL dposv\n");
+                correct_measurement = false;
+            }
+            else{
+                std::printf("Time MKL dposv: %f\n", times_posv[i]);
+            }
+        }
+
+
         dense_to_band_for_LU<double>(
             dense_matrix,
             matrix_band_LU,
@@ -183,7 +286,7 @@ int main(int argc, char *argv[]) {
             kl);
 
 
-        for(int i = 0; i < number_measurements; i++){
+        for(int i = 0; i < nmeas; i++){
             copy_array<double>(matrix_band_LU, matrix_band_LU_copy, matrix_size*(2*ku+kl+1));
             copy_array<double>(rhs, rhs_copy, matrix_size);
             times_gbsv[i] = solve_mkl_dgbsv(
@@ -213,7 +316,7 @@ int main(int argc, char *argv[]) {
             matrix_size,
             kd);
 
-        for(int i = 0; i < number_measurements; i++){
+        for(int i = 0; i < nmeas; i++){
             copy_array<double>(matrix_band_CHOL, matrix_band_CHOL_copy, matrix_size*(kd+1));
             copy_array<double>(rhs, rhs_copy, matrix_size);
             times_pbsv[i] = solve_mkl_dpbsv(
@@ -234,50 +337,8 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        for(int i = 0; i < number_measurements; i++){
-            copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
-            copy_array<double>(rhs, rhs_copy, matrix_size);
 
-            times_gesv[i] = solve_mkl_dgesv(
-                dense_matrix_copy,
-                rhs_copy,
-                reference_solution,
-                matrix_size,
-                abstol,
-                reltol,
-                flag_verbose);
-            if(times_gesv[i] < 0.0){
-                std::printf("Error in MKL dgesv\n");
-                correct_measurement = false;
-            }
-            else{
-                std::printf("Time MKL dgesv: %f\n", times_gesv[i]);
-            }
-        }
-
-
-        for(int i = 0; i < number_measurements; i++){
-            copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
-            copy_array<double>(rhs, rhs_copy, matrix_size);
-
-            times_posv[i] = solve_mkl_dposv(
-                dense_matrix_copy,
-                rhs_copy,
-                reference_solution,
-                matrix_size,
-                abstol,
-                reltol,
-                flag_verbose);
-            if(times_posv[i] < 0.0){
-                std::printf("Error in MKL dposv\n");
-                correct_measurement = false;
-            }
-            else{
-                std::printf("Time MKL dposv: %f\n", times_posv[i]);
-            }
-        }
-
-        for(int i = 0; i < number_measurements; i++){
+        for(int i = 0; i < nmeas; i++){
             copy_array<double>(rhs, rhs_copy, matrix_size);
             double starting_guess[matrix_size];
             // bit overkill to set zero in every measurement
@@ -307,7 +368,37 @@ int main(int argc, char *argv[]) {
 
         }
 
-        for(int i = 0; i < number_measurements; i++){
+
+        for(int i = 0; i < nmeas; i++){
+            copy_array<double>(rhs, rhs_copy, matrix_size);
+            double starting_guess[matrix_size];
+            // bit overkill to set zero in every measurement
+            for(int j = 0; j < matrix_size; j++){
+                starting_guess[j] = previous_solution[j];
+            }
+            times_cusparse_CG_guess[i] = solve_cusparse_CG(
+                data,
+                indices,
+                indptr,
+                rhs_copy,
+                reference_solution,
+                starting_guess,
+                number_of_nonzero,
+                matrix_size,
+                abstol,
+                reltol,
+                residual_tol_CG,
+                flag_verbose);
+            if(times_cusparse_CG_guess[i] < 0.0){
+                std::printf("Error in cusparse CG\n");
+                correct_measurement = false;
+            }
+            else{
+                std::printf("Time cusparse CG: %f\n", times_cusparse_CG_guess[i]);
+            }
+        }
+
+        for(int i = 0; i < nmeas; i++){
             copy_array<double>(rhs, rhs_copy, matrix_size);
 
             times_cusparse_ILU_CG[i] = solve_cusparse_ILU_CG(
@@ -332,11 +423,13 @@ int main(int argc, char *argv[]) {
 
         }
 
-        for(int i = 0; i < number_measurements; i++){
+
+
+        for(int i = 0; i < nmeas; i++){
             copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
             copy_array<double>(rhs, rhs_copy, matrix_size);
 
-            times_cusolver_dense_LU[i] = solve_cusolver_LU(
+            times_cusolver_dense_LU[i] = solve_cusolver_dense_LU(
                 dense_matrix_copy,
                 rhs_copy,
                 reference_solution,
@@ -355,11 +448,11 @@ int main(int argc, char *argv[]) {
         }
 
 
-        for(int i = 0; i < number_measurements; i++){
+        for(int i = 0; i < nmeas; i++){
             copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
             copy_array<double>(rhs, rhs_copy, matrix_size);
 
-            times_cusolver_dense_CHOL[i] = solve_cusolver_CHOL(
+            times_cusolver_dense_CHOL[i] = solve_cusolver_dense_CHOL(
                 dense_matrix_copy,
                 rhs_copy,
                 reference_solution,
@@ -378,10 +471,10 @@ int main(int argc, char *argv[]) {
         }
 
 
-        for(int i = 0; i < number_measurements; i++){
+        for(int i = 0; i < nmeas; i++){
             copy_array<double>(rhs, rhs_copy, matrix_size);
 
-            times_cusolver_sparse_CHOL[i] = solve_cusolver_CHOL(
+            times_cusolver_sparse_CHOL[i] = solve_cusolver_sparse_CHOL(
                 data,
                 indices,
                 indptr,
@@ -393,11 +486,11 @@ int main(int argc, char *argv[]) {
                 reltol,
                 flag_verbose);
             if(times_cusolver_sparse_CHOL[i] < 0.0){
-                std::printf("Error in cusolver sparse\n");
+                std::printf("Error in cusolver sparse CHOL\n");
                 correct_measurement = false;
             }
             else{
-                std::printf("Time cusolver sparse: %f\n", times_cusolver_sparse_CHOL[i]);
+                std::printf("Time cusolver sparse CHOL: %f\n", times_cusolver_sparse_CHOL[i]);
             }
 
             if(!correct_measurement){
@@ -414,39 +507,39 @@ int main(int argc, char *argv[]) {
         outputFile_times.open("times.txt");
 
         if(outputFile_times.is_open()){
-            for(int i = 0; i < number_measurements; i++){
+            for(int i = 0; i < nmeas; i++){
                 outputFile_times << times_gesv[i] << " ";
             }
             outputFile_times << '\n';
-            for(int i = 0; i < number_measurements; i++){
+            for(int i = 0; i < nmeas; i++){
                 outputFile_times << times_posv[i] << " ";
             }
             outputFile_times << '\n';
-            for(int i = 0; i < number_measurements; i++){
+            for(int i = 0; i < nmeas; i++){
                 outputFile_times << times_gbsv[i] << " ";
             }
             outputFile_times << '\n';
-            for(int i = 0; i < number_measurements; i++){
+            for(int i = 0; i < nmeas; i++){
                 outputFile_times << times_pbsv[i] << " ";
             }
             outputFile_times << '\n';
-            for(int i = 0; i < number_measurements; i++){
+            for(int i = 0; i < nmeas; i++){
                 outputFile_times << times_cusparse_CG[i] << " ";
             }
             outputFile_times << '\n';
-            for(int i = 0; i < number_measurements; i++){
+            for(int i = 0; i < nmeas; i++){
                 outputFile_times << times_cusparse_ILU_CG[i] << " ";
             }
             outputFile_times << '\n';
-            for(int i = 0; i < number_measurements; i++){
+            for(int i = 0; i < nmeas; i++){
                 outputFile_times << times_cusolver_dense_LU[i] << " ";
             }
             outputFile_times << '\n';
-            for(int i = 0; i < number_measurements; i++){
+            for(int i = 0; i < nmeas; i++){
                 outputFile_times << times_cusolver_dense_CHOL[i] << " ";
             }
             outputFile_times << '\n';
-            for(int i = 0; i < number_measurements; i++){
+            for(int i = 0; i < nmeas; i++){
                 outputFile_times << times_cusolver_sparse_CHOL[i] << " ";
             }
             outputFile_times << '\n';
@@ -464,6 +557,7 @@ int main(int argc, char *argv[]) {
     free(dense_matrix_copy);
     free(rhs_copy);
     free(dense_matrix);
+    free(dense_matrix_ref);
     free(data);
     free(indices);
     free(indptr);

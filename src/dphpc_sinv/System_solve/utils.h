@@ -3,35 +3,21 @@
 #include <cstdio>
 
 
-bool load_binary_matrix(
-    char *filename, 
-    std::complex<double> *matrix, 
-    int rows, 
-    int cols);
-
-
-void free_matrix(
-    std::complex<double> *matrix);
-
-void print_matrix(
-    std::complex<double> *matrix, 
-    int rows, 
-    int cols);
-
-bool load_matrix_parameters(
-    char *filename, 
-    unsigned int *matrice_size, 
-    unsigned int *blocksize);
+template<typename T>
+bool load_binary_array(
+    std::string filename, 
+    T *array, 
+    int size);
 
 template<typename T>
 bool load_text_array(
-    char *filename, 
+    std::string filename, 
     T *array,
     int size);
 
 template <typename T>
 bool save_text_array(
-    char *filename,
+    std::string filename,
     const T* array,
     int size);
 

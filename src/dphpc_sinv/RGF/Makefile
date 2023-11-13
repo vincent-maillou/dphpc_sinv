@@ -7,14 +7,14 @@ EIGENROOT = /home/vincent-maillou/Documents/Libraries/eigen/
 CXXFLAGS = -Wall -Wextra -fopenmp -std=c++14 -I${EIGENROOT}
 NVCCFLAGS = -arch=sm_60 -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -std=c++14 -Xcompiler -fopenmp -I${CUDA_ROOT}/include
 LDFLAGS =
-SOURCES= main.cpp utils.cpp
+SOURCES= dense_rgf.cpp utils.cpp
 
 CPP_SOURCES = $(filter %.cpp, $(SOURCES))
 CU_SOURCES = $(filter %.cu, $(SOURCES))
 
 CPP_OBJ_FILES=$(CPP_SOURCES:.cpp=.o)
 CU_OBJ_FILES =$(CU_SOURCES:.cu=.o)
-BINARY = main
+BINARY = dense_rgf
 
 
 .PHONY: all

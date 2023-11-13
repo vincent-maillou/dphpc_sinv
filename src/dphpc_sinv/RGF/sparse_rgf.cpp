@@ -6,12 +6,13 @@
 #include <iostream>
 
 #include <Eigen/Dense>
+#include <Eigen/Sparse>
 
 #include "utils.h"
 
 int main() {
     // Get matrix parameters
-    char f_matparam[] = "../../../tests/tests_cases/mat_parameters_0.txt";
+    char f_matparam[] = "../../../tests/tests_cases/dense_blocks_matrix_0_parameters.txt";
     unsigned int matrix_size;
     unsigned int blocksize;
 
@@ -28,18 +29,19 @@ int main() {
 
     // Load matrix to invert
     std::complex<double>* matrix_diagblk = (std::complex<double>*) malloc(blocksize * matrix_size * sizeof(std::complex<double>));
-    char f_mat_diagblk[] = "../../../tests/tests_cases/matrix_0_diagblk.bin";
+    char f_mat_diagblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_diagblk.bin";
     load_binary_matrix(f_mat_diagblk, matrix_diagblk, blocksize, matrix_size);
 
     std::complex<double>* matrix_upperblk = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
-    char f_mat_upperblk[] = "../../../tests/tests_cases/matrix_0_upperblk.bin";
+    char f_mat_upperblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_upperblk.bin";
     load_binary_matrix(f_mat_upperblk, matrix_upperblk, blocksize, off_diag_size);
 
     std::complex<double>* matrix_lowerblk = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
-    char f_mat_lowerblk[] = "../../../tests/tests_cases/matrix_0_lowerblk.bin";
+    char f_mat_lowerblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_lowerblk.bin";
     load_binary_matrix(f_mat_lowerblk, matrix_lowerblk, blocksize, off_diag_size);
 
-    // Transform C style storage to vector of eigen matrices
+
+    // Transform C style storage to vector of eigen dense matrices
     std::vector<Eigen::MatrixXcd> eig_diagblk;
     std::vector<Eigen::MatrixXcd> eig_upperblk;
     std::vector<Eigen::MatrixXcd> eig_lowerblk;
@@ -58,10 +60,29 @@ int main() {
         }
     }
 
+
+    // Transform C style storage to vector of eigen sparse matrices
+    std::vector<Eigen::SparseMatrix<std::complex<double>>> eig_sparse_diagblk;
+    std::vector<Eigen::SparseMatrix<std::complex<double>>> eig_sparse_upperblk;
+    std::vector<Eigen::SparseMatrix<std::complex<double>>> eig_sparse_lowerblk;
+
+    for (unsigned int i = 0; i < n_blocks; ++i) {
+        eig_sparse_diagblk.push_back(eig_sparse_diagblk.sparseView());
+
+        if(i < n_blocks-1){
+            eig_sparse_upperblk.push_back(eig_sparse_upperblk.sparseView());
+
+            eig_sparse_lowerblk.push_back(eig_sparse_lowerblk.sparseView());
+        }
+    }
+
+
     // ----- END OF INIT SECTION -----
 
 
+    // TODO: MODIFY HERE TO USE EIGEN SPARSE MATRICES
 
+    
     // Pre-allocate memory for the inverted blocks
     std::vector<Eigen::MatrixXcd> eig_inv_diagblk(n_blocks);
     std::vector<Eigen::MatrixXcd> eig_inv_upperblk(n_blocks-1);
@@ -91,15 +112,15 @@ int main() {
 
     // Load reference solution of the matrix inverse
     std::complex<double>* matrix_inv_diagblk = (std::complex<double>*) malloc(blocksize * matrix_size * sizeof(std::complex<double>));
-    char f_mat_inv_diagblk[] = "../../../tests/tests_cases/matrix_0_inverse_diagblk.bin";
+    char f_mat_inv_diagblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_inverse_diagblk.bin";
     load_binary_matrix(f_mat_inv_diagblk, matrix_inv_diagblk, blocksize, matrix_size);
 
     std::complex<double>* matrix_inv_upperblk = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
-    char f_mat_inv_upperblk[] = "../../../tests/tests_cases/matrix_0_inverse_upperblk.bin";
+    char f_mat_inv_upperblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_inverse_upperblk.bin";
     load_binary_matrix(f_mat_inv_upperblk, matrix_inv_upperblk, blocksize, off_diag_size);
     
     std::complex<double>* matrix_inv_lowerblk = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
-    char f_mat_inv_lowerblk[] = "../../../tests/tests_cases/matrix_0_inverse_lowerblk.bin";
+    char f_mat_inv_lowerblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_inverse_lowerblk.bin";
     load_binary_matrix(f_mat_inv_lowerblk, matrix_inv_lowerblk, blocksize, off_diag_size);
 
 

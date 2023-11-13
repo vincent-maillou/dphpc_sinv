@@ -1,23 +1,16 @@
-"""
-@author: Vincent Maillou (vmaillou@iis.ee.ethz.ch)
-@date: 2023-09
-
-Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
-"""
+# Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-SEED = 63
-MAT_SIZE = 10
-BLOCKSIZE = 2
-
-
-def generate_random_matrix():
-    np.random.seed(SEED)
-    matrix = np.random.rand(MAT_SIZE, MAT_SIZE) + 1j * \
-        np.random.rand(MAT_SIZE, MAT_SIZE)
+def generate_random_matrix(
+    matrice_size: int,
+    seed: int = None,
+):
+    np.random.seed(seed)
+    matrix = np.random.rand(matrice_size, matrice_size) + 1j * \
+        np.random.rand(matrice_size, matrice_size)
 
     value_diag = np.sum(np.abs(matrix), axis=1)
     np.fill_diagonal(matrix, value_diag)
@@ -25,9 +18,9 @@ def generate_random_matrix():
     return matrix
 
 
-def generateBandedDiagonalMatrix(
-    is_complex: bool = False, 
-    is_symmetric: bool = False,
+def generateBandedMatrix(
+    matrice_size: int, 
+    bandwidth: int,
     seed: int = None
 ) -> np.ndarray:
     """ Generate a banded diagonal matrix of shape: matrice_size^2 with a 
@@ -39,10 +32,6 @@ def generateBandedDiagonalMatrix(
         Size of the matrice to generate.
     matrice_bandwidth : int
         Bandwidth of the matrice to generate.
-    is_complex : bool, optional
-        Whether the matrice should be complex or real valued. The default is False.
-    is_symmetric : bool, optional
-        Whether the matrice should be symmetric or not. The default is False.
     seed : int, optional
         Seed for the random number generator. The default is no seed.
         
@@ -51,13 +40,76 @@ def generateBandedDiagonalMatrix(
     A : np.ndarray
         The generated matrice.
     """
-    np.random.seed(SEED)
-    A = np.random.rand(MAT_SIZE, MAT_SIZE) + 1j*np.random.rand(MAT_SIZE, MAT_SIZE)
+    np.random.seed(seed)
+    A = np.random.rand(matrice_size, matrice_size) + 1j*np.random.rand(matrice_size, matrice_size)
     
-    for i in range(MAT_SIZE):
-        for j in range(MAT_SIZE):
-            if i - j >= BLOCKSIZE or j - i >= BLOCKSIZE:
+    for i in range(matrice_size):
+        for j in range(matrice_size):
+            if i - j >= bandwidth or j - i >= bandwidth:
                 A[i, j] = 0
+
+    return A
+
+
+def sparsifyMatrix(
+    matrice: np.ndarray,
+    sparsity: float,
+    seed: int = None
+) -> np.ndarray:
+    """ Sparsify a matrice by setting sparsity% of its entries to zero.
+
+    Parameters
+    ----------
+    matrice : np.ndarray
+        The matrice to sparsify.
+    sparsity : float
+        Sparsity of the matrice to generate.
+    seed : int, optional
+        Seed for the random number generator. The default is no seed.
+        
+    Returns
+    -------
+    A : np.ndarray
+        The sparsified matrice.
+    """
+    np.random.seed(seed)
+    A = matrice.copy()
+    for i in range(A.shape[0]):
+        for j in range(A.shape[1]):
+            if np.random.rand() < sparsity:
+                A[i, j] = 0
+
+    return A
+
+
+def generateSparseBandedMatrix(
+    matrice_size: int, 
+    bandwidth: int,
+    sparsity: float,
+    seed: int = None
+) -> np.ndarray:
+    """ Generate a sparse banded diagonal matrix of shape: matrice_size^2 with a 
+    bandwidth = matrice_bandwidth, filled with random numbers.
+
+    Parameters
+    ----------
+    matrice_size : int
+        Size of the matrice to generate.
+    matrice_bandwidth : int
+        Bandwidth of the matrice to generate.
+    sparsity : float
+        Sparsity of the matrice to generate.
+    seed : int, optional
+        Seed for the random number generator. The default is no seed.
+        
+    Returns
+    -------
+    A : np.ndarray
+        The generated matrice.
+    """
+    A = generateBandedMatrix(matrice_size, bandwidth, seed)
+    
+    A = sparsifyMatrix(A, sparsity, seed)
 
     return A
 
@@ -65,8 +117,6 @@ def generateBandedDiagonalMatrix(
 def write_matrix_to_file(
     path_to_file: str,
     matrix: np.ndarray,
-    matrix_size: int,
-    blocksize: int,
 ):
     with open(path_to_file, "wb") as f:
         f.write(matrix.tobytes())
@@ -151,54 +201,3 @@ def write_matrix_parameters(
     with open(path_to_file, "w") as f:
         f.write(str(matrix_size) + "\n")
         f.write(str(blocksize) + "\n")
-
-
-if __name__ == "__main__":
-    # Generate random matrix
-    matrix = generateBandedDiagonalMatrix()
-    #matrix = generate_random_matrix()
-
-    # assert matrix to be invertible
-    assert np.allclose( np.linalg.inv(matrix) @ matrix, np.eye(MAT_SIZE) )
-    assert np.linalg.det(matrix) != 0
-
-
-    # Compute inverse
-    inv_matrix = np.linalg.inv(matrix)
-
-    # Extract diagonal and off-diagonal blocks
-    matrix_diag_blk = extract_diagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE)
-    matrix_upper_blk = extract_offdiagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE, 1)
-    matrix_lower_blk = extract_offdiagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE, -1)
-
-    matrix_inv_diag_blk = extract_diagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE)
-    matrix_inv_upper_blk = extract_offdiagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE, 1)
-    matrix_inv_lower_blk = extract_offdiagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE, -1)
-
-
-    # Save matrices to file
-    path_to_file = "../../tests/tests_cases/"
-
-    import matplotlib.pyplot as plt
-    plt.matshow(matrix.real)
-    plt.matshow(matrix_diag_blk.real)
-    plt.matshow(matrix_upper_blk.real)
-    plt.matshow(matrix_lower_blk.real)
-    plt.show()
-    
-    filename = "matrix_0_diagblk.bin"
-    write_matrix_to_file(path_to_file+filename, matrix_diag_blk, MAT_SIZE, 1)
-    filename = "matrix_0_upperblk.bin"
-    write_matrix_to_file(path_to_file+filename, matrix_upper_blk, MAT_SIZE, 1)
-    filename = "matrix_0_lowerblk.bin"
-    write_matrix_to_file(path_to_file+filename, matrix_lower_blk, MAT_SIZE, 1)
-
-    filename = "matrix_0_inverse_diagblk.bin"
-    write_matrix_to_file(path_to_file+filename, matrix_inv_diag_blk, MAT_SIZE, 1)
-    filename = "matrix_0_inverse_upperblk.bin"
-    write_matrix_to_file(path_to_file+filename, matrix_inv_upper_blk, MAT_SIZE, 1)
-    filename = "matrix_0_inverse_lowerblk.bin"
-    write_matrix_to_file(path_to_file+filename, matrix_inv_lower_blk, MAT_SIZE, 1)
-
-    filename = "mat_parameters_0.txt"
-    write_matrix_parameters(path_to_file+filename, MAT_SIZE, BLOCKSIZE)

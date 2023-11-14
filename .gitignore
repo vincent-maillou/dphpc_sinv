@@ -170,3 +170,4 @@ src/dphpc_sinv/*.o
 **/*.o
 .vscode/
 **/.vscode/
+**/dense_rgf

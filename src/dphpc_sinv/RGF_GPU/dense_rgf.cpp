@@ -161,9 +161,9 @@ int main() {
         matrix_upperblk_cont[i] = matrix_upperblk[m*off_diag_size + k*blocksize + n];
         matrix_lowerblk_cont[i] = matrix_lowerblk[m*off_diag_size + k*blocksize + n];
     }
-    for(unsigned int i = 0; i < blocksize * off_diag_size; i++){
-        std::cout << "matrix_upperblk_cont[" << i << "] = " << matrix_upperblk_cont[i] << std::endl;
-    }
+    // for(unsigned int i = 0; i < blocksize * off_diag_size; i++){
+    //     std::cout << "matrix_upperblk_cont[" << i << "] = " << matrix_upperblk_cont[i] << std::endl;
+    // }
 
     complex_d* matrix_diagblk_d = NULL;
     complex_d* matrix_upperblk_d = NULL;
@@ -336,7 +336,7 @@ int main() {
             matrix_lowerblk_d + (i-1)*blocksize*blocksize, blocksize,
             inv_diagblk_d + (i-1)*blocksize*blocksize, blocksize,
             &beta,
-            inv_diagblk_d + i*blocksize*blocksize, blocksize));
+            inv_lowerblk_d, blocksize));
         //MatMul eig_diagblk[i] - tmp * eig_upperblk[i-1]
         alpha = make_cuDoubleComplex(-1.0, 0.0);
         beta = make_cuDoubleComplex(1.0, 0.0);
@@ -345,7 +345,7 @@ int main() {
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
-            inv_diagblk_d + i*blocksize*blocksize, blocksize,
+            inv_lowerblk_d, blocksize,
             matrix_upperblk_d + (i-1)*blocksize*blocksize, blocksize,
             &beta,
             matrix_diagblk_d + i*blocksize*blocksize, blocksize));
@@ -391,6 +391,76 @@ int main() {
                     blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice));
 
 
+    }
+
+
+    // 2. Backward substitution (performed right to left)
+    for(int i = n_blocks-2; i >= 0; --i){
+        //tmp = eig_inv_diagblk[i+1] * eig_lowerblk[i]
+        // use identity_cpy_d as tmp
+        alpha = make_cuDoubleComplex(1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
+        cublasErrchk(cublasZgemm(
+            cublas_handle,
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            inv_diagblk_d + (i+1)*blocksize*blocksize, blocksize,
+            matrix_lowerblk_d + i*blocksize*blocksize, blocksize,
+            &beta,
+            identity_cpy_d, blocksize));
+
+        // eig_inv_lowerblk[i] = -tmp*eig_inv_diagblk[i];
+        alpha = make_cuDoubleComplex(-1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
+        cublasErrchk(cublasZgemm(
+            cublas_handle,
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            identity_cpy_d, blocksize,
+            inv_diagblk_d + i*blocksize*blocksize, blocksize,
+            &beta,
+            inv_lowerblk_d + i*blocksize*blocksize, blocksize));
+
+        // tmp = eig_inv_diagblk[i] * eig_upperblk[i]
+        alpha = make_cuDoubleComplex(1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
+        cublasErrchk(cublasZgemm(
+            cublas_handle,
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            inv_diagblk_d + i*blocksize*blocksize, blocksize,
+            matrix_upperblk_d + i*blocksize*blocksize, blocksize,
+            &beta,
+            identity_cpy_d, blocksize));
+
+        //eig_inv_upperblk[i] = -tmp * eig_inv_diagblk[i+1];
+        alpha = make_cuDoubleComplex(-1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
+        cublasErrchk(cublasZgemm(
+            cublas_handle,
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            identity_cpy_d, blocksize,
+            inv_diagblk_d + (i+1)*blocksize*blocksize, blocksize,
+            &beta,
+            inv_upperblk_d + i*blocksize*blocksize, blocksize));
+
+        //eig_inv_diagblk[i] -= tmp * eig_inv_lowerblk[i];
+        alpha = make_cuDoubleComplex(-1.0, 0.0);
+        beta = make_cuDoubleComplex(1.0, 0.0);
+        cublasErrchk(cublasZgemm(
+            cublas_handle,
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            identity_cpy_d, blocksize,
+            inv_lowerblk_d + i*blocksize*blocksize, blocksize,
+            &beta,
+            inv_diagblk_d + i*blocksize*blocksize, blocksize));
     }
 
 
@@ -469,11 +539,11 @@ int main() {
         inv_lowerblk_ref[i] = matrix_inv_lowerblk[m*off_diag_size + k*blocksize + n];
     }
 
-    // print last block of inverted matrix
-    for(unsigned int i = blocksize *(matrix_size-blocksize); i < blocksize * matrix_size; i++){
-        std::cout << "inv_diagblk_ref[" << i << "] = " << inv_diagblk_ref[i] << std::endl;
-        std::cout << "inv_diagblk_h[" << i << "] = " << inv_diagblk_h[i] << std::endl;
-    }
+    // // print last block of inverted matrix
+    // for(unsigned int i = blocksize *(matrix_size-blocksize); i < blocksize * matrix_size; i++){
+    //     std::cout << "inv_diagblk_ref[" << i << "] = " << inv_diagblk_ref[i] << std::endl;
+    //     std::cout << "inv_diagblk_h[" << i << "] = " << inv_diagblk_h[i] << std::endl;
+    // }
 
 
     double norm_diagblk = 0.0;

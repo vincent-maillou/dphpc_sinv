@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/A_full.bin", A_ref, N, N);
     load_matrix("matrix_0_inverse_diagblk.bin", A_inv, N, N);
 
-    // Test cases
+    // Test cases schur reduction
 
     // // full matrix from different path
     Eigen::MatrixXcd eigenA_read_in = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A, N, N);
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
     load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/A_red_s_bottom_full.bin", A_red_bot, N, N);
     Eigen::MatrixXcd eigenArb = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_red_bot, N, N);
 
-    /* End of Test case read-in*/
+    /* End of Test case schur reduction read-in*/
 
     int n_blocks = N / blocksize;
     int partitions = 3; // Change to number of MPI processes
@@ -132,19 +132,32 @@ int main(int argc, char *argv[]) {
         }
 
     }
-
     // End reduce_schur
 
     //Define aggregated schur matrix on "process 0"
-    Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*(partitions - 1), blocksize*(partitions - 1));
+    Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*(partitions - 1) * 2, blocksize*(partitions - 1) * 2);
+    A_schur.setZero();
 
-    /* To-Do: Implement aggregation of the correct Schur Blocks in a serial code by 
-    filling the function "aggregate_reduced_system_locally" defined in the header file. In the end A_schur should contain the correct Schur blocks.
+    // Test case for aggregate schur
+    std::complex<double>* A_schur_test = new std::complex<double>[2 * blocksize * (partitions - 1) * 2 * blocksize  * (partitions - 1)];
+    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/A_schur.bin", A_schur_test, 2 *  blocksize * (partitions - 1), 2 * blocksize * (partitions - 1));
+    Eigen::MatrixXcd eigenA_schur_test = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_schur_test, 2 * blocksize * (partitions - 1), 2 * blocksize * (partitions - 1));
 
-    Reference Python Implementation: aggregate_reduced_system and send_reduced_system 
+    aggregate_reduced_system_locally(A_schur, eigenA, (partitions - 1) * 2, partition_blocksize, blocksize, partitions);
+
+    // Test case for aggregate schur
+    std::complex<double>* G_schur_test = new std::complex<double>[2 * blocksize * (partitions - 1) * 2 * blocksize  * (partitions - 1)];
+    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_schur.bin", G_schur_test, 2 *  blocksize * (partitions - 1), 2 * blocksize * (partitions - 1));
+    Eigen::MatrixXcd eigenG_schur_test = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_schur_test, 2 * blocksize * (partitions - 1), 2 * blocksize * (partitions - 1));
+
+    auto G_schur = A_schur.inverse();
+
+        /* To-Do: Implement write_back of the inverted Schur Blocks in a serial code by 
+    filling the function "writeback_inverted_system_locally" defined in the header file. In the end G_matrices should contain the correct inverted blocks.
+
+    Reference Python Implementation: sendback_inverted_reduced_system and receiveback_inverted_reduced_system
     
-    To-Do: Generate Testcase for A_schur from the reference Implementation.*/
-    
+    To-Do: Generate Testcase for G_matrices from the reference Implementation.*/
 
     // Check if the matrices are the same
     if (eigenA[0]->isApprox(eigenArt)) {
@@ -165,6 +178,20 @@ int main(int argc, char *argv[]) {
         std::cout << "Bottom Right Schur Matrix are the same." << std::endl;
     } else {
         std::cout << "Bottom Right Schur Matrix are different." << std::endl;
+    }
+
+    //Check if reduced schur matrices are the same
+    if (A_schur.isApprox(eigenA_schur_test)) {
+        std::cout << "A_schur are the same." << std::endl;
+    } else {
+        std::cout << "A_schur are different." << std::endl;
+    }
+
+    //Check if reduced schur matrices are the same
+    if (G_schur.isApprox(eigenG_schur_test)) {
+        std::cout << "G_schur are the same." << std::endl;
+    } else {
+        std::cout << "G_schur are different." << std::endl;
     }
 
 

@@ -120,3 +120,104 @@ std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_central(
 
     return std::make_tuple(L, U);
 }
+
+void aggregate_reduced_system_locally(
+    Eigen::MatrixXcd& A_schur,
+    Eigen::MatrixXcd** A_schur_processes,
+    int nblocks_schur_system,
+    int partition_blocksize,
+    int blocksize,
+    int partitions
+)
+{
+    // A_schur will first take as the first row the (local) reduced row of the root process.
+    int start_rowindice = 0;
+
+    int start_rowindice_remote = (0 + partition_blocksize - 1) * blocksize;
+
+    int start_colindice = 0;
+
+    int start_colindice_remote = (partition_blocksize - 1) * blocksize;
+    
+    A_schur.block(0, 0, blocksize, 2 * blocksize) =
+        A_schur_processes[0]->block(start_rowindice_remote, start_colindice_remote, blocksize, 2 * blocksize);
+
+    std::cout << "extracting left top corner block done!" << std::endl;
+    
+    // Then, A_schur will aggregate the Schur complement rows of the central processes.
+    // Each central process sends 2 rows (4 distinct blocks that have been locally aggregated
+    // by the sending process) to the root.
+    for (int process_i = 1; process_i < partitions - 1; ++process_i) {
+        // Assuming comm.recv is equivalent to direct assignment
+        std::cout << "process_i: " << process_i << std::endl;
+        // Upper left double block of process-local A_schur
+        start_rowindice = blocksize + (process_i - 1) * 2 * blocksize;
+
+        start_rowindice_remote = (process_i  * partition_blocksize) * blocksize;
+        
+        start_colindice = 2 * (process_i - 1) * blocksize;
+
+        start_colindice_remote = (process_i * partition_blocksize - 1) * blocksize;
+
+        std::cout << "start_rowindice: " << start_rowindice << std::endl;
+        std::cout << "start_rowindice_remote: " << start_rowindice_remote << std::endl;
+
+        std::cout << "start_colindice: " << start_colindice << std::endl;
+        std::cout << "start_colindice_remote: " << start_colindice_remote << std::endl;
+
+        
+        A_schur.block(start_rowindice, start_colindice, blocksize, 2 * blocksize) =
+            A_schur_processes[process_i]->block(start_rowindice_remote, start_colindice_remote, blocksize, 2 * blocksize);
+
+        // Upper right single block of process-local A_schur
+        start_colindice += 2 * blocksize;
+
+        start_colindice_remote += partition_blocksize * blocksize;
+
+        A_schur.block(start_rowindice, start_colindice, blocksize, blocksize) =
+            A_schur_processes[process_i]->block(start_rowindice_remote, start_colindice_remote, blocksize, blocksize);
+
+        // Lower left single block of process-local A_schur
+        start_rowindice += blocksize;
+        start_colindice -= blocksize;
+
+        start_rowindice_remote = ((process_i + 1) * partition_blocksize - 1) * blocksize;
+        start_colindice_remote = (process_i * partition_blocksize) * blocksize;
+
+        A_schur.block(start_rowindice, start_colindice, blocksize, blocksize) =
+            A_schur_processes[process_i]->block(start_rowindice_remote, start_colindice_remote, blocksize, blocksize);
+
+        // Lower right double block of process-local A_schur
+        start_colindice += blocksize;
+        start_colindice_remote += (partition_blocksize -1 ) * blocksize;
+
+        A_schur.block(start_rowindice, start_colindice, blocksize, 2 * blocksize) =
+            A_schur_processes[process_i]->block(start_rowindice_remote, start_colindice_remote, blocksize, 2 * blocksize);
+
+
+    }
+    
+    // Finally, A_schur will aggregate the Schur complement row of the last process.
+    //start_rowindice_remote = 80;
+
+    start_rowindice_remote = (partitions - 1) * partition_blocksize * blocksize;
+
+    start_rowindice = (nblocks_schur_system - 1) * blocksize;
+
+    //start_rowindice = 24;
+
+    //start_colindice_remote = 72;
+
+    start_colindice_remote = (partitions - 1) * partition_blocksize * blocksize - blocksize;
+
+    start_colindice = (nblocks_schur_system - 2) * blocksize;
+
+    // std::cout << start_rowindice_remote << std::endl;
+    // std::cout << start_rowindice << std::endl;
+    
+    // Assuming comm.recv is equivalent to direct assignment
+    A_schur.block(start_rowindice, start_colindice, blocksize, 2 * blocksize) =
+        A_schur_processes[partitions-1]->block(start_rowindice_remote, start_colindice_remote, blocksize, 2 * blocksize);
+}
+
+

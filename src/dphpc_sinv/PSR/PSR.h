@@ -41,8 +41,19 @@ std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_central(
 void aggregate_reduced_system_locally(
     Eigen::MatrixXcd& A,
     Eigen::MatrixXcd** A_schur_processes,
+    int nblocks_schur_system,
     int partition_blocksize,
-    int blocksize
+    int blocksize,
+    int partitions
+);
+
+void writeback_inverted_system_locally(
+    Eigen::MatrixXcd& G,
+    Eigen::MatrixXcd** G_schur_processes,
+    int nblocks_schur_system,
+    int partition_blocksize,
+    int blocksize,
+    int partitions
 );
 
 

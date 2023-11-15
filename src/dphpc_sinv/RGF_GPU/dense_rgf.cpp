@@ -691,8 +691,12 @@ bool rgf_matrix_does_not_fit_gpu_memory(
             identity_cpy_d, blocksize,
             inv_lowerblk_d, blocksize,
             &beta,
-            inv_diagblk_d, blocksize));
+            inv_diagblk_small_d, blocksize));
 
+
+        cudaErrchk(cudaMemcpy(inv_diagblk_d,
+                    inv_diagblk_small_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice));
         cudaErrchk(cudaMemcpy(inv_diagblk_h + i*blocksize*blocksize,
                     inv_diagblk_d,
                     blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost));
@@ -934,11 +938,11 @@ int main() {
         inv_lowerblk_cont[i] = matrix_inv_lowerblk_ref[m*off_diag_size + k*blocksize + n];
     }
 
-    // print last block of inverted matrix
-    for(unsigned int i = blocksize *(matrix_size-blocksize); i < blocksize * matrix_size; i++){
-        std::cout << "inv_diagblk_cont[" << i << "] = " << inv_diagblk_cont[i] << std::endl;
-        std::cout << "inv_diagblk_h[" << i << "] = " << inv_diagblk_h[i] << std::endl;
-    }
+    // // print last block of inverted matrix
+    // for(unsigned int i = blocksize *(matrix_size-blocksize); i < blocksize * matrix_size; i++){
+    //     std::cout << "inv_diagblk_cont[" << i << "] = " << inv_diagblk_cont[i] << std::endl;
+    //     std::cout << "inv_diagblk_h[" << i << "] = " << inv_diagblk_h[i] << std::endl;
+    // }
 
     double norm_diagblk = 0.0;
     double norm_upperblk = 0.0;

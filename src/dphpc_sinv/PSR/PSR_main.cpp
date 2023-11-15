@@ -87,6 +87,8 @@ int main(int argc, char *argv[]) {
         *eigenA[i] = eigenA_read_in;
     }
 
+    auto full_inverse = eigenA_read_in.inverse();
+
     // Check if the matrices are the same
     if (*eigenA[0] == eigenA_ref && *eigenA[1] == eigenA_ref && *eigenA[2] == eigenA_ref) {
         std::cout << "A with orig. A are the same." << std::endl;
@@ -152,12 +154,144 @@ int main(int argc, char *argv[]) {
 
     auto G_schur = A_schur.inverse();
 
+    // top left corner before schur production
+    std::complex<double>* G_red_top = new std::complex<double>[N * N];
+    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_red_s_top_full.bin", G_red_top, N, N);
+    Eigen::MatrixXcd eigenGrt = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_red_top, N, N);
+
+    // center before schur production
+    std::complex<double>* G_red_center = new std::complex<double>[N * N];
+    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_red_s_central_full.bin", G_red_center, N, N);
+    Eigen::MatrixXcd eigenGrc = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_red_center, N, N);
+
+    // bottom right corner before schur production
+    std::complex<double>* G_red_bot = new std::complex<double>[N * N];
+    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_red_s_bottom_full.bin", G_red_bot, N, N);
+    Eigen::MatrixXcd eigenGrb = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_red_bot, N, N);
+
+    writeback_inverted_system_locally(G_schur, G_matrices, (partitions - 1) * 2, partition_blocksize, blocksize, partitions);
+
+    // top left corner after schur production
+    std::complex<double>* G_prod_top = new std::complex<double>[N * N];
+    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_prod_s_top_full.bin", G_prod_top, N, N);
+    Eigen::MatrixXcd eigenGpt = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_prod_top, N, N);
+
+    // center after schur production
+    std::complex<double>* G_prod_center = new std::complex<double>[N * N];
+    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_prod_s_central_full.bin", G_prod_center, N, N);
+    Eigen::MatrixXcd eigenGpc = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_prod_center, N, N);
+
+    // bottom right cornerafter schur production
+    std::complex<double>* G_prod_bot = new std::complex<double>[N * N];
+    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_prod_s_bottom_full.bin", G_prod_bot, N, N);
+    Eigen::MatrixXcd eigenGpb = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_prod_bot, N, N);
+
         /* To-Do: Implement write_back of the inverted Schur Blocks in a serial code by 
     filling the function "writeback_inverted_system_locally" defined in the header file. In the end G_matrices should contain the correct inverted blocks.
 
     Reference Python Implementation: sendback_inverted_reduced_system and receiveback_inverted_reduced_system
     
     To-Do: Generate Testcase for G_matrices from the reference Implementation.*/
+
+    for (int i = 0; i < partitions; ++i) {
+        int start_blockrow = i * partition_blocksize;
+
+        std::cout << "Process " << rank << " is producing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+
+
+        if (i == 0){
+            produceSchurTopLeftCorner(*eigenA[i], *L_matrices[i], *U_matrices[i], *G_matrices[i], start_blockrow, partition_blocksize, blocksize);
+        }
+
+        if (i == 1){
+            produceSchurCentral(*eigenA[i], *L_matrices[i], *U_matrices[i], *G_matrices[i], start_blockrow, partition_blocksize, blocksize);
+        }
+
+        if (i == 2){
+            produceSchurBottomRightCorner(*eigenA[i], *L_matrices[i], *U_matrices[i], *G_matrices[i], start_blockrow, partition_blocksize, blocksize);
+        }
+
+    }
+
+
+    Eigen::MatrixXcd G_final = Eigen::MatrixXcd(N, N);
+    G_final.setZero();
+
+
+    for (int i = 0; i < partitions; ++i) {
+        int start_blockrow = i * partition_blocksize;
+
+        std::cout << "Process " << rank << " is producing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+
+
+        if (i == 0){
+            for (int j = 0; j < partition_blocksize; ++j){
+                G_final.block(start_blockrow * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize) =\
+                    (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize);
+                G_final.block(start_blockrow * blocksize + j * blocksize, (start_blockrow + 1) * blocksize + j * blocksize, blocksize, blocksize) =\
+                    (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, (start_blockrow + 1) * blocksize + j * blocksize, blocksize, blocksize);
+                 if (j < partition_blocksize - 1){
+                    G_final.block((start_blockrow + 1) * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize) =\
+                        (*G_matrices[i]).block((start_blockrow + 1) * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize);
+                 }
+            }
+            
+        }
+
+        if (i == 1){
+            for (int j = 0; j < partition_blocksize; ++j){
+                G_final.block(start_blockrow * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize) =\
+                 (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize);
+
+                G_final.block(start_blockrow * blocksize + j * blocksize, (start_blockrow + 1) * blocksize + j * blocksize, blocksize, blocksize) =\
+                 (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, (start_blockrow + 1) * blocksize + j * blocksize, blocksize, blocksize);
+
+                G_final.block(start_blockrow * blocksize + j * blocksize, (start_blockrow - 1) * blocksize + j * blocksize, blocksize, blocksize) =\
+                 (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, (start_blockrow - 1) * blocksize + j * blocksize, blocksize, blocksize);
+            }
+        }
+
+        if (i == 2){
+            for (int j = 0; j < partition_blocksize; ++j){
+                G_final.block(start_blockrow * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize) =\
+                 (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize);
+
+                G_final.block(start_blockrow * blocksize + j * blocksize, (start_blockrow - 1) * blocksize + j * blocksize, blocksize, blocksize) =\
+                 (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, (start_blockrow - 1) * blocksize + j * blocksize, blocksize, blocksize);
+
+                 if(j < partition_blocksize -1){
+                    G_final.block(start_blockrow * blocksize + j * blocksize, (start_blockrow + 1) * blocksize + j * blocksize, blocksize, blocksize) =\
+                    (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, (start_blockrow + 1) * blocksize + j * blocksize, blocksize, blocksize);
+                 }
+            }
+        }
+
+    }
+
+    for (int i = 0; i < n_blocks; ++i) {
+       if(G_final.block(i * blocksize, i * blocksize, blocksize, blocksize).isApprox(full_inverse.block(i * blocksize, i * blocksize, blocksize, blocksize))){
+           std::cout << "Diagonal Block " << i << " is the same." << std::endl;
+       } else {
+           std::cout << "Diagonal Block " << i << " is different." << std::endl;
+       }
+
+       if(i < n_blocks - 1){
+            if(G_final.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize).isApprox(full_inverse.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize))){
+                std::cout << "Off-Diagonal Block " << i << " is the same." << std::endl;
+            } else {
+                std::cout << "Off-Diagonal Block " << i << " is different." << std::endl;
+            }
+
+            if(G_final.block((i + 1) * blocksize, i * blocksize, blocksize, blocksize).isApprox(full_inverse.block((i + 1) * blocksize, i * blocksize, blocksize, blocksize))){
+                std::cout << "Off-Diagonal Block " << i << " is the same." << std::endl;
+            } else {
+                std::cout << "Off-Diagonal Block " << i << " is different." << std::endl;
+            }
+       }
+    }
+
+
+
 
     // Check if the matrices are the same
     if (eigenA[0]->isApprox(eigenArt)) {
@@ -195,6 +329,31 @@ int main(int argc, char *argv[]) {
     }
 
 
+    //Check if the produced inverted matrices are the same
+    if (G_matrices[0]->block(0, 0, (partition_blocksize + 1) * blocksize, (partition_blocksize + 1) * blocksize)\
+    .isApprox(eigenGpt.block(0, 0, (partition_blocksize + 1) * blocksize, (partition_blocksize + 1) * blocksize))){
+        std::cout << "Top Left prod. G Matrix are the same." << std::endl;
+    } else {
+        std::cout << "Top Left prod. G Matrix are different." << std::endl;
+    }
+
+    //Check if the write-back inverted matrices are the same
+    if (G_matrices[1]->block((partition_blocksize+1) * blocksize, (partition_blocksize + 1 ) * blocksize, blocksize, blocksize)\
+    .isApprox(eigenGpc.block((partition_blocksize+1) * blocksize, (partition_blocksize + 1 ) * blocksize, blocksize, blocksize))) {
+        std::cout << "Center prod. G second Matrix-Block are the same." << std::endl;
+    } else {
+        std::cout << "Center prod. G second Matrix-Block are different." << std::endl;
+    }
+
+    //Check if the write-back inverted matrices are the same
+    if (G_matrices[2]->block((partitions - 1 ) * (partition_blocksize) * blocksize, (partitions - 1 ) * (partition_blocksize) * blocksize - blocksize, (partition_blocksize) * blocksize, (partition_blocksize + 1) * blocksize)\
+    .isApprox(eigenGpb.block((partitions - 1 ) * (partition_blocksize) * blocksize, (partitions - 1 ) * (partition_blocksize) * blocksize - blocksize, (partition_blocksize) * blocksize, (partition_blocksize + 1) * blocksize))) {
+        std::cout << "Bottom Right prod. G Matrix are the same." << std::endl;
+    } else {
+        std::cout << "Bottom Right prod. G Matrix are different." << std::endl;
+    }
+
+
     delete[] A;
     delete[] A_inv;
     delete[] A_ref;
@@ -202,9 +361,15 @@ int main(int argc, char *argv[]) {
     delete[] A_red_center;
     delete[] A_red_bot;
 
+    delete[] G_red_top;
+    delete[] G_red_center;
+    delete[] G_red_bot;
+
     for(int i = 0; i < partitions; ++i) {
         delete eigenA[i];
         delete G_matrices[i];
+        delete L_matrices[i];
+        delete U_matrices[i];
     }
 
     MPI_Finalize();

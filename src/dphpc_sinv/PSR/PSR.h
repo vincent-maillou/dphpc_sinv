@@ -48,7 +48,7 @@ void aggregate_reduced_system_locally(
 );
 
 void writeback_inverted_system_locally(
-    Eigen::MatrixXcd& G,
+    Eigen::MatrixXcd G,
     Eigen::MatrixXcd** G_schur_processes,
     int nblocks_schur_system,
     int partition_blocksize,
@@ -56,5 +56,32 @@ void writeback_inverted_system_locally(
     int partitions
 );
 
+void produceSchurTopLeftCorner(Eigen::MatrixXcd A,
+                               Eigen::MatrixXcd L,
+                               Eigen::MatrixXcd U,
+                               Eigen::MatrixXcd& G,
+                               int start_blockrow,
+                               int partition_blocksize,
+                               int blocksize
+                               
+);
+
+void produceSchurBottomRightCorner(Eigen::MatrixXcd A,
+                                   Eigen::MatrixXcd L,
+                                   Eigen::MatrixXcd U,
+                                   Eigen::MatrixXcd& G,
+                                   int start_blockrow,
+                                   int partition_blocksize,
+                                   int blocksize
+);   
+
+void produceSchurCentral(Eigen::MatrixXcd A,
+                                   Eigen::MatrixXcd L,
+                                   Eigen::MatrixXcd U,
+                                   Eigen::MatrixXcd& G,
+                                   int start_blockrow,
+                                   int partition_blocksize,
+                                   int blocksize
+);   
 
 void myFunction(Eigen::MatrixXcd& A);

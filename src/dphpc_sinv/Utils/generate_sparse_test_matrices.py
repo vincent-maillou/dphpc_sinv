@@ -25,6 +25,10 @@ if __name__ == "__main__":
     # Compute inverse
     inv_matrix = np.linalg.inv(matrix)
 
+    plt.matshow(matrix.real)
+    plt.matshow(inv_matrix.real)
+    plt.show()
+
     # Extract diagonal and off-diagonal blocks
     matrix_diag_blk = matrix_utils.extract_diagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE)
     matrix_upper_blk = matrix_utils.extract_offdiagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE, 1)
@@ -33,12 +37,6 @@ if __name__ == "__main__":
     matrix_inv_diag_blk = matrix_utils.extract_diagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE)
     matrix_inv_upper_blk = matrix_utils.extract_offdiagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE, 1)
     matrix_inv_lower_blk = matrix_utils.extract_offdiagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE, -1)
-
-    """ plt.matshow(matrix.real)
-    plt.matshow(matrix_diag_blk.real)
-    plt.matshow(matrix_upper_blk.real)
-    plt.matshow(matrix_lower_blk.real)
-    plt.show() """
 
     # Save matrices to file
     filename = "sparse_matrix_0_diagblk.bin"

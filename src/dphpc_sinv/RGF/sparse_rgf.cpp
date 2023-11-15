@@ -12,7 +12,7 @@
 
 int main() {
     // Get matrix parameters
-    char f_matparam[] = "../../../tests/tests_cases/dense_blocks_matrix_0_parameters.txt";
+    char f_matparam[] = "../../../tests/tests_cases/sparse_matrix_0_parameters.txt";
     unsigned int matrix_size;
     unsigned int blocksize;
 
@@ -29,15 +29,15 @@ int main() {
 
     // Load matrix to invert
     std::complex<double>* matrix_diagblk = (std::complex<double>*) malloc(blocksize * matrix_size * sizeof(std::complex<double>));
-    char f_mat_diagblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_diagblk.bin";
+    char f_mat_diagblk[] = "../../../tests/tests_cases/sparse_matrix_0_diagblk.bin";
     load_binary_matrix(f_mat_diagblk, matrix_diagblk, blocksize, matrix_size);
 
     std::complex<double>* matrix_upperblk = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
-    char f_mat_upperblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_upperblk.bin";
+    char f_mat_upperblk[] = "../../../tests/tests_cases/sparse_matrix_0_upperblk.bin";
     load_binary_matrix(f_mat_upperblk, matrix_upperblk, blocksize, off_diag_size);
 
     std::complex<double>* matrix_lowerblk = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
-    char f_mat_lowerblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_lowerblk.bin";
+    char f_mat_lowerblk[] = "../../../tests/tests_cases/sparse_matrix_0_lowerblk.bin";
     load_binary_matrix(f_mat_lowerblk, matrix_lowerblk, blocksize, off_diag_size);
 
 
@@ -61,18 +61,16 @@ int main() {
     }
 
 
-    // Transform C style storage to vector of eigen sparse matrices
+    // Transform eigen dense matrix to eigen sparse matrices
     std::vector<Eigen::SparseMatrix<std::complex<double>>> eig_sparse_diagblk;
     std::vector<Eigen::SparseMatrix<std::complex<double>>> eig_sparse_upperblk;
     std::vector<Eigen::SparseMatrix<std::complex<double>>> eig_sparse_lowerblk;
 
     for (unsigned int i = 0; i < n_blocks; ++i) {
-        eig_sparse_diagblk.push_back(eig_sparse_diagblk.sparseView());
-
+        eig_sparse_diagblk.push_back(eig_diagblk[i].sparseView());
         if(i < n_blocks-1){
-            eig_sparse_upperblk.push_back(eig_sparse_upperblk.sparseView());
-
-            eig_sparse_lowerblk.push_back(eig_sparse_lowerblk.sparseView());
+            eig_sparse_upperblk.push_back(eig_upperblk[i].sparseView());
+            eig_sparse_lowerblk.push_back(eig_lowerblk[i].sparseView());
         }
     }
 
@@ -80,47 +78,47 @@ int main() {
     // ----- END OF INIT SECTION -----
 
 
-    // TODO: MODIFY HERE TO USE EIGEN SPARSE MATRICES
-
-    
     // Pre-allocate memory for the inverted blocks
     std::vector<Eigen::MatrixXcd> eig_inv_diagblk(n_blocks);
     std::vector<Eigen::MatrixXcd> eig_inv_upperblk(n_blocks-1);
     std::vector<Eigen::MatrixXcd> eig_inv_lowerblk(n_blocks-1);
+
+    Eigen::MatrixXcd tmp_lowerfactor = Eigen::MatrixXcd::Zero(blocksize, blocksize);
 
     // 0. Inverse of the first block
     eig_inv_diagblk[0] = eig_diagblk[0].inverse();
 
     // 1. Forward substitution (performed left to right)
     for (unsigned int i = 1; i < n_blocks; ++i) {
-        eig_inv_diagblk[i] = (eig_diagblk[i] - eig_lowerblk[i-1] * eig_inv_diagblk[i-1] * eig_upperblk[i-1]).inverse();
+        eig_inv_diagblk[i] = (eig_sparse_diagblk[i] - eig_sparse_lowerblk[i-1] * eig_inv_diagblk[i-1] * eig_sparse_upperblk[i-1]);
+        eig_inv_diagblk[i] = eig_inv_diagblk[i].inverse();
     }
 
     // 2. Backward substitution (performed right to left)
     for(int i = n_blocks-2; i >= 0; --i){
-        Eigen::MatrixXcd tmp_lowerfactor = eig_inv_diagblk[i+1] * eig_lowerblk[i] * eig_inv_diagblk[i];
+        tmp_lowerfactor = eig_inv_diagblk[i+1] * eig_sparse_lowerblk[i] * eig_inv_diagblk[i];
 
         eig_inv_lowerblk[i] = -tmp_lowerfactor;
-        eig_inv_upperblk[i] = -eig_inv_diagblk[i] * eig_upperblk[i] * eig_inv_diagblk[i+1];
+        eig_inv_upperblk[i] = -eig_inv_diagblk[i] * eig_sparse_upperblk[i] * eig_inv_diagblk[i+1];
 
-        eig_inv_diagblk[i] += eig_inv_diagblk[i] * eig_upperblk[i] * tmp_lowerfactor;
+        eig_inv_diagblk[i] += eig_inv_diagblk[i] * eig_sparse_upperblk[i] * tmp_lowerfactor;
     }
-
 
 
     // ----- RESULT CHECKING SECTION -----
 
+
     // Load reference solution of the matrix inverse
     std::complex<double>* matrix_inv_diagblk = (std::complex<double>*) malloc(blocksize * matrix_size * sizeof(std::complex<double>));
-    char f_mat_inv_diagblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_inverse_diagblk.bin";
+    char f_mat_inv_diagblk[] = "../../../tests/tests_cases/sparse_matrix_0_inverse_diagblk.bin";
     load_binary_matrix(f_mat_inv_diagblk, matrix_inv_diagblk, blocksize, matrix_size);
 
     std::complex<double>* matrix_inv_upperblk = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
-    char f_mat_inv_upperblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_inverse_upperblk.bin";
+    char f_mat_inv_upperblk[] = "../../../tests/tests_cases/sparse_matrix_0_inverse_upperblk.bin";
     load_binary_matrix(f_mat_inv_upperblk, matrix_inv_upperblk, blocksize, off_diag_size);
     
     std::complex<double>* matrix_inv_lowerblk = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
-    char f_mat_inv_lowerblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_inverse_lowerblk.bin";
+    char f_mat_inv_lowerblk[] = "../../../tests/tests_cases/sparse_matrix_0_inverse_lowerblk.bin";
     load_binary_matrix(f_mat_inv_lowerblk, matrix_inv_lowerblk, blocksize, off_diag_size);
 
 

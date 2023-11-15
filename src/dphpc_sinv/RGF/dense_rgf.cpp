@@ -89,6 +89,7 @@ int main() {
 
     // ----- RESULT CHECKING SECTION -----
 
+
     // Load reference solution of the matrix inverse
     std::complex<double>* matrix_inv_diagblk = (std::complex<double>*) malloc(blocksize * matrix_size * sizeof(std::complex<double>));
     char f_mat_inv_diagblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_inverse_diagblk.bin";

@@ -7,26 +7,25 @@ EIGENROOT = /home/vincent-maillou/Documents/Libraries/eigen/
 CXXFLAGS = -Wall -Wextra -fopenmp -std=c++14 -I${EIGENROOT}
 NVCCFLAGS = -arch=sm_60 -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -std=c++14 -Xcompiler -fopenmp -I${CUDA_ROOT}/include
 LDFLAGS =
-SOURCES= dense_rgf.cpp utils.cpp
+SOURCES = dense_rgf.cpp utils.cpp
 
 CPP_SOURCES = $(filter %.cpp, $(SOURCES))
 CU_SOURCES = $(filter %.cu, $(SOURCES))
 
 CPP_OBJ_FILES=$(CPP_SOURCES:.cpp=.o)
 CU_OBJ_FILES =$(CU_SOURCES:.cu=.o)
-BINARY = dense_rgf
+
+OUTPUT = dense_rgf sparse_rgf
 
 
 .PHONY: all
-all: $(BINARY)
+all: $(OUTPUT)
 
-# todo make a nice makefile
-# create a nice makefile which compiles all the files to a binary
-# and cleans up the mess afterwards
-# with build folder and stuff
-$(BINARY): $(CPP_OBJ_FILES) $(CU_OBJ_FILES)
-	$(CXX) $(CXXFLAGS) $(CPP_OBJ_FILES) $(CU_OBJ_FILES) -o $@ $(LDFLAGS)
+dense_rgf: dense_rgf.o utils.o
+	$(CXX) $(CXXFLAGS) dense_rgf.o utils.o -o $@
 
+sparse_rgf: sparse_rgf.o utils.o
+	$(CXX) $(CXXFLAGS) sparse_rgf.o utils.o -o $@
 
 # Rule for compiling C++ source files
 %.o: %.cpp
@@ -37,9 +36,8 @@ $(BINARY): $(CPP_OBJ_FILES) $(CU_OBJ_FILES)
 	$(NVCC) $(NVCCFLAGS) -c $< -o $@
 
 
-
 .PHONY: clean
 clean:
-	rm -f main *.o
+	rm -f $(OUTPUT) *.o
 
 	

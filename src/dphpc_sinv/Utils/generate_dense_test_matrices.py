@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import os
 
 SEED = 63
-MAT_SIZE = 10
-BLOCKSIZE = 2
+MAT_SIZE = 8000
+BLOCKSIZE = 800
 PATH_TO_FILE = "../../../tests/tests_cases/"
 
 

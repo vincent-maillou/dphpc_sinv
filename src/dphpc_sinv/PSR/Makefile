@@ -10,13 +10,13 @@ CXXFLAGS = -Wall -Wextra -fopenmp -std=c++14 -I${EIGENROOT} -I${CUDA_ROOT}/inclu
 NVCCFLAGS = -arch=sm_60 -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -std=c++14 -Xcompiler -fopenmp -I${CUDA_ROOT}/include
 LDMKLFLAGS = -L${MKLROOT}/lib/intel64 -Wl,--start-group -lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -Wl,--end-group
 LDFLAGS = -L${CUDA_ROOT}/lib64 -lcudart -lpthread -lm -ldl
-SOURCES= PSR.cpp, PSR_main.cpp
+SOURCES= PSR.cpp, PSR_testutils.cpp, PSR_main.cpp
 
 CPP_SOURCES = $(SOURCES)
 CU_SOURCES = $(filter %.cu, $(SOURCES))
 
 #CPP_OBJ_FILES=$(CPP_SOURCES:.cpp=.o)
-CPP_OBJ_FILES = PSR.o PSR_main.o
+CPP_OBJ_FILES = PSR.o PSR_testutils.o PSR_main.o
 CU_OBJ_FILES =$(CU_SOURCES:.cu=.o)
 BINARY = main
 

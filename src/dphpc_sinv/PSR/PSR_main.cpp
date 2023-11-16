@@ -1,28 +1,5 @@
 #include "PSR.h"
 
-void load_matrix(
-    std::string filename, 
-    std::complex<double> *matrix, 
-    int rows, 
-    int cols)
-{
-    // Open the binary file for reading
-    std::ifstream input(filename, std::ios::binary);
-    if (input.is_open()) {
-        // Read the binary data into the std::complex<double> array
-        input.read(reinterpret_cast<char*>(matrix), sizeof(std::complex<double>) * rows * cols);
-
-        // Check if the read operation was successful
-        if (!input) {
-            std::cerr << "Read operation failed or reached the end of the file." << std::endl;
-        } 
-        // Close the input file
-        input.close();
-    } else {
-        std::cerr << "Failed to open the binary file for reading." << std::endl;
-    }
-}
-
 int main(int argc, char *argv[]) {
 
     int rank, size;
@@ -33,344 +10,50 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Hello from process " << rank << " of " << size << std::endl;
 
+    std::string test_folder = "/home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/test_matrices/120_4_5/";
+
     const int N = 120; // Change this to the desired size of your NxN matrix
-    const int blocksize = 8; // Change this to the desired blocksize
+    const int blocksize = 4; // Change this to the desired blocksize
+    int partitions = 5; // Change to number of MPI processes
+    int num_central_partitions = partitions - 2;
+
+    // Partition Parameters
+    int n_blocks = N / blocksize;
+    int partition_blocksize = n_blocks / partitions;
+
+    int n_blocks_schursystem = (partitions - 1) * 2;
+    // End of Partition Parameters
+
+    bool FullSeqTest = false;
+
     // Memory allocation for each "process"
     std::complex<double>* A = new std::complex<double>[N * N];
-    // std::complex<double>* A0 = new std::complex<double>[N * N];
-    // std::complex<double>* A1 = new std::complex<double>[N * N];
-    // std::complex<double>* A2 = new std::complex<double>[N * N];
 
-    std::complex<double>* A_inv = new std::complex<double>[N * N];
-    std::complex<double>* A_ref = new std::complex<double>[N * N];
-    std::string filename = "matrix_0_diagblk.bin";
-    std::string reference_filename = "/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/A_full.bin";
-    std::string filename_inv = "matrix_0_inverse_diagblk.bin";
-
-    load_matrix("matrix_0_diagblk.bin", A, N, N);
-    // load_matrix("matrix_0_diagblk.bin", A0, N, N);
-    // load_matrix("matrix_0_diagblk.bin", A1, N, N);
-    // load_matrix("matrix_0_diagblk.bin", A2, N, N);
-    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/A_full.bin", A_ref, N, N);
-    load_matrix("matrix_0_inverse_diagblk.bin", A_inv, N, N);
+    load_matrix(test_folder + "A_full.bin", A, N, N);
 
     // Test cases schur reduction
 
     // // full matrix from different path
     Eigen::MatrixXcd eigenA_read_in = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A, N, N);
-    Eigen::MatrixXcd eigenA_ref = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_ref, N, N);
 
-    // top left corner schur reduction
-    std::complex<double>* A_red_top = new std::complex<double>[N * N];
-    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/A_red_s_top_full.bin", A_red_top, N, N);
-    Eigen::MatrixXcd eigenArt = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_red_top, N, N);
-
-    // center schur reduction
-    std::complex<double>* A_red_center = new std::complex<double>[N * N];
-    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/A_red_s_centre_full.bin", A_red_center, N, N);
-    Eigen::MatrixXcd eigenArc = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_red_center, N, N);
-
-    // bottom right corner schur reduction
-    std::complex<double>* A_red_bot = new std::complex<double>[N * N];
-    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/A_red_s_bottom_full.bin", A_red_bot, N, N);
-    Eigen::MatrixXcd eigenArb = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_red_bot, N, N);
-
-    /* End of Test case schur reduction read-in*/
-
-    int n_blocks = N / blocksize;
-    int partitions = 3; // Change to number of MPI processes
-    int partition_blocksize = n_blocks / partitions;
-
-    Eigen::MatrixXcd** eigenA = new Eigen::MatrixXcd*[partitions];
-    for(int i = 0; i < partitions; ++i) {
-        eigenA[i] = new Eigen::MatrixXcd(N, N);
-        *eigenA[i] = eigenA_read_in;
+    if (FullSeqTest) {
+        auto G_final = psr_seqsolve_fulltest(test_folder,
+                                 N,
+                                 num_central_partitions,
+                                 blocksize,
+                                 n_blocks,
+                                 partitions,
+                                 partition_blocksize,
+                                 rank,
+                                 n_blocks_schursystem,
+                                 eigenA_read_in
+        );
     }
-
-    auto full_inverse = eigenA_read_in.inverse();
-
-    // Check if the matrices are the same
-    if (*eigenA[0] == eigenA_ref && *eigenA[1] == eigenA_ref && *eigenA[2] == eigenA_ref) {
-        std::cout << "A with orig. A are the same." << std::endl;
-    } else {
-        std::cout << "A with orig. A are different." << std::endl;
-    }
-
-    // Begin reduce_schur
-    Eigen::MatrixXcd** G_matrices = new Eigen::MatrixXcd*[partitions];
-    Eigen::MatrixXcd** L_matrices = new Eigen::MatrixXcd*[partitions];
-    Eigen::MatrixXcd** U_matrices = new Eigen::MatrixXcd*[partitions];
-
-    for (int i = 0; i < partitions; ++i) {
-        int start_blockrow = i * partition_blocksize;
-        
-        G_matrices[i] = new Eigen::MatrixXcd(eigenA[i]->rows(), eigenA[i]->cols());
-        L_matrices[i] = new Eigen::MatrixXcd(eigenA[i]->rows(), eigenA[i]->cols());
-        U_matrices[i] = new Eigen::MatrixXcd(eigenA[i]->rows(), eigenA[i]->cols());
-
-        G_matrices[i]->setZero();
-        L_matrices[i]->setZero();
-        U_matrices[i]->setZero();
-
-        std::cout << "Process " << rank << " is reducing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
-        
-
-        if (i == 0){
-            auto result = reduce_schur_topleftcorner(*eigenA[i], start_blockrow, partition_blocksize, blocksize);
-            *L_matrices[i] = std::get<0>(result);
-            *U_matrices[i] = std::get<1>(result);
-        }
-
-        if (i == 1){
-            auto result = reduce_schur_central(*eigenA[i], start_blockrow, partition_blocksize, blocksize);
-            *L_matrices[i] = std::get<0>(result);
-            *U_matrices[i] = std::get<1>(result);
-        }
-
-        if (i == 2){
-            auto result = reduce_schur_bottomrightcorner(*eigenA[i], start_blockrow, partition_blocksize, blocksize);
-            *L_matrices[i] = std::get<0>(result);
-            *U_matrices[i] = std::get<1>(result);
-        }
-
-    }
-    // End reduce_schur
-
-    //Define aggregated schur matrix on "process 0"
-    Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*(partitions - 1) * 2, blocksize*(partitions - 1) * 2);
-    A_schur.setZero();
-
-    // Test case for aggregate schur
-    std::complex<double>* A_schur_test = new std::complex<double>[2 * blocksize * (partitions - 1) * 2 * blocksize  * (partitions - 1)];
-    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/A_schur.bin", A_schur_test, 2 *  blocksize * (partitions - 1), 2 * blocksize * (partitions - 1));
-    Eigen::MatrixXcd eigenA_schur_test = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_schur_test, 2 * blocksize * (partitions - 1), 2 * blocksize * (partitions - 1));
-
-    aggregate_reduced_system_locally(A_schur, eigenA, (partitions - 1) * 2, partition_blocksize, blocksize, partitions);
-
-    // Test case for aggregate schur
-    std::complex<double>* G_schur_test = new std::complex<double>[2 * blocksize * (partitions - 1) * 2 * blocksize  * (partitions - 1)];
-    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_schur.bin", G_schur_test, 2 *  blocksize * (partitions - 1), 2 * blocksize * (partitions - 1));
-    Eigen::MatrixXcd eigenG_schur_test = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_schur_test, 2 * blocksize * (partitions - 1), 2 * blocksize * (partitions - 1));
-
-    auto G_schur = A_schur.inverse();
-
-    // top left corner before schur production
-    std::complex<double>* G_red_top = new std::complex<double>[N * N];
-    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_red_s_top_full.bin", G_red_top, N, N);
-    Eigen::MatrixXcd eigenGrt = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_red_top, N, N);
-
-    // center before schur production
-    std::complex<double>* G_red_center = new std::complex<double>[N * N];
-    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_red_s_central_full.bin", G_red_center, N, N);
-    Eigen::MatrixXcd eigenGrc = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_red_center, N, N);
-
-    // bottom right corner before schur production
-    std::complex<double>* G_red_bot = new std::complex<double>[N * N];
-    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_red_s_bottom_full.bin", G_red_bot, N, N);
-    Eigen::MatrixXcd eigenGrb = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_red_bot, N, N);
-
-    writeback_inverted_system_locally(G_schur, G_matrices, (partitions - 1) * 2, partition_blocksize, blocksize, partitions);
-
-    // top left corner after schur production
-    std::complex<double>* G_prod_top = new std::complex<double>[N * N];
-    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_prod_s_top_full.bin", G_prod_top, N, N);
-    Eigen::MatrixXcd eigenGpt = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_prod_top, N, N);
-
-    // center after schur production
-    std::complex<double>* G_prod_center = new std::complex<double>[N * N];
-    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_prod_s_central_full.bin", G_prod_center, N, N);
-    Eigen::MatrixXcd eigenGpc = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_prod_center, N, N);
-
-    // bottom right cornerafter schur production
-    std::complex<double>* G_prod_bot = new std::complex<double>[N * N];
-    load_matrix("/home/dleonard/Documents/forked_SINV/SINV/tests/psr_tests/saved_matrices/G_prod_s_bottom_full.bin", G_prod_bot, N, N);
-    Eigen::MatrixXcd eigenGpb = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(G_prod_bot, N, N);
-
-        /* To-Do: Implement write_back of the inverted Schur Blocks in a serial code by 
-    filling the function "writeback_inverted_system_locally" defined in the header file. In the end G_matrices should contain the correct inverted blocks.
-
-    Reference Python Implementation: sendback_inverted_reduced_system and receiveback_inverted_reduced_system
-    
-    To-Do: Generate Testcase for G_matrices from the reference Implementation.*/
-
-    for (int i = 0; i < partitions; ++i) {
-        int start_blockrow = i * partition_blocksize;
-
-        std::cout << "Process " << rank << " is producing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
-
-
-        if (i == 0){
-            produceSchurTopLeftCorner(*eigenA[i], *L_matrices[i], *U_matrices[i], *G_matrices[i], start_blockrow, partition_blocksize, blocksize);
-        }
-
-        if (i == 1){
-            produceSchurCentral(*eigenA[i], *L_matrices[i], *U_matrices[i], *G_matrices[i], start_blockrow, partition_blocksize, blocksize);
-        }
-
-        if (i == 2){
-            produceSchurBottomRightCorner(*eigenA[i], *L_matrices[i], *U_matrices[i], *G_matrices[i], start_blockrow, partition_blocksize, blocksize);
-        }
-
-    }
-
-
-    Eigen::MatrixXcd G_final = Eigen::MatrixXcd(N, N);
-    G_final.setZero();
-
-
-    for (int i = 0; i < partitions; ++i) {
-        int start_blockrow = i * partition_blocksize;
-
-        std::cout << "Process " << rank << " is producing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
-
-
-        if (i == 0){
-            for (int j = 0; j < partition_blocksize; ++j){
-                G_final.block(start_blockrow * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize) =\
-                    (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize);
-                G_final.block(start_blockrow * blocksize + j * blocksize, (start_blockrow + 1) * blocksize + j * blocksize, blocksize, blocksize) =\
-                    (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, (start_blockrow + 1) * blocksize + j * blocksize, blocksize, blocksize);
-                 if (j < partition_blocksize - 1){
-                    G_final.block((start_blockrow + 1) * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize) =\
-                        (*G_matrices[i]).block((start_blockrow + 1) * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize);
-                 }
-            }
-            
-        }
-
-        if (i == 1){
-            for (int j = 0; j < partition_blocksize; ++j){
-                G_final.block(start_blockrow * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize) =\
-                 (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize);
-
-                G_final.block(start_blockrow * blocksize + j * blocksize, (start_blockrow + 1) * blocksize + j * blocksize, blocksize, blocksize) =\
-                 (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, (start_blockrow + 1) * blocksize + j * blocksize, blocksize, blocksize);
-
-                G_final.block(start_blockrow * blocksize + j * blocksize, (start_blockrow - 1) * blocksize + j * blocksize, blocksize, blocksize) =\
-                 (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, (start_blockrow - 1) * blocksize + j * blocksize, blocksize, blocksize);
-            }
-        }
-
-        if (i == 2){
-            for (int j = 0; j < partition_blocksize; ++j){
-                G_final.block(start_blockrow * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize) =\
-                 (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, start_blockrow * blocksize + j * blocksize, blocksize, blocksize);
-
-                G_final.block(start_blockrow * blocksize + j * blocksize, (start_blockrow - 1) * blocksize + j * blocksize, blocksize, blocksize) =\
-                 (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, (start_blockrow - 1) * blocksize + j * blocksize, blocksize, blocksize);
-
-                 if(j < partition_blocksize -1){
-                    G_final.block(start_blockrow * blocksize + j * blocksize, (start_blockrow + 1) * blocksize + j * blocksize, blocksize, blocksize) =\
-                    (*G_matrices[i]).block(start_blockrow * blocksize + j * blocksize, (start_blockrow + 1) * blocksize + j * blocksize, blocksize, blocksize);
-                 }
-            }
-        }
-
-    }
-
-    for (int i = 0; i < n_blocks; ++i) {
-       if(G_final.block(i * blocksize, i * blocksize, blocksize, blocksize).isApprox(full_inverse.block(i * blocksize, i * blocksize, blocksize, blocksize))){
-           std::cout << "Diagonal Block " << i << " is the same." << std::endl;
-       } else {
-           std::cout << "Diagonal Block " << i << " is different." << std::endl;
-       }
-
-       if(i < n_blocks - 1){
-            if(G_final.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize).isApprox(full_inverse.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize))){
-                std::cout << "Off-Diagonal Block " << i << " is the same." << std::endl;
-            } else {
-                std::cout << "Off-Diagonal Block " << i << " is different." << std::endl;
-            }
-
-            if(G_final.block((i + 1) * blocksize, i * blocksize, blocksize, blocksize).isApprox(full_inverse.block((i + 1) * blocksize, i * blocksize, blocksize, blocksize))){
-                std::cout << "Off-Diagonal Block " << i << " is the same." << std::endl;
-            } else {
-                std::cout << "Off-Diagonal Block " << i << " is different." << std::endl;
-            }
-       }
-    }
-
-
-
-
-    // Check if the matrices are the same
-    if (eigenA[0]->isApprox(eigenArt)) {
-        std::cout << "Top Left Schur Matrix are the same." << std::endl;
-    } else {
-        std::cout << "Top Left Schur Matrix are different." << std::endl;
-    }
-
-    // Check if the matrices are the same
-    if (eigenA[1]->isApprox(eigenArc)) {
-        std::cout << "Center Schur Matrix are the same." << std::endl;
-    } else {
-        std::cout << "Center Schur Matrix are different." << std::endl;
-    }
-
-    // Check if the matrices are the same
-    if (eigenA[2]->isApprox(eigenArb)) {
-        std::cout << "Bottom Right Schur Matrix are the same." << std::endl;
-    } else {
-        std::cout << "Bottom Right Schur Matrix are different." << std::endl;
-    }
-
-    //Check if reduced schur matrices are the same
-    if (A_schur.isApprox(eigenA_schur_test)) {
-        std::cout << "A_schur are the same." << std::endl;
-    } else {
-        std::cout << "A_schur are different." << std::endl;
-    }
-
-    //Check if reduced schur matrices are the same
-    if (G_schur.isApprox(eigenG_schur_test)) {
-        std::cout << "G_schur are the same." << std::endl;
-    } else {
-        std::cout << "G_schur are different." << std::endl;
-    }
-
-
-    //Check if the produced inverted matrices are the same
-    if (G_matrices[0]->block(0, 0, (partition_blocksize + 1) * blocksize, (partition_blocksize + 1) * blocksize)\
-    .isApprox(eigenGpt.block(0, 0, (partition_blocksize + 1) * blocksize, (partition_blocksize + 1) * blocksize))){
-        std::cout << "Top Left prod. G Matrix are the same." << std::endl;
-    } else {
-        std::cout << "Top Left prod. G Matrix are different." << std::endl;
-    }
-
-    //Check if the write-back inverted matrices are the same
-    if (G_matrices[1]->block((partition_blocksize+1) * blocksize, (partition_blocksize + 1 ) * blocksize, blocksize, blocksize)\
-    .isApprox(eigenGpc.block((partition_blocksize+1) * blocksize, (partition_blocksize + 1 ) * blocksize, blocksize, blocksize))) {
-        std::cout << "Center prod. G second Matrix-Block are the same." << std::endl;
-    } else {
-        std::cout << "Center prod. G second Matrix-Block are different." << std::endl;
-    }
-
-    //Check if the write-back inverted matrices are the same
-    if (G_matrices[2]->block((partitions - 1 ) * (partition_blocksize) * blocksize, (partitions - 1 ) * (partition_blocksize) * blocksize - blocksize, (partition_blocksize) * blocksize, (partition_blocksize + 1) * blocksize)\
-    .isApprox(eigenGpb.block((partitions - 1 ) * (partition_blocksize) * blocksize, (partitions - 1 ) * (partition_blocksize) * blocksize - blocksize, (partition_blocksize) * blocksize, (partition_blocksize + 1) * blocksize))) {
-        std::cout << "Bottom Right prod. G Matrix are the same." << std::endl;
-    } else {
-        std::cout << "Bottom Right prod. G Matrix are different." << std::endl;
-    }
-
+    else {
+        auto G_final = psr_seqsolve(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, true);
+    }   
 
     delete[] A;
-    delete[] A_inv;
-    delete[] A_ref;
-    delete[] A_red_top;
-    delete[] A_red_center;
-    delete[] A_red_bot;
-
-    delete[] G_red_top;
-    delete[] G_red_center;
-    delete[] G_red_bot;
-
-    for(int i = 0; i < partitions; ++i) {
-        delete eigenA[i];
-        delete G_matrices[i];
-        delete L_matrices[i];
-        delete U_matrices[i];
-    }
 
     MPI_Finalize();
 

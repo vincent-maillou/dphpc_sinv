@@ -329,65 +329,51 @@ bool rgf_matrix_fits_gpu_memory(
     // deallocate device memory
     if (stream) {
         cudaErrchk(cudaStreamDestroy(stream));
-        std::printf("Stream destroyed\n");
     }
     if(cublas_handle) {
         cublasErrchk(cublasDestroy(cublas_handle));
-        std::printf("Cublas handle destroyed\n");
     }
     if(cusolver_handle) {
         cusolverErrchk(cusolverDnDestroy(cusolver_handle));
-        std::printf("Cusolver handle destroyed\n");
     }
     if(matrix_diagblk_d) {
         cudaErrchk(cudaFree(matrix_diagblk_d));
-        std::printf("matrix_diagblk_d destroyed\n");
     }
     if(matrix_upperblk_d) {
         cudaErrchk(cudaFree(matrix_upperblk_d));
-        std::printf("matrix_upperblk_d destroyed\n");
     }
     if(matrix_lowerblk_d) {
         cudaErrchk(cudaFree(matrix_lowerblk_d));
-        std::printf("matrix_lowerblk_d destroyed\n");
     }
     if(inv_diagblk_d) {
         cudaErrchk(cudaFree(inv_diagblk_d));
-        std::printf("inv_diagblk_d destroyed\n");
     }
     if(inv_upperblk_d) {
         cudaErrchk(cudaFree(inv_upperblk_d));
-        std::printf("inv_upperblk_d destroyed\n");
     }
     if(inv_lowerblk_d) {
         cudaErrchk(cudaFree(inv_lowerblk_d));
-        std::printf("inv_lowerblk_d destroyed\n");
     }
     if(identity_d){
         cudaErrchk(cudaFree(identity_d));
-        std::printf("identity_d destroyed\n");
     }
     if(identity_cpy_d){
         cudaErrchk(cudaFree(identity_cpy_d));
-        std::printf("identity_cpy_d destroyed\n");
     }
     if(buffer){
         cudaErrchk(cudaFree(buffer));
-        std::printf("buffer destroyed\n");
     }
     if(ipiv_d){
         cudaErrchk(cudaFree(ipiv_d));
-        std::printf("ipiv_d destroyed\n");
     }
     if(info_d){
         cudaErrchk(cudaFree(info_d));
-        std::printf("info_d destroyed\n");
     }
     return success;
 }
 
 
-bool rgf_matrix_does_not_fit_gpu_memory(
+bool rgf_dense_matrix_does_not_fit_gpu_memory(
     unsigned int blocksize,
     unsigned int matrix_size,
     complex_h *matrix_diagblk_h,
@@ -753,6 +739,441 @@ bool rgf_matrix_does_not_fit_gpu_memory(
 }
 
 
+bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
+    unsigned int blocksize,
+    unsigned int matrix_size,
+    complex_h *matrix_diagblk_h,
+    complex_h *matrix_upperblk_h,
+    complex_h *matrix_lowerblk_h,
+    complex_h *inv_diagblk_h,
+    complex_h *inv_upperblk_h,
+    complex_h *inv_lowerblk_h)
+{
+    if(matrix_size % blocksize != 0){
+        printf("Error: matrix_size is not a multiple of blocksize\n");
+        return false;
+    }
+    unsigned int n_blocks = matrix_size / blocksize;
+    bool success = true;
+
+    // Init cuda stuff
+
+    // need multiple streams for overlap
+    int number_streams = 3;
+    cudaStream_t stream[number_streams];
+    for(int i = 0; i < number_streams; i++){
+        cudaErrchk(cudaStreamCreateWithFlags(&stream[i], cudaStreamNonBlocking));
+    }
+
+    cusolverDnHandle_t cusolver_handle[number_streams];
+    for(int i = 0; i < number_streams; i++){
+        cusolverErrchk(cusolverDnCreate(&cusolver_handle[i]));
+        cusolverErrchk(cusolverDnSetStream(cusolver_handle[i], stream[i]));
+    }
+
+    cublasHandle_t cublas_handle[number_streams];
+    for(int i = 0; i < number_streams; i++){
+        cublasErrchk(cublasCreate(&cublas_handle[i]));
+        cublasErrchk(cublasSetStream(cublas_handle[i], stream[i]));
+    }
+
+    cudaEvent_t schur_inverted[n_blocks];
+    for(unsigned int i = 0; i < n_blocks; i++){
+        cudaErrchk(cudaEventCreate(&schur_inverted[i]))
+    }
+    
+
+
+
+    // not allowed to load full matrix to device
+    // allocate memory for the blocks
+    
+    complex_d* matrix_diagblk_d[2];
+    complex_d* matrix_upperblk_d[2];
+    complex_d* matrix_lowerblk_d[2];
+
+    // allocate single blocks of the matrix
+    for(int i = 0; i < 2; i++){
+        cudaErrchk(cudaMalloc((void**)&matrix_diagblk_d[i], blocksize * blocksize * sizeof(complex_d)));
+        cudaErrchk(cudaMalloc((void**)&matrix_upperblk_d[i], blocksize * blocksize * sizeof(complex_d)));
+        cudaErrchk(cudaMalloc((void**)&matrix_lowerblk_d[i], blocksize * blocksize * sizeof(complex_d)));
+    }
+
+
+
+    // allocate memory for the inverse
+    complex_d* inv_diagblk_d = NULL;
+    complex_d* inv_diagblk_small_d = NULL;
+    complex_d* inv_upperblk_d = NULL;
+    complex_d* inv_lowerblk_d = NULL;
+
+    cudaErrchk(cudaMalloc((void**)&inv_diagblk_d, blocksize * blocksize * sizeof(complex_d)));
+    cudaErrchk(cudaMalloc((void**)&inv_diagblk_small_d, blocksize * blocksize * sizeof(complex_d)));
+
+    cudaErrchk(cudaMalloc((void**)&inv_upperblk_d, blocksize * blocksize * sizeof(complex_d)));
+    cudaErrchk(cudaMalloc((void**)&inv_lowerblk_d, blocksize * blocksize * sizeof(complex_d)));
+
+    //memory for pivoting
+    int *ipiv_d = NULL;
+    int *info_d = NULL;
+    cudaErrchk(cudaMalloc((void**)&info_d, sizeof(int)))
+    cudaErrchk(cudaMalloc((void**)&ipiv_d, blocksize*sizeof(int)));
+
+
+    // create right hand side identity matrix
+    complex_h* identity_h = (complex_h*) malloc(blocksize * blocksize * sizeof(complex_h));
+    complex_d* identity_d = NULL;
+    complex_d* identity_cpy_d = NULL;
+    cudaErrchk(cudaMalloc((void**)&identity_d, blocksize * blocksize * sizeof(complex_d)));
+    cudaErrchk(cudaMalloc((void**)&identity_cpy_d, blocksize * blocksize * sizeof(complex_d)));
+
+
+    for(unsigned int i = 0; i < blocksize * blocksize; i++){
+        identity_h[i] = 0.0;
+        if(i / blocksize == i % blocksize){
+            identity_h[i] = 1.0;
+        }
+    }
+
+
+    //figure out extra amount of memory needed
+    complex_d *buffer = NULL;
+    int bufferSize = 0;
+    cusolverErrchk(cusolverDnZgetrf_bufferSize(cusolver_handle[0], blocksize, blocksize,
+                                            (complex_d *)matrix_diagblk_d[0],
+                                              blocksize, &bufferSize));
+    cudaErrchk(cudaMalloc((void**)&buffer, sizeof(complex_d) * bufferSize));
+
+    // ----- END OF INIT SECTION -----
+
+    // init right hand side identity matrix on device for backsub
+    cudaErrchk(cudaMemcpyAsync(identity_d, reinterpret_cast<const complex_d*>(identity_h),
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[0]));
+    cudaErrchk(cudaMemcpyAsync(identity_cpy_d, identity_d,
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice, stream[0]));
+    
+
+    cudaErrchk(cudaMemcpyAsync(matrix_diagblk_d[0], reinterpret_cast<const complex_d*>(matrix_diagblk_h),
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[0]));
+
+
+    cusolverErrchk(cusolverDnZgetrf(cusolver_handle[0], blocksize, blocksize,
+                                matrix_diagblk_d[0], blocksize, buffer, ipiv_d, info_d));
+    
+
+    //back substitution
+    cusolverErrchk(cusolverDnZgetrs(cusolver_handle[0], CUBLAS_OP_N, blocksize,
+                                    blocksize, matrix_diagblk_d[0], blocksize, ipiv_d,
+                                    identity_cpy_d, blocksize, info_d));
+
+    // record finishing the inverse of the first block
+    cudaErrchk(cudaEventRecord(schur_inverted[0], stream[0]));
+
+
+    //wait for the inverse of the first block
+    cudaErrchk(cudaStreamWaitEvent(stream[2], schur_inverted[0]));
+    // 0. Inverse of the first block
+    cudaErrchk(cudaMemcpyAsync(inv_diagblk_h, identity_cpy_d,
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[2]));
+    
+
+
+    // first memcpy happens before loop
+    cudaErrchk(cudaMemcpyAsync(matrix_diagblk_d[1],
+                reinterpret_cast<const complex_d*>(matrix_diagblk_h + blocksize*blocksize),
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[1]));
+    cudaErrchk(cudaMemcpyAsync(matrix_upperblk_d[1],
+                reinterpret_cast<const complex_d*>(matrix_upperblk_h),
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[1]));
+    cudaErrchk(cudaMemcpyAsync(matrix_lowerblk_d[1],
+                reinterpret_cast<const complex_d*>(matrix_lowerblk_h),
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[1]));
+
+
+
+    complex_d alpha;
+    complex_d beta;
+    // // 1. Forward substitution (performed left to right)
+    for (unsigned int i = 1; i < n_blocks; ++i) {
+
+
+        int stream_memload = (i+1) % 2;
+        int stream_compute = i % 2;
+        int stream_memunload = 2;
+
+
+        if(i < n_blocks+1){
+            // load the blocks for the next iteration
+            cudaErrchk(cudaMemcpyAsync(matrix_diagblk_d[stream_memload],
+                        reinterpret_cast<const complex_d*>(matrix_diagblk_h + (i+1)*blocksize*blocksize),
+                        blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
+            cudaErrchk(cudaMemcpyAsync(matrix_upperblk_d[stream_memload],
+                        reinterpret_cast<const complex_d*>(matrix_upperblk_h + (i)*blocksize*blocksize),
+                        blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
+            cudaErrchk(cudaMemcpyAsync(matrix_lowerblk_d[stream_memload],
+                        reinterpret_cast<const complex_d*>(matrix_lowerblk_h  + (i)*blocksize*blocksize),
+                        blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
+        }
+
+        //wait for the schur inverse from the previous iteration
+        cudaErrchk(cudaStreamWaitEvent(stream[stream_compute], schur_inverted[i-1]));
+
+        // MatMul tmp = eig_lowerblk[i-1] * eig_inv_diagblk[i-1]
+        // use the identity_cpy_d from last iteration
+        // use inv_lowerblk_d as tmp
+        alpha = make_cuDoubleComplex(1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
+
+        cublasErrchk(cublasZgemm(
+            cublas_handle[stream_compute],
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            matrix_lowerblk_d[stream_compute], blocksize,
+            identity_cpy_d, blocksize,
+            &beta,
+            inv_lowerblk_d, blocksize));
+        //MatMul schur complement = eig_diagblk[i] - tmp * eig_upperblk[i-1]
+        alpha = make_cuDoubleComplex(-1.0, 0.0);
+        beta = make_cuDoubleComplex(1.0, 0.0);
+
+        cublasErrchk(cublasZgemm(
+            cublas_handle[stream_compute],
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            inv_lowerblk_d, blocksize,
+            matrix_upperblk_d[stream_compute], blocksize,
+            &beta,
+            matrix_diagblk_d[stream_compute], blocksize));
+
+
+        //copy identity
+        cudaErrchk(cudaMemcpyAsync(identity_cpy_d, identity_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice, stream[stream_compute]));
+        // inverse schur complement
+        cusolverErrchk(cusolverDnZgetrf(cusolver_handle[stream_compute], blocksize, blocksize,
+                                    matrix_diagblk_d[stream_compute],
+                                    blocksize, buffer, ipiv_d, info_d));
+        
+
+        //back substitution
+        cusolverErrchk(cusolverDnZgetrs(cusolver_handle[stream_compute], CUBLAS_OP_N, blocksize,
+                                        blocksize,
+                                        matrix_diagblk_d[stream_compute],
+                                        blocksize, ipiv_d,
+                                        identity_cpy_d, blocksize, info_d));
+        // record finishing of computation in step i
+        cudaErrchk(cudaEventRecord(schur_inverted[i], stream[stream_compute]));
+
+        // wait to unload for the finish of computations
+        cudaErrchk(cudaStreamWaitEvent(stream[stream_memunload], schur_inverted[i]));
+        cudaErrchk(cudaMemcpyAsync(inv_diagblk_h + i*blocksize*blocksize,
+                    identity_cpy_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
+    
+
+    }
+
+
+
+    for(int j = 0; j < number_streams; j++){
+        cudaErrchk(cudaStreamSynchronize(stream[j]));
+    }
+    //synchronize between forward and backward substitution
+    cudaErrchk(cudaMemcpy(inv_diagblk_d,
+                identity_cpy_d,
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice));
+
+    // 2. Backward substitution (performed right to left)
+    for(int i = n_blocks-2; i >= 0; --i){
+        
+        for(int j = 0; j < number_streams; j++){
+            cudaErrchk(cudaStreamSynchronize(stream[j]));
+        }
+
+        cudaErrchk(cudaMemcpy(matrix_upperblk_d[0],
+                    reinterpret_cast<const complex_d*>(matrix_upperblk_h + i*blocksize*blocksize),
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(matrix_lowerblk_d[0],
+                    reinterpret_cast<const complex_d*>(matrix_lowerblk_h + i*blocksize*blocksize),
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(inv_diagblk_small_d,
+                    reinterpret_cast<const complex_d*>(inv_diagblk_h  + i*blocksize*blocksize),
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice));        
+
+
+        //tmp = eig_inv_diagblk[i+1] * eig_lowerblk[i]
+        // use identity_cpy_d as tmp
+        // reuse inv_diagblk_d from last iteration
+        // which is the last true inverse block
+        alpha = make_cuDoubleComplex(1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
+        for(int j = 0; j < number_streams; j++){
+            cudaErrchk(cudaStreamSynchronize(stream[j]));
+        }
+        cublasErrchk(cublasZgemm(
+            cublas_handle[0],
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            inv_diagblk_d, blocksize,
+            matrix_lowerblk_d[0], blocksize,
+            &beta,
+            identity_cpy_d, blocksize));
+
+        // eig_inv_lowerblk[i] = -tmp*eig_inv_diagblk[i];
+        alpha = make_cuDoubleComplex(-1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
+        
+        for(int j = 0; j < number_streams; j++){
+            cudaErrchk(cudaStreamSynchronize(stream[j]));
+        }
+        cublasErrchk(cublasZgemm(
+            cublas_handle[0],
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            identity_cpy_d, blocksize,
+            inv_diagblk_small_d, blocksize,
+            &beta,
+            inv_lowerblk_d, blocksize));
+        for(int j = 0; j < number_streams; j++){
+            cudaErrchk(cudaStreamSynchronize(stream[j]));
+        }
+        cudaErrchk(cudaMemcpy(inv_lowerblk_h + i*blocksize*blocksize,
+                    inv_lowerblk_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost));
+
+        // tmp = eig_inv_diagblk[i] * eig_upperblk[i]
+        alpha = make_cuDoubleComplex(1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
+        
+        for(int j = 0; j < number_streams; j++){
+            cudaErrchk(cudaStreamSynchronize(stream[j]));
+        }
+        cublasErrchk(cublasZgemm(
+            cublas_handle[0],
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            inv_diagblk_small_d, blocksize,
+            matrix_upperblk_d[0], blocksize,
+            &beta,
+            identity_cpy_d, blocksize));
+
+        //eig_inv_upperblk[i] = -tmp * eig_inv_diagblk[i+1];
+        alpha = make_cuDoubleComplex(-1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
+        for(int j = 0; j < number_streams; j++){
+            cudaErrchk(cudaStreamSynchronize(stream[j]));
+        }
+        cublasErrchk(cublasZgemm(
+            cublas_handle[0],
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            identity_cpy_d, blocksize,
+            inv_diagblk_d, blocksize,
+            &beta,
+            inv_upperblk_d, blocksize));
+        for(int j = 0; j < number_streams; j++){
+            cudaErrchk(cudaStreamSynchronize(stream[j]));
+        }
+        cudaErrchk(cudaMemcpy(inv_upperblk_h + i*blocksize*blocksize,
+                    inv_upperblk_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost));
+
+        //eig_inv_diagblk[i] -= tmp * eig_inv_lowerblk[i];
+        alpha = make_cuDoubleComplex(-1.0, 0.0);
+        beta = make_cuDoubleComplex(1.0, 0.0);
+        for(int j = 0; j < number_streams; j++){
+            cudaErrchk(cudaStreamSynchronize(stream[j]));
+        }
+        cublasErrchk(cublasZgemm(
+            cublas_handle[0],
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            identity_cpy_d, blocksize,
+            inv_lowerblk_d, blocksize,
+            &beta,
+            inv_diagblk_small_d, blocksize));
+        for(int j = 0; j < number_streams; j++){
+            cudaErrchk(cudaStreamSynchronize(stream[j]));
+        }
+
+        cudaErrchk(cudaMemcpy(inv_diagblk_d,
+                    inv_diagblk_small_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice));
+        cudaErrchk(cudaMemcpy(inv_diagblk_h + i*blocksize*blocksize,
+                    inv_diagblk_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost));
+    }
+
+    for(int j = 0; j < number_streams; j++){
+        cudaErrchk(cudaStreamSynchronize(stream[j]));
+    }
+    // deallocate device memory
+    for(int i = 0; i < number_streams; i++){
+        if (stream[i]) {
+            cudaErrchk(cudaStreamDestroy(stream[i]));
+        }
+        if(cublas_handle[i]) {
+            cublasErrchk(cublasDestroy(cublas_handle[i]));
+        }
+        if(cusolver_handle[i]) {
+            cusolverErrchk(cusolverDnDestroy(cusolver_handle[i]));
+        }
+    }
+    for(int i = 0; i < 2; i++){
+        if(matrix_diagblk_d[i]) {
+            cudaErrchk(cudaFree(matrix_diagblk_d[i]));
+        }
+        if(matrix_upperblk_d[i]) {
+            cudaErrchk(cudaFree(matrix_upperblk_d[i]));
+        }
+        if(matrix_lowerblk_d[i]) {
+            cudaErrchk(cudaFree(matrix_lowerblk_d[i]));
+        }
+    }
+    if(inv_diagblk_d) {
+        cudaErrchk(cudaFree(inv_diagblk_d));
+    }
+    if(inv_upperblk_d) {
+        cudaErrchk(cudaFree(inv_upperblk_d));
+    }
+    if(inv_lowerblk_d) {
+        cudaErrchk(cudaFree(inv_lowerblk_d));
+    }
+    if(identity_d){
+        cudaErrchk(cudaFree(identity_d));
+    }
+    if(identity_cpy_d){
+        cudaErrchk(cudaFree(identity_cpy_d));
+    }
+    if(inv_diagblk_small_d){
+        cudaErrchk(cudaFree(inv_diagblk_small_d));
+    }
+    if(buffer){
+        cudaErrchk(cudaFree(buffer));
+    }
+    if(ipiv_d){
+        cudaErrchk(cudaFree(ipiv_d));
+    }
+    if(info_d){
+        cudaErrchk(cudaFree(info_d));
+    }
+    for(unsigned int i = 0; i < n_blocks; i++){
+        if(schur_inverted[i]){
+            cudaErrchk(cudaEventDestroy(schur_inverted[i]));
+        }        
+    }
+
+    return success;
+}
+
+
 int main() {
 
     if (cudaSetDevice(0) != cudaSuccess) {
@@ -810,15 +1231,15 @@ int main() {
 
     Below they will be transformed to the following layout:
 
-    matrix_diagblk_cont = [A_0;
+    matrix_diagblk_h = [A_0;
                            A_1;
                            ...;
                            A_n]
-    matrix_upperblk_cont = [B_0;
+    matrix_upperblk_h = [B_0;
                             B_1;
                             ...;
                             B_n-1]
-    matrix_lowerblk_cont = [C_0;
+    matrix_lowerblk_h = [C_0;
                             C_1;
                             ...;
                             C_n-1]
@@ -827,10 +1248,12 @@ int main() {
     */
 
 
-    complex_h* matrix_diagblk_cont = (complex_h*) malloc(blocksize * matrix_size * sizeof(complex_h));
-    complex_h* matrix_upperblk_cont = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
-    complex_h* matrix_lowerblk_cont = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
-
+    complex_h* matrix_diagblk_h = NULL;
+    complex_h* matrix_upperblk_h = NULL;
+    complex_h* matrix_lowerblk_h = NULL;
+    cudaMallocHost((void**)&matrix_diagblk_h, blocksize * matrix_size * sizeof(complex_h));
+    cudaMallocHost((void**)&matrix_upperblk_h, blocksize * off_diag_size * sizeof(complex_h));
+    cudaMallocHost((void**)&matrix_lowerblk_h, blocksize * off_diag_size * sizeof(complex_h));
 
     for(unsigned int i = 0; i < blocksize * matrix_size; i++){
         // block index
@@ -841,7 +1264,7 @@ int main() {
         int m = h % blocksize;
         // col inside block
         int n = h / blocksize;
-        matrix_diagblk_cont[i] = matrix_diagblk[m*matrix_size + k*blocksize + n];
+        matrix_diagblk_h[i] = matrix_diagblk[m*matrix_size + k*blocksize + n];
     }
     for(unsigned int i = 0; i < blocksize * off_diag_size; i++){
         // block index
@@ -852,22 +1275,26 @@ int main() {
         int m = h % blocksize;
         // col inside block
         int n = h / blocksize;
-        matrix_upperblk_cont[i] = matrix_upperblk[m*off_diag_size + k*blocksize + n];
-        matrix_lowerblk_cont[i] = matrix_lowerblk[m*off_diag_size + k*blocksize + n];
+        matrix_upperblk_h[i] = matrix_upperblk[m*off_diag_size + k*blocksize + n];
+        matrix_lowerblk_h[i] = matrix_lowerblk[m*off_diag_size + k*blocksize + n];
     }
     // for(unsigned int i = 0; i < blocksize * off_diag_size; i++){
-    //     std::cout << "matrix_upperblk_cont[" << i << "] = " << matrix_upperblk_cont[i] << std::endl;
+    //     std::cout << "matrix_upperblk_h[" << i << "] = " << matrix_upperblk_h[i] << std::endl;
     // }
 
     // allocate memory for the inverse
-    complex_h* inv_diagblk_h = (complex_h*) malloc(blocksize * matrix_size * sizeof(complex_h));
-    complex_h* inv_upperblk_h = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
-    complex_h* inv_lowerblk_h = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
+    complex_h* inv_diagblk_h = NULL;
+    complex_h* inv_upperblk_h = NULL;
+    complex_h* inv_lowerblk_h = NULL;
+
+    cudaMallocHost((void**)&inv_diagblk_h, blocksize * matrix_size * sizeof(complex_h));
+    cudaMallocHost((void**)&inv_upperblk_h, blocksize * off_diag_size * sizeof(complex_h));
+    cudaMallocHost((void**)&inv_lowerblk_h, blocksize * off_diag_size * sizeof(complex_h));
 
     // if(!(rgf_matrix_fits_gpu_memory(blocksize, matrix_size,
-    //                                 matrix_diagblk_cont,
-    //                                 matrix_upperblk_cont,
-    //                                 matrix_lowerblk_cont,
+    //                                 matrix_diagblk_h,
+    //                                 matrix_upperblk_h,
+    //                                 matrix_lowerblk_h,
     //                                 inv_diagblk_h,
     //                                 inv_upperblk_h,
     //                                 inv_lowerblk_h))){
@@ -877,19 +1304,30 @@ int main() {
     //     printf("rgf_matrix_fits_gpu_memory succeeded\n");
     // }
 
-    if(!rgf_matrix_does_not_fit_gpu_memory(blocksize, matrix_size,
-                                    matrix_diagblk_cont,
-                                    matrix_upperblk_cont,
-                                    matrix_lowerblk_cont,
+    // if(!rgf_dense_matrix_does_not_fit_gpu_memory(blocksize, matrix_size,
+    //                                 matrix_diagblk_h,
+    //                                 matrix_upperblk_h,
+    //                                 matrix_lowerblk_h,
+    //                                 inv_diagblk_h,
+    //                                 inv_upperblk_h,
+    //                                 inv_lowerblk_h)){
+    //     printf("Error: rgf_dense_matrix_does_not_fit_gpu_memory failed\n");
+    // }
+    // else{
+    //     printf("rgf_dense_matrix_does_not_fit_gpu_memory succeeded\n");
+    // }
+    if(!rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(blocksize, matrix_size,
+                                    matrix_diagblk_h,
+                                    matrix_upperblk_h,
+                                    matrix_lowerblk_h,
                                     inv_diagblk_h,
                                     inv_upperblk_h,
                                     inv_lowerblk_h)){
-        printf("Error: rgf_matrix_does_not_fit_gpu_memory failed\n");
+        printf("Error: rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap failed\n");
     }
     else{
-        printf("rgf_matrix_does_not_fit_gpu_memory succeeded\n");
+        printf("rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap succeeded\n");
     }
-
 
     // ----- RESULT CHECKING SECTION -----
 
@@ -908,9 +1346,9 @@ int main() {
 
 
     // Transform the reference solution to contiguous blocks where the blocks have column-major order
-    complex_h* inv_diagblk_cont = (complex_h*) malloc(blocksize * matrix_size * sizeof(complex_h));
-    complex_h* inv_upperblk_cont = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
-    complex_h* inv_lowerblk_cont = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
+    complex_h* inv_diagblk_ref = (complex_h*) malloc(blocksize * matrix_size * sizeof(complex_h));
+    complex_h* inv_upperblk_ref = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
+    complex_h* inv_lowerblk_ref = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
 
 
 
@@ -923,7 +1361,7 @@ int main() {
         int m = h % blocksize;
         // col inside block
         int n = h / blocksize;
-        inv_diagblk_cont[i] = matrix_inv_diagblk_ref[m*matrix_size + k*blocksize + n];
+        inv_diagblk_ref[i] = matrix_inv_diagblk_ref[m*matrix_size + k*blocksize + n];
     }
     for(unsigned int i = 0; i < blocksize * off_diag_size; i++){
         // block index
@@ -934,14 +1372,14 @@ int main() {
         int m = h % blocksize;
         // col inside block
         int n = h / blocksize;
-        inv_upperblk_cont[i] = matrix_inv_upperblk_ref[m*off_diag_size + k*blocksize + n];
-        inv_lowerblk_cont[i] = matrix_inv_lowerblk_ref[m*off_diag_size + k*blocksize + n];
+        inv_upperblk_ref[i] = matrix_inv_upperblk_ref[m*off_diag_size + k*blocksize + n];
+        inv_lowerblk_ref[i] = matrix_inv_lowerblk_ref[m*off_diag_size + k*blocksize + n];
     }
 
     // // print last block of inverted matrix
     // for(unsigned int i = blocksize *(matrix_size-blocksize); i < blocksize * matrix_size; i++){
-    //     std::cout << "inv_diagblk_cont[" << i << "] = " << inv_diagblk_cont[i] << std::endl;
     //     std::cout << "inv_diagblk_h[" << i << "] = " << inv_diagblk_h[i] << std::endl;
+    //     std::cout << "inv_diagblk_ref[" << i << "] = " << inv_diagblk_ref[i] << std::endl;
     // }
 
     double norm_diagblk = 0.0;
@@ -951,54 +1389,53 @@ int main() {
     double diff_upperblk = 0.0;
     double diff_lowerblk = 0.0;
     for(unsigned int i = 0; i < blocksize * matrix_size; i++){
-        norm_diagblk += std::abs(inv_diagblk_h[i]);
-        diff_diagblk += std::abs(inv_diagblk_h[i] - inv_diagblk_cont[i]);
+        norm_diagblk += std::abs(inv_diagblk_ref[i]);
+        diff_diagblk += std::abs(inv_diagblk_h[i] - inv_diagblk_ref[i]);
     }
     for(unsigned int i = 0; i < blocksize * off_diag_size; i++){
-        norm_upperblk += std::abs(inv_upperblk_h[i]);
-        norm_lowerblk += std::abs(inv_lowerblk_h[i]);
-        diff_upperblk += std::abs(inv_upperblk_h[i] - inv_upperblk_cont[i]);
-        diff_lowerblk += std::abs(inv_lowerblk_h[i] - inv_lowerblk_cont[i]);
+        norm_upperblk += std::abs(inv_upperblk_ref[i]);
+        norm_lowerblk += std::abs(inv_lowerblk_ref[i]);
+        diff_upperblk += std::abs(inv_upperblk_h[i] - inv_upperblk_ref[i]);
+        diff_lowerblk += std::abs(inv_lowerblk_h[i] - inv_lowerblk_ref[i]);
     }
     double eps = 1e-12;
     if(diff_diagblk/norm_diagblk > eps){
-        printf("Error: inv_diagblk_h and inv_diagblk_cont are not equal\n");
+        printf("Error: inv_diagblk_h and inv_diagblk_ref are not equal\n");
     }
     else{
-        printf("inv_diagblk_h and inv_diagblk_cont are equal\n");
+        printf("inv_diagblk_h and inv_diagblk_ref are equal\n");
     }
     if(diff_upperblk/norm_upperblk > eps){
-        printf("Error: inv_upperblk_h and inv_upperblk_cont are not equal\n");
+        printf("Error: inv_upperblk_h and inv_upperblk_ref are not equal\n");
     }
     else{
-        printf("inv_upperblk_h and inv_upperblk_cont are equal\n");
+        printf("inv_upperblk_h and inv_upperblk_ref are equal\n");
     }
     if(diff_lowerblk/norm_lowerblk > eps){
-        printf("Error: inv_lowerblk_h and inv_lowerblk_cont are not equal\n");
+        printf("Error: inv_lowerblk_h and inv_lowerblk_ref are not equal\n");
     }
     else{
-        printf("inv_lowerblk_h and inv_lowerblk_cont are equal\n");
+        printf("inv_lowerblk_h and inv_lowerblk_ref are equal\n");
     }
-
 
 
     if(inv_diagblk_h){
-        free(inv_diagblk_h);
+        cudaFreeHost(inv_diagblk_h);
     }
     if(inv_upperblk_h){
-        free(inv_upperblk_h);
+        cudaFreeHost(inv_upperblk_h);
     }
     if(inv_lowerblk_h){
-        free(inv_lowerblk_h);
+        cudaFreeHost(inv_lowerblk_h);
     }
-    if(inv_diagblk_cont){
-        free(inv_diagblk_cont);
+    if(matrix_diagblk_h){
+        cudaFreeHost(matrix_diagblk_h);
     }
-    if(inv_upperblk_cont){
-        free(inv_upperblk_cont);
+    if(matrix_upperblk_h){
+        cudaFreeHost(matrix_upperblk_h);
     }
-    if(inv_lowerblk_cont){
-        free(inv_lowerblk_cont);
+    if(matrix_lowerblk_h){
+        cudaFreeHost(matrix_lowerblk_h);
     }
     if(matrix_diagblk){
         free(matrix_diagblk);
@@ -1017,6 +1454,15 @@ int main() {
     }
     if(matrix_inv_lowerblk_ref){
         free(matrix_inv_lowerblk_ref);
+    }
+    if(inv_diagblk_ref){
+        free(inv_diagblk_ref);
+    }
+    if(inv_upperblk_ref){
+        free(inv_upperblk_ref);
+    }
+    if(inv_lowerblk_ref){
+        free(inv_lowerblk_ref);
     }
 
 

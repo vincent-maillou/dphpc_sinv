@@ -781,9 +781,15 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     for(unsigned int i = 0; i < n_blocks; i++){
         cudaErrchk(cudaEventCreate(&schur_inverted[i]))
     }
-    
-
-
+    cudaEvent_t unload[n_blocks];
+    for(unsigned int i = 0; i < n_blocks; i++){
+        cudaErrchk(cudaEventCreate(&unload[i]))
+    }
+    complex_d alpha;
+    complex_d beta;
+    int stream_memload = 1;
+    int stream_compute = 0;
+    int stream_memunload = 2;
 
     // not allowed to load full matrix to device
     // allocate memory for the blocks
@@ -803,13 +809,15 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
 
     // allocate memory for the inverse
     complex_d* inv_diagblk_d = NULL;
-    complex_d* inv_diagblk_small_d = NULL;
+    complex_d* inv_diagblk_small_d[2];
     complex_d* inv_upperblk_d = NULL;
     complex_d* inv_lowerblk_d = NULL;
 
     cudaErrchk(cudaMalloc((void**)&inv_diagblk_d, blocksize * blocksize * sizeof(complex_d)));
-    cudaErrchk(cudaMalloc((void**)&inv_diagblk_small_d, blocksize * blocksize * sizeof(complex_d)));
-
+    for(int i = 0; i < 2; i++){
+        cudaErrchk(cudaMalloc((void**)&inv_diagblk_small_d[i], blocksize * blocksize * sizeof(complex_d)));
+    }
+    
     cudaErrchk(cudaMalloc((void**)&inv_upperblk_d, blocksize * blocksize * sizeof(complex_d)));
     cudaErrchk(cudaMalloc((void**)&inv_lowerblk_d, blocksize * blocksize * sizeof(complex_d)));
 
@@ -839,8 +847,8 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     //figure out extra amount of memory needed
     complex_d *buffer = NULL;
     int bufferSize = 0;
-    cusolverErrchk(cusolverDnZgetrf_bufferSize(cusolver_handle[0], blocksize, blocksize,
-                                            (complex_d *)matrix_diagblk_d[0],
+    cusolverErrchk(cusolverDnZgetrf_bufferSize(cusolver_handle[stream_compute], blocksize, blocksize,
+                                            (complex_d *)matrix_diagblk_d[stream_compute],
                                               blocksize, &bufferSize));
     cudaErrchk(cudaMalloc((void**)&buffer, sizeof(complex_d) * bufferSize));
 
@@ -848,51 +856,51 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
 
     // init right hand side identity matrix on device for backsub
     cudaErrchk(cudaMemcpyAsync(identity_d, reinterpret_cast<const complex_d*>(identity_h),
-                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[0]));
-    cudaErrchk(cudaMemcpyAsync(identity_cpy_d, identity_d,
-                blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice, stream[0]));
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_compute]));
+    cudaErrchk(cudaMemcpyAsync(inv_diagblk_d, identity_d,
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice, stream[stream_compute]));
     
 
-    cudaErrchk(cudaMemcpyAsync(matrix_diagblk_d[0], reinterpret_cast<const complex_d*>(matrix_diagblk_h),
-                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[0]));
+    cudaErrchk(cudaMemcpyAsync(matrix_diagblk_d[stream_compute], reinterpret_cast<const complex_d*>(matrix_diagblk_h),
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_compute]));
 
 
-    cusolverErrchk(cusolverDnZgetrf(cusolver_handle[0], blocksize, blocksize,
-                                matrix_diagblk_d[0], blocksize, buffer, ipiv_d, info_d));
+    cusolverErrchk(cusolverDnZgetrf(cusolver_handle[stream_compute], blocksize, blocksize,
+                                matrix_diagblk_d[stream_compute], blocksize, buffer, ipiv_d, info_d));
     
 
     //back substitution
-    cusolverErrchk(cusolverDnZgetrs(cusolver_handle[0], CUBLAS_OP_N, blocksize,
-                                    blocksize, matrix_diagblk_d[0], blocksize, ipiv_d,
-                                    identity_cpy_d, blocksize, info_d));
+    cusolverErrchk(cusolverDnZgetrs(cusolver_handle[stream_compute], CUBLAS_OP_N, blocksize,
+                                    blocksize, matrix_diagblk_d[stream_compute], blocksize, ipiv_d,
+                                    inv_diagblk_d, blocksize, info_d));
 
     // record finishing the inverse of the first block
-    cudaErrchk(cudaEventRecord(schur_inverted[0], stream[0]));
+    cudaErrchk(cudaEventRecord(schur_inverted[0], stream[stream_compute]));
 
 
     //wait for the inverse of the first block
-    cudaErrchk(cudaStreamWaitEvent(stream[2], schur_inverted[0]));
+    cudaErrchk(cudaStreamWaitEvent(stream[stream_memunload], schur_inverted[0]));
     // 0. Inverse of the first block
-    cudaErrchk(cudaMemcpyAsync(inv_diagblk_h, identity_cpy_d,
-                blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[2]));
-    
+    cudaErrchk(cudaMemcpyAsync(inv_diagblk_h, inv_diagblk_d,
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
+    // unloading finished
+    cudaErrchk(cudaEventRecord(unload[0], stream[stream_memunload]));
 
 
     // first memcpy happens before loop
     cudaErrchk(cudaMemcpyAsync(matrix_diagblk_d[1],
                 reinterpret_cast<const complex_d*>(matrix_diagblk_h + blocksize*blocksize),
-                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[1]));
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
     cudaErrchk(cudaMemcpyAsync(matrix_upperblk_d[1],
                 reinterpret_cast<const complex_d*>(matrix_upperblk_h),
-                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[1]));
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
     cudaErrchk(cudaMemcpyAsync(matrix_lowerblk_d[1],
                 reinterpret_cast<const complex_d*>(matrix_lowerblk_h),
-                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[1]));
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
 
 
 
-    complex_d alpha;
-    complex_d beta;
+
     // // 1. Forward substitution (performed left to right)
     for (unsigned int i = 1; i < n_blocks; ++i) {
 
@@ -919,7 +927,7 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         cudaErrchk(cudaStreamWaitEvent(stream[stream_compute], schur_inverted[i-1]));
 
         // MatMul tmp = eig_lowerblk[i-1] * eig_inv_diagblk[i-1]
-        // use the identity_cpy_d from last iteration
+        // use the inv_diagblk_d from last iteration
         // use inv_lowerblk_d as tmp
         alpha = make_cuDoubleComplex(1.0, 0.0);
         beta = make_cuDoubleComplex(0.0, 0.0);
@@ -930,7 +938,7 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
             blocksize, blocksize, blocksize,
             &alpha,
             matrix_lowerblk_d[stream_compute], blocksize,
-            identity_cpy_d, blocksize,
+            inv_diagblk_d, blocksize,
             &beta,
             inv_lowerblk_d, blocksize));
         //MatMul schur complement = eig_diagblk[i] - tmp * eig_upperblk[i-1]
@@ -947,9 +955,10 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
             &beta,
             matrix_diagblk_d[stream_compute], blocksize));
 
-
+        // wait to not overwrite block to unload
+        cudaErrchk(cudaStreamWaitEvent(stream[stream_compute], unload[i-1]));
         //copy identity
-        cudaErrchk(cudaMemcpyAsync(identity_cpy_d, identity_d,
+        cudaErrchk(cudaMemcpyAsync(inv_diagblk_d, identity_d,
                     blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice, stream[stream_compute]));
         // inverse schur complement
         cusolverErrchk(cusolverDnZgetrf(cusolver_handle[stream_compute], blocksize, blocksize,
@@ -962,46 +971,60 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
                                         blocksize,
                                         matrix_diagblk_d[stream_compute],
                                         blocksize, ipiv_d,
-                                        identity_cpy_d, blocksize, info_d));
+                                        inv_diagblk_d, blocksize, info_d));
         // record finishing of computation in step i
         cudaErrchk(cudaEventRecord(schur_inverted[i], stream[stream_compute]));
 
         // wait to unload for the finish of computations
         cudaErrchk(cudaStreamWaitEvent(stream[stream_memunload], schur_inverted[i]));
         cudaErrchk(cudaMemcpyAsync(inv_diagblk_h + i*blocksize*blocksize,
-                    identity_cpy_d,
+                    inv_diagblk_d,
                     blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
-    
+        // unloading finished
+        cudaErrchk(cudaEventRecord(unload[i], stream[stream_memunload]));
 
     }
 
+    int stream_memload_before = (n_blocks) % 2;
+    int stream_compute_before = (n_blocks-1) % 2;
 
-
-    for(int j = 0; j < number_streams; j++){
-        cudaErrchk(cudaStreamSynchronize(stream[j]));
-    }
-    //synchronize between forward and backward substitution
-    cudaErrchk(cudaMemcpy(inv_diagblk_d,
-                identity_cpy_d,
-                blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice));
+    cudaErrchk(cudaMemcpyAsync(matrix_upperblk_d[stream_memload_before],
+                reinterpret_cast<const complex_d*>(matrix_upperblk_h + (n_blocks-2)*blocksize*blocksize),
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
+    cudaErrchk(cudaMemcpyAsync(matrix_lowerblk_d[stream_memload_before],
+                reinterpret_cast<const complex_d*>(matrix_lowerblk_h + (n_blocks-2)*blocksize*blocksize),
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
+    // possible race condition with unloading of previous loop
+    // not sure
+    cudaErrchk(cudaMemcpyAsync(inv_diagblk_small_d[stream_memload_before],
+                reinterpret_cast<const complex_d*>(inv_diagblk_h  + (n_blocks-2)*blocksize*blocksize),
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
+  
 
     // 2. Backward substitution (performed right to left)
     for(int i = n_blocks-2; i >= 0; --i){
-        
-        for(int j = 0; j < number_streams; j++){
-            cudaErrchk(cudaStreamSynchronize(stream[j]));
+
+        // fix stream compute to be the stream which loaded
+        // blocks before the loop
+        stream_memload = (stream_compute_before + (i - n_blocks + 2) ) % 2;
+        stream_compute = (stream_memload_before + (i - n_blocks + 2) ) % 2;
+        stream_memunload = 2;
+
+        if(i > 0){
+            cudaErrchk(cudaMemcpyAsync(matrix_upperblk_d[stream_memload],
+                        reinterpret_cast<const complex_d*>(matrix_upperblk_h + (i-1)*blocksize*blocksize),
+                        blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
+            cudaErrchk(cudaMemcpyAsync(matrix_lowerblk_d[stream_memload],
+                        reinterpret_cast<const complex_d*>(matrix_lowerblk_h + (i-1)*blocksize*blocksize),
+                        blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
+            cudaErrchk(cudaMemcpyAsync(inv_diagblk_small_d[stream_memload],
+                        reinterpret_cast<const complex_d*>(inv_diagblk_h  + (i-1)*blocksize*blocksize),
+                        blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));    
         }
+    
 
-        cudaErrchk(cudaMemcpy(matrix_upperblk_d[0],
-                    reinterpret_cast<const complex_d*>(matrix_upperblk_h + i*blocksize*blocksize),
-                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice));
-        cudaErrchk(cudaMemcpy(matrix_lowerblk_d[0],
-                    reinterpret_cast<const complex_d*>(matrix_lowerblk_h + i*blocksize*blocksize),
-                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice));
-        cudaErrchk(cudaMemcpy(inv_diagblk_small_d,
-                    reinterpret_cast<const complex_d*>(inv_diagblk_h  + i*blocksize*blocksize),
-                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice));        
-
+        // wait for the block of the last iteration
+        cudaErrchk(cudaStreamWaitEvent(stream[stream_compute], schur_inverted[i+1]));
 
         //tmp = eig_inv_diagblk[i+1] * eig_lowerblk[i]
         // use identity_cpy_d as tmp
@@ -1009,16 +1032,13 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         // which is the last true inverse block
         alpha = make_cuDoubleComplex(1.0, 0.0);
         beta = make_cuDoubleComplex(0.0, 0.0);
-        for(int j = 0; j < number_streams; j++){
-            cudaErrchk(cudaStreamSynchronize(stream[j]));
-        }
         cublasErrchk(cublasZgemm(
-            cublas_handle[0],
+            cublas_handle[stream_compute],
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
             inv_diagblk_d, blocksize,
-            matrix_lowerblk_d[0], blocksize,
+            matrix_lowerblk_d[stream_compute], blocksize,
             &beta,
             identity_cpy_d, blocksize));
 
@@ -1026,50 +1046,38 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         alpha = make_cuDoubleComplex(-1.0, 0.0);
         beta = make_cuDoubleComplex(0.0, 0.0);
         
-        for(int j = 0; j < number_streams; j++){
-            cudaErrchk(cudaStreamSynchronize(stream[j]));
-        }
+        // wait to not overwrite blocks to unload
+        cudaErrchk(cudaStreamWaitEvent(stream[stream_compute], unload[i+1]));   
         cublasErrchk(cublasZgemm(
-            cublas_handle[0],
+            cublas_handle[stream_compute],
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
             identity_cpy_d, blocksize,
-            inv_diagblk_small_d, blocksize,
+            inv_diagblk_small_d[stream_compute], blocksize,
             &beta,
             inv_lowerblk_d, blocksize));
-        for(int j = 0; j < number_streams; j++){
-            cudaErrchk(cudaStreamSynchronize(stream[j]));
-        }
-        cudaErrchk(cudaMemcpy(inv_lowerblk_h + i*blocksize*blocksize,
-                    inv_lowerblk_d,
-                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost));
 
         // tmp = eig_inv_diagblk[i] * eig_upperblk[i]
         alpha = make_cuDoubleComplex(1.0, 0.0);
         beta = make_cuDoubleComplex(0.0, 0.0);
-        
-        for(int j = 0; j < number_streams; j++){
-            cudaErrchk(cudaStreamSynchronize(stream[j]));
-        }
+
         cublasErrchk(cublasZgemm(
-            cublas_handle[0],
+            cublas_handle[stream_compute],
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
-            inv_diagblk_small_d, blocksize,
-            matrix_upperblk_d[0], blocksize,
+            inv_diagblk_small_d[stream_compute], blocksize,
+            matrix_upperblk_d[stream_compute], blocksize,
             &beta,
             identity_cpy_d, blocksize));
 
         //eig_inv_upperblk[i] = -tmp * eig_inv_diagblk[i+1];
         alpha = make_cuDoubleComplex(-1.0, 0.0);
         beta = make_cuDoubleComplex(0.0, 0.0);
-        for(int j = 0; j < number_streams; j++){
-            cudaErrchk(cudaStreamSynchronize(stream[j]));
-        }
+
         cublasErrchk(cublasZgemm(
-            cublas_handle[0],
+            cublas_handle[stream_compute],
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
@@ -1077,40 +1085,43 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
             inv_diagblk_d, blocksize,
             &beta,
             inv_upperblk_d, blocksize));
-        for(int j = 0; j < number_streams; j++){
-            cudaErrchk(cudaStreamSynchronize(stream[j]));
-        }
-        cudaErrchk(cudaMemcpy(inv_upperblk_h + i*blocksize*blocksize,
-                    inv_upperblk_d,
-                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost));
+
 
         //eig_inv_diagblk[i] -= tmp * eig_inv_lowerblk[i];
         alpha = make_cuDoubleComplex(-1.0, 0.0);
         beta = make_cuDoubleComplex(1.0, 0.0);
-        for(int j = 0; j < number_streams; j++){
-            cudaErrchk(cudaStreamSynchronize(stream[j]));
-        }
+
         cublasErrchk(cublasZgemm(
-            cublas_handle[0],
+            cublas_handle[stream_compute],
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
             identity_cpy_d, blocksize,
             inv_lowerblk_d, blocksize,
             &beta,
-            inv_diagblk_small_d, blocksize));
-        for(int j = 0; j < number_streams; j++){
-            cudaErrchk(cudaStreamSynchronize(stream[j]));
-        }
+            inv_diagblk_small_d[stream_compute], blocksize));
+ 
+        cudaErrchk(cudaMemcpyAsync(inv_diagblk_d,
+                    inv_diagblk_small_d[stream_compute],
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice, stream[stream_compute]));
+        cudaErrchk(cudaEventRecord(schur_inverted[i], stream[stream_compute]));
 
-        cudaErrchk(cudaMemcpy(inv_diagblk_d,
-                    inv_diagblk_small_d,
-                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice));
-        cudaErrchk(cudaMemcpy(inv_diagblk_h + i*blocksize*blocksize,
+        // wait to unload for the finish of computations
+        cudaErrchk(cudaStreamWaitEvent(stream[stream_memunload], schur_inverted[i]));
+        cudaErrchk(cudaMemcpyAsync(inv_diagblk_h + i*blocksize*blocksize,
                     inv_diagblk_d,
-                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost));
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
+        cudaErrchk(cudaMemcpyAsync(inv_upperblk_h + i*blocksize*blocksize,
+                    inv_upperblk_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
+        cudaErrchk(cudaMemcpyAsync(inv_lowerblk_h + i*blocksize*blocksize,
+                    inv_lowerblk_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
+        // unloading finished
+        cudaErrchk(cudaEventRecord(unload[i], stream[stream_memunload]));
     }
 
+    // synchronize all the streams
     for(int j = 0; j < number_streams; j++){
         cudaErrchk(cudaStreamSynchronize(stream[j]));
     }
@@ -1152,9 +1163,13 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     if(identity_cpy_d){
         cudaErrchk(cudaFree(identity_cpy_d));
     }
-    if(inv_diagblk_small_d){
-        cudaErrchk(cudaFree(inv_diagblk_small_d));
+
+    for(int i = 0; i < 2; i++){
+        if(inv_diagblk_small_d[i]){
+            cudaErrchk(cudaFree(inv_diagblk_small_d[i]));
+        }        
     }
+
     if(buffer){
         cudaErrchk(cudaFree(buffer));
     }
@@ -1168,6 +1183,11 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         if(schur_inverted[i]){
             cudaErrchk(cudaEventDestroy(schur_inverted[i]));
         }        
+    }
+    for(unsigned int i = 0; i < n_blocks; i++){
+        if(unload[i]){
+            cudaErrchk(cudaEventDestroy(unload[i]));
+        }
     }
 
     return success;

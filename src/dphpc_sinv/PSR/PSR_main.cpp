@@ -31,9 +31,7 @@ int main(int argc, char *argv[]) {
 
     load_matrix(test_folder + "A_full.bin", A, N, N);
 
-    // Test cases schur reduction
 
-    // // full matrix from different path
     Eigen::MatrixXcd eigenA_read_in = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A, N, N);
 
     if (FullSeqTest) {

@@ -6,15 +6,15 @@ EIGENROOT = /usr/scratch/mont-fort17/almaeder/libraries/eigen/
 
 CXXFLAGS = -Wall -Wextra -fopenmp -std=c++14 -I${EIGENROOT} -I${CUDA_ROOT}/include
 NVCCFLAGS = -arch=sm_60 -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -std=c++14 -Xcompiler -fopenmp -I${CUDA_ROOT}/include
-LDFLAGS = -L"${CUDA_ROOT}/lib64" -lcuda -lcudart -lcusolver -lcublas
-SOURCES= dense_rgf.cpp utils.cpp
+LDFLAGS = -L"${CUDA_ROOT}/lib64" -lcuda -lcudart -lcusolver -lcublas -lcusparse
+SOURCES= sparse_rgf.cpp utils.cpp
 
 CPP_SOURCES = $(filter %.cpp, $(SOURCES))
 CU_SOURCES = $(filter %.cu, $(SOURCES))
 
 CPP_OBJ_FILES=$(CPP_SOURCES:.cpp=.o)
 CU_OBJ_FILES =$(CU_SOURCES:.cu=.o)
-BINARY = dense_rgf
+BINARY = sparse_rgf
 
 
 .PHONY: all

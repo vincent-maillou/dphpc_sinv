@@ -6,9 +6,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-SEED = 63
-MAT_SIZE = 10
-BLOCKSIZE = 2
+SEED = 8000
+MAT_SIZE = 500
+BLOCKSIZE = 100
 PATH_TO_FILE = "../../../tests/tests_cases/"
 
 

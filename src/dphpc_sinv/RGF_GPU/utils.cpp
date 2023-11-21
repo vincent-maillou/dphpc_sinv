@@ -6,6 +6,7 @@
 #include <fstream>
 #include <vector>
 #include <iostream>
+#include <string>
 
 #include "utils.h"
 
@@ -28,6 +29,29 @@ bool load_binary_matrix(
     std::fclose(fp);
     return true;
 }
+
+template<typename T>
+bool load_binary_array(
+    std::string filename, 
+    T *array,
+    int size)
+{
+    std::FILE *fp;
+
+    fp = std::fopen(filename.c_str(), "rb");
+    if (fp == nullptr) {
+        std::printf("Error opening file\n");
+        return false;
+    }
+
+    std::fread(array, sizeof(T), size, fp);
+
+    std::fclose(fp);
+    return true;
+}
+template bool load_binary_array<double>(std::string filename, double* array, int size);
+template bool load_binary_array<int>(std::string filename, int* array, int size);
+template bool load_binary_array<std::complex<double>>(std::string filename, std::complex<double>* array, int size);
 
 
 void free_matrix(
@@ -74,7 +98,7 @@ bool load_matrix_parameters(
 
 template<typename T>
 bool load_text_array(
-    char *filename, 
+    const char *filename, 
     T *array,
     int size)
 {
@@ -85,11 +109,7 @@ bool load_text_array(
         return false;
     }
 
-    // problem on how the text file is saved
-    // i.e. savetxt from numpy does 1.123e01 instead of 11.23
-    // fix, but not possible for complex numbers
-    // i.e. templating brings no benefit:)
-    double num = 0.0;
+    double num = T(0.0);
     //keep storing values from the text file so long as data exists:
     for (int i = 0; i < size; i++) {
         ifile >> num;
@@ -103,8 +123,8 @@ bool load_text_array(
 // Explicit instantiation of the template
 // else not found in compilation
 // other option would be to put the implementation in the header file
-template bool load_text_array<double>(char* filename, double* matrix, int size);
-template bool load_text_array<int>(char* filename, int* matrix, int size);
+template bool load_text_array<double>(const char* filename, double* array, int size);
+template bool load_text_array<int>(const char* filename, int* array, int size);
 
 template <typename T>
 bool save_text_array(

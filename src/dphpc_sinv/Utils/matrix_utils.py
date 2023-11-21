@@ -3,6 +3,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from scipy.sparse import csr_matrix
+import os
 
 def generate_random_matrix(
     matrice_size: int,
@@ -76,14 +78,14 @@ def sparsifyMatrix(
     A = matrice.copy()
     for i in range(A.shape[0]):
         for j in range(A.shape[1]):
-            if np.random.rand() < sparsity:
+            if np.random.rand() > sparsity:
                 A[i, j] = 0
 
     return A
 
 
 def generateSparseBandedMatrix(
-    matrice_size: int, 
+    matrice_size: int,
     bandwidth: int,
     sparsity: float,
     seed: int = None
@@ -111,6 +113,10 @@ def generateSparseBandedMatrix(
     
     A = sparsifyMatrix(A, sparsity, seed)
 
+    # assert that the matrix will be invertible
+    value_diag = np.sum(np.abs(A), axis=1)
+    np.fill_diagonal(A, value_diag + 1)
+
     return A
 
 
@@ -120,6 +126,69 @@ def write_matrix_to_file(
 ):
     with open(path_to_file, "wb") as f:
         f.write(matrix.tobytes())
+
+def write_dense_matrix_to_sparse_blocks_file(
+    path_to_file: str,
+    matrix: np.ndarray,
+    blocksize: int
+):
+    assert matrix.shape[0] == matrix.shape[1]
+    assert matrix.shape[0] % blocksize == 0
+    matrix_size = matrix.shape[0]
+    number_of_blocks = matrix_size // blocksize
+
+    if not os.path.exists(path_to_file):
+        os.mkdir(path_to_file)
+
+    save_path = os.path.join(path_to_file, "sparse_matrices_"+str(matrix_size)+"_"+str(blocksize)+"/")
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+
+
+    diag_nnz = []
+    for i in range(number_of_blocks):
+        sparse_block_diag = csr_matrix(matrix[i*blocksize:(i+1)*blocksize, i*blocksize:(i+1)*blocksize])
+        diag_nnz.append(sparse_block_diag.nnz)
+        with open(os.path.join(save_path, "diag_data" + str(i) + ".bin"), "wb") as f:
+            f.write(sparse_block_diag.data.tobytes())
+        with open(os.path.join(save_path, "diag_indices" + str(i) + ".bin"), "wb") as f:
+            f.write(sparse_block_diag.indices.tobytes())
+        with open(os.path.join(save_path, "diag_indptr" + str(i) + ".bin"), "wb") as f:
+            f.write(sparse_block_diag.indptr.tobytes())
+
+    upper_nnz = []
+    lower_nnz = []
+    for i in range(number_of_blocks-1):
+        sparse_block_upper = csr_matrix(matrix[i*blocksize:(i+1)*blocksize, (i+1)*blocksize:(i+2)*blocksize])
+        upper_nnz.append(sparse_block_upper.nnz)
+        with open(os.path.join(save_path, "upper_data" + str(i) + ".bin"), "wb") as f:
+            f.write(sparse_block_upper.data.tobytes())
+        with open(os.path.join(save_path, "upper_indices" + str(i) + ".bin"), "wb") as f:
+            f.write(sparse_block_upper.indices.tobytes())
+        with open(os.path.join(save_path, "upper_indptr" + str(i) + ".bin"), "wb") as f:
+            f.write(sparse_block_upper.indptr.tobytes())
+        sparse_block_lower = csr_matrix(matrix[(i+1)*blocksize:(i+2)*blocksize, i*blocksize:(i+1)*blocksize])
+        lower_nnz.append(sparse_block_lower.nnz)
+        with open(os.path.join(save_path, "lower_data" + str(i) + ".bin"), "wb") as f:
+            f.write(sparse_block_lower.data.tobytes())
+        with open(os.path.join(save_path, "lower_indices" + str(i) + ".bin"), "wb") as f:
+            f.write(sparse_block_lower.indices.tobytes())
+        with open(os.path.join(save_path, "lower_indptr" + str(i) + ".bin"), "wb") as f:
+            f.write(sparse_block_lower.indptr.tobytes())
+    print(diag_nnz)
+    print(save_path)
+    with open(os.path.join(save_path, "diag_nnz.txt"), "w", encoding="utf-8") as f:
+        for i in range(number_of_blocks):
+            f.write(str(diag_nnz[i]) + "\n")
+    with open(os.path.join(save_path, "upper_nnz.txt"), "w", encoding="utf-8") as f:
+        for i in range(number_of_blocks-1):
+            f.write(str(upper_nnz[i]) + "\n")
+    with open(os.path.join(save_path, "lower_nnz.txt"), "w", encoding="utf-8") as f:
+        for i in range(number_of_blocks-1):
+            f.write(str(lower_nnz[i]) + "\n")
+    print("Diag nnz: ", diag_nnz)
+    print("Upper nnz: ", upper_nnz)
+    print("Lower nnz: ", lower_nnz)
 
 
 def print_matrix(

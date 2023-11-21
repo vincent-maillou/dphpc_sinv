@@ -9,9 +9,9 @@ import os
 SEED = 63
 MAT_SIZE = 10
 BLOCKSIZE = 2
-SPARSITY = 0.3
+SPARSITY = 1.2
 PATH_TO_FILE = "../../../tests/tests_cases/"
-
+PATH_TO_FILE = os.path.join("/home/sem23f28/Documents/dphpc_sinv", "tests/", "tests_cases/")
 
 
 if __name__ == "__main__":
@@ -25,6 +25,8 @@ if __name__ == "__main__":
     # Compute inverse
     inv_matrix = np.linalg.inv(matrix)
 
+    print(inv_matrix)
+    print(matrix)
     # Extract diagonal and off-diagonal blocks
     matrix_diag_blk = matrix_utils.extract_diagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE)
     matrix_upper_blk = matrix_utils.extract_offdiagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE, 1)
@@ -39,21 +41,29 @@ if __name__ == "__main__":
     plt.matshow(matrix_upper_blk.real)
     plt.matshow(matrix_lower_blk.real)
     plt.show() """
+    plt.matshow(matrix.real)
+    plt.savefig("matrix.png")
+
+    matrix_utils.write_dense_matrix_to_sparse_blocks_file(
+        PATH_TO_FILE,
+        matrix,
+        BLOCKSIZE
+    )
 
     # Save matrices to file
-    filename = "sparse_matrix_0_diagblk.bin"
+    filename = "sparse_blocks_matrix_0_diagblk.bin"
     matrix_utils.write_matrix_to_file(PATH_TO_FILE+filename, matrix_diag_blk)
-    filename = "sparse_matrix_0_upperblk.bin"
+    filename = "sparse_blocks_matrix_0_upperblk.bin"
     matrix_utils.write_matrix_to_file(PATH_TO_FILE+filename, matrix_upper_blk)
-    filename = "sparse_matrix_0_lowerblk.bin"
+    filename = "sparse_blocks_matrix_0_lowerblk.bin"
     matrix_utils.write_matrix_to_file(PATH_TO_FILE+filename, matrix_lower_blk)
 
-    filename = "sparse_matrix_0_inverse_diagblk.bin"
+    filename = "sparse_blocks_matrix_0_inverse_diagblk.bin"
     matrix_utils.write_matrix_to_file(PATH_TO_FILE+filename, matrix_inv_diag_blk)
-    filename = "sparse_matrix_0_inverse_upperblk.bin"
+    filename = "sparse_blocks_matrix_0_inverse_upperblk.bin"
     matrix_utils.write_matrix_to_file(PATH_TO_FILE+filename, matrix_inv_upper_blk)
-    filename = "sparse_matrix_0_inverse_lowerblk.bin"
+    filename = "sparse_blocks_matrix_0_inverse_lowerblk.bin"
     matrix_utils.write_matrix_to_file(PATH_TO_FILE+filename, matrix_inv_lower_blk)
 
-    filename = "sparse_matrix_0_parameters.txt"
+    filename = "sparse_blocks_matrix_0_parameters.txt"
     matrix_utils.write_matrix_parameters(PATH_TO_FILE+filename, MAT_SIZE, BLOCKSIZE)

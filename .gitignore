@@ -171,4 +171,5 @@ src/dphpc_sinv/*.o
 .vscode/
 **/.vscode/
 **/dense_rgf
+**/sparse_rgf
 **/*.nsys-rep

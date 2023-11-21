@@ -11,6 +11,11 @@ bool load_binary_matrix(
     int rows, 
     int cols);
 
+template<typename T>
+bool load_binary_array(
+    std::string filename, 
+    T *array,
+    int size);
 
 void free_matrix(
     std::complex<double> *matrix);
@@ -27,7 +32,7 @@ bool load_matrix_parameters(
 
 template<typename T>
 bool load_text_array(
-    char *filename, 
+    const char *filename, 
     T *array,
     int size);
 

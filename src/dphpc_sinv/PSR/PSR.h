@@ -113,6 +113,21 @@ void produceSchurCentral(Eigen::MatrixXcd A,
                                    int blocksize
 );   
 
+
+void fill_buffer(Eigen::MatrixXcd& inMatrix,
+		 Eigen::MatrixXcd** eigenA, 
+		 int partition_blocksize, 
+		 int blocksize, 
+		 int rank, 
+		 int partitions);
+
+
+void fill_reduced_schur_matrix(Eigen::MatrixXcd& A_schur, 
+			       double* comm_buf, 
+			       int in_buf_size, 
+			       int blocksize, 
+			       int partitions);
+
 void myFunction(Eigen::MatrixXcd& A);
 
 void load_matrix(

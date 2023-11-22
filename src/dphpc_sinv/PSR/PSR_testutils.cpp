@@ -64,6 +64,10 @@ void compareSINV_referenceInverse_byblock(int n_blocks,
 }
 
 
+
+
+
+
 Eigen::MatrixXcd psr_seqsolve_fulltest(const std::string test_folder,
                              int N,
                              int num_central_partitions,
@@ -123,7 +127,22 @@ Eigen::MatrixXcd psr_seqsolve_fulltest(const std::string test_folder,
     load_matrix(test_folder + "A_schur.bin", A_schur_test,  blocksize * n_blocks_schursystem, blocksize * n_blocks_schursystem);
     Eigen::MatrixXcd eigenA_schur_test = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_schur_test, blocksize * n_blocks_schursystem, blocksize * n_blocks_schursystem);
 
-    aggregate_reduced_system_locally(A_schur, eigenA, n_blocks_schursystem, partition_blocksize, blocksize, partitions);
+    //Start of changes for MPIALLGATHER
+    unsigned long comm_buf_size = (blocksize * blocksize * partitions * 6) << 1; 
+    double* comm_buf = new double[comm_buf_size];
+
+    unsigned long in_buf_size = (blocksize * blocksize * 6) << 1;
+    Eigen::MatrixXcd inMatrix = Eigen::MatrixXcd::Zero(blocksize, 6*blocksize);
+    fill_buffer(inMatrix, eigenA, partition_blocksize, blocksize, rank, partitions);
+
+    double* in_buf = (double*) inMatrix.data();
+    MPI_Allgather(in_buf, in_buf_size, MPI_DOUBLE, comm_buf, in_buf_size, MPI_DOUBLE, MPI_COMM_WORLD);
+
+    fill_reduced_schur_matrix(A_schur, comm_buf, in_buf_size, blocksize, partitions);
+
+    delete[] comm_buf;
+    //aggregate_reduced_system_locally(A_schur, eigenA, n_blocks_schursystem, partition_blocksize, blocksize, partitions);
+    //End of changes
 
     // Test case for aggregate schur
     std::complex<double>* G_schur_test = new std::complex<double>[blocksize * n_blocks_schursystem * blocksize * n_blocks_schursystem];

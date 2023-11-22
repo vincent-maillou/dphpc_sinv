@@ -579,6 +579,78 @@ void aggregate_Gblocks_tofinalinverse_sequentially(int partitions,
 
 }
 
+
+void fill_buffer(Eigen::MatrixXcd& inMatrix, Eigen::MatrixXcd** eigenA, int partition_blocksize, int blocksize, int rank, int partitions) {
+
+    if(rank == 0) {
+	int start_rowindice_remote = (0 + partition_blocksize - 1) * blocksize;
+
+	int start_colindice_remote = (partition_blocksize - 1) * blocksize;
+
+	inMatrix.block(0, 0, blocksize, 2*blocksize) = (eigenA[0]->block(start_rowindice_remote, start_colindice_remote, blocksize, 2 * blocksize));
+    } else if (rank == partitions-1) {
+	int start_rowindice_remote = (partitions - 1) * partition_blocksize * blocksize;
+
+	int start_colindice_remote = (partitions - 1) * partition_blocksize * blocksize - blocksize;
+
+	// Assuming comm.recv is equivalent to direct assignment
+	inMatrix.block(0, 0, blocksize, 2*blocksize) = (eigenA[partitions-1]->block(start_rowindice_remote, start_colindice_remote, blocksize, 2 * blocksize));
+    } else {
+	// Upper right double block of process-local A_schur
+        int start_rowindice_remote = (rank  * partition_blocksize) * blocksize;
+        
+        int start_colindice_remote = (rank * partition_blocksize - 1) * blocksize;
+        
+        inMatrix.block(0, 0, blocksize, 2*blocksize) =  (eigenA[rank]->block(start_rowindice_remote, start_colindice_remote, blocksize, 2 * blocksize));
+
+        // Upper right single block of process-local A_schur
+        start_colindice_remote += partition_blocksize * blocksize;
+
+        inMatrix.block(0, 2*blocksize, blocksize, blocksize) = (eigenA[rank]->block(start_rowindice_remote, start_colindice_remote, blocksize, blocksize));
+
+        // Lower left single block of process-local A_schur
+        start_rowindice_remote = ((rank + 1) * partition_blocksize - 1) * blocksize;
+        start_colindice_remote = (rank * partition_blocksize) * blocksize;
+
+        inMatrix.block(0, 3*blocksize, blocksize, blocksize) = (eigenA[rank]->block(start_rowindice_remote, start_colindice_remote, blocksize, blocksize));
+
+        // Lower right double block of process-local A_schur
+        start_colindice_remote += (partition_blocksize -1 ) * blocksize;
+
+        inMatrix.block(0, 4*blocksize, blocksize, 2*blocksize) = (eigenA[rank]->block(start_rowindice_remote, start_colindice_remote, blocksize, 2 * blocksize));
+    }
+}
+
+void fill_reduced_schur_matrix(Eigen::MatrixXcd& A_schur, double* comm_buf, int in_buf_size, int blocksize, int partitions) {
+
+    const int rowSize = blocksize;
+    const int colSizeCorner = blocksize << 1;
+    const int colSizeMiddle = colSizeCorner + blocksize;
+    const int half_buf_size = 6*blocksize*blocksize;
+   
+    // Fill in the 2 blocks from the top process (i.e. rank 0)
+    A_schur.block( 0, 0, rowSize, colSizeCorner) = 
+       	    Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>
+	    ( (std::complex<double>*) comm_buf, rowSize, colSizeCorner);
+    
+    //Fill in the 2 blocks from the bottom process (i.e rank (partitions-1))
+    A_schur.block( (2*partitions-3)*blocksize, (2*partitions-4)*blocksize, rowSize, colSizeCorner) = 
+            Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>
+	    ( (std::complex<double>*) (comm_buf + (partitions-1)*in_buf_size), rowSize, colSizeCorner);
+
+    //Fill in the the 6 blocks over two rows from the processes in the middle (i.e. rank > 0 && rank < (partitions - 1))
+    for(int i = 1; i < partitions-1; ++i) {
+	A_schur.block( (2*i-1)*blocksize, (2*i-2)*blocksize, rowSize, colSizeMiddle) = 
+		Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>
+		( (std::complex<double>*) (comm_buf + i*in_buf_size), rowSize, colSizeMiddle);
+
+	A_schur.block( (2*i)*blocksize, (2*i-1)*blocksize, rowSize, colSizeMiddle) = 
+		Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>
+		( (std::complex<double>*) (comm_buf + i*in_buf_size + half_buf_size), rowSize, colSizeMiddle);
+    }
+
+}
+
 Eigen::MatrixXcd psr_seqsolve(int N,
                              int blocksize,
                              int n_blocks,
@@ -619,7 +691,22 @@ Eigen::MatrixXcd psr_seqsolve(int N,
     Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*n_blocks_schursystem, blocksize*n_blocks_schursystem);
     A_schur.setZero();
 
-    aggregate_reduced_system_locally(A_schur, eigenA, n_blocks_schursystem, partition_blocksize, blocksize, partitions);
+    //Start of changes for MPIALLGATHER
+    unsigned long comm_buf_size = (blocksize * blocksize * partitions * 6) << 1; 
+    double* comm_buf = new double[comm_buf_size];
+
+    unsigned long in_buf_size = (blocksize * blocksize * 6) << 1;
+    Eigen::MatrixXcd inMatrix = Eigen::MatrixXcd::Zero(blocksize, 6*blocksize);
+    fill_buffer(inMatrix, eigenA, partition_blocksize, blocksize, rank, partitions);
+
+    double* in_buf = (double*) inMatrix.data();
+    MPI_Allgather(in_buf, in_buf_size, MPI_DOUBLE, comm_buf, in_buf_size, MPI_DOUBLE, MPI_COMM_WORLD);
+
+    fill_reduced_schur_matrix(A_schur, comm_buf, in_buf_size, blocksize, partitions);
+
+    delete[] comm_buf;
+    //aggregate_reduced_system_locally(A_schur, eigenA, n_blocks_schursystem, partition_blocksize, blocksize, partitions);
+    //End of changes
 
     auto G_schur = A_schur.inverse();
 

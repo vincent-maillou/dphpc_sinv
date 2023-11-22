@@ -176,14 +176,16 @@ bool assert_array_magnitude(
     double sum_difference = 0.0;
     double sum_ref = 0.0;
     for (int i = 0; i < size; i++) {
-        sum_difference += std::abs(array_test[i] - array_ref[i]);
-        sum_ref += std::abs(array_ref[i]);
+        sum_difference += std::abs(array_test[i] - array_ref[i]) *std::abs(array_test[i] - array_ref[i]);
+        sum_ref += std::abs(array_ref[i])*std::abs(array_ref[i]);
 
     }
+    sum_difference = std::sqrt(sum_difference);
+    sum_ref = std::sqrt(sum_ref);
     if (sum_difference > reltol * sum_ref + abstol) {
         std::printf("Arrays are in magnitude not the same\n");
-        // std::cout << sum_difference << std::endl;
-        // std::cout << reltol * sum_ref + abstol << std::endl;
+        std::cout << "Difference " << sum_difference << std::endl;
+        std::cout << "Mixed tolerance " << reltol * sum_ref + abstol << std::endl;
         return false;
     }
 

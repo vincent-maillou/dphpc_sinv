@@ -68,8 +68,9 @@ double solve_cusparse_CG(
     int matrix_size,
     double abstol,
     double reltol,
-    double residual_tol,
-    bool flag_verbose);
+    double restol,
+    bool flag_verbose,
+    int *steps_taken);
 
 double solve_cusparse_ILU_CG(
     double *data_h,
@@ -81,8 +82,24 @@ double solve_cusparse_ILU_CG(
     int matrix_size,
     double abstol,
     double reltol,
-    double residual_tol,
-    bool flag_verbose);
+    double restol,
+    bool flag_verbose,
+    int *steps_taken);
+
+double solve_cusparse_CG_jacobi(
+    double *data_h,
+    int *col_indices_h,
+    int *row_indptr_h,
+    double *rhs_h,
+    double *reference_solution_h,
+    double *starting_guess_h,
+    int nnz,
+    int matrix_size,
+    double abstol,
+    double reltol,
+    double restol,
+    bool flag_verbose,
+    int *steps_taken);
 
 double solve_cusolver_sparse_CHOL(
     double *data_h,

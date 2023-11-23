@@ -180,3 +180,14 @@ Eigen::MatrixXcd psr_seqsolve(int N,
                              Eigen::MatrixXcd& eigenA_read_in,
                              bool compare_reference
 );
+
+Eigen::MatrixXcd psr_solve(int N,
+                             int blocksize,
+                             int n_blocks,
+                             int partitions,
+                             int partition_blocksize,
+                             int rank,
+                             int n_blocks_schursystem,
+                             Eigen::MatrixXcd& eigenA_read_in,
+                             bool compare_reference
+);

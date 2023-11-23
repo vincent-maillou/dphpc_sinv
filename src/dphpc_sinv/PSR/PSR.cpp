@@ -1,4 +1,5 @@
 #include "PSR.h"
+#include <iomanip>
 
 void myFunction(Eigen::MatrixXcd& A) {
     // Your function logic here
@@ -135,6 +136,36 @@ std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_bottomrightcorner(
     return std::make_tuple(L, U);
 }
 
+std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_bottomrightcorner_2(
+    Eigen::MatrixXcd& A,
+    int partition_blocksize,
+    int blocksize
+) {
+    Eigen::MatrixXcd L = Eigen::MatrixXcd::Zero(A.rows(), A.cols());
+    Eigen::MatrixXcd U = Eigen::MatrixXcd::Zero(A.rows(), A.cols());
+
+    // Corner elimination upward
+    for (int i_blockrow = partition_blocksize - 1; i_blockrow >= 1; --i_blockrow) {
+        int i_rowindice = i_blockrow * blocksize;
+	int il1_rowindice = i_rowindice - blocksize;    
+        int ip1_rowindice = i_rowindice + blocksize;
+
+        Eigen::MatrixXcd A_inv_ip1_ip1 = A.block(i_rowindice, ip1_rowindice, blocksize, blocksize).inverse();
+
+        L.block(il1_rowindice, ip1_rowindice, blocksize, blocksize) =
+            A.block(il1_rowindice, ip1_rowindice, blocksize, blocksize) * A_inv_ip1_ip1;
+
+        U.block(i_rowindice, i_rowindice, blocksize, blocksize) =
+            A_inv_ip1_ip1 * A.block(i_rowindice, i_rowindice, blocksize, blocksize);
+
+        A.block(il1_rowindice, i_rowindice, blocksize, blocksize) -=
+            L.block(il1_rowindice, ip1_rowindice, blocksize, blocksize) *
+            A.block(i_rowindice, i_rowindice, blocksize, blocksize);
+    }
+
+    return std::make_tuple(L, U);
+}
+
 std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_central(
     Eigen::MatrixXcd& A,
     int start_blockrow,
@@ -143,7 +174,7 @@ std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_central(
 ) {
     Eigen::MatrixXcd L = Eigen::MatrixXcd::Zero(A.rows(), A.cols());
     Eigen::MatrixXcd U = Eigen::MatrixXcd::Zero(A.rows(), A.cols());
-
+    
     // Center elimination downward
     for (int i_blockrow = start_blockrow + 2; i_blockrow < start_blockrow + partition_blocksize; ++i_blockrow) {
         int im1_rowindice = (i_blockrow - 1) * blocksize;
@@ -184,6 +215,59 @@ std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_central(
 
     return std::make_tuple(L, U);
 }
+
+
+std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_central_2(
+    Eigen::MatrixXcd& A,
+    int partition_blocksize,
+    int blocksize
+) {
+    Eigen::MatrixXcd L = Eigen::MatrixXcd::Zero(A.rows(), A.cols());
+    Eigen::MatrixXcd U = Eigen::MatrixXcd::Zero(A.rows(), A.cols());
+
+    // Center elimination downward
+    for (int i_blockrow = 2; i_blockrow < partition_blocksize; ++i_blockrow) {
+        int i_rowindice = i_blockrow * blocksize;
+        int im1_rowindice = i_rowindice - blocksize;
+	int ip1_rowindice = i_rowindice + blocksize;
+
+        int top_rowindice = 0;
+	int top_rowindice_col = blocksize;
+
+        Eigen::MatrixXcd A_inv_im1_im1 = A.block(im1_rowindice, i_rowindice, blocksize, blocksize).inverse();
+
+        L.block(i_rowindice, i_rowindice, blocksize, blocksize) =
+            A.block(i_rowindice, i_rowindice, blocksize, blocksize) * A_inv_im1_im1;
+
+        L.block(top_rowindice, i_rowindice, blocksize, blocksize) =
+            A.block(top_rowindice, i_rowindice, blocksize, blocksize) * A_inv_im1_im1;
+
+        U.block(im1_rowindice, ip1_rowindice, blocksize, blocksize) =
+            A_inv_im1_im1 * A.block(im1_rowindice, ip1_rowindice, blocksize, blocksize);
+
+        U.block(im1_rowindice, top_rowindice_col, blocksize, blocksize) =
+            A_inv_im1_im1 * A.block(im1_rowindice, top_rowindice_col, blocksize, blocksize);
+
+        A.block(i_rowindice, ip1_rowindice, blocksize, blocksize) -=
+            L.block(i_rowindice, i_rowindice, blocksize, blocksize) *
+            A.block(im1_rowindice, ip1_rowindice, blocksize, blocksize);
+
+        A.block(top_rowindice, top_rowindice_col, blocksize, blocksize) -=
+            L.block(top_rowindice, i_rowindice, blocksize, blocksize) *
+            A.block(im1_rowindice, top_rowindice_col, blocksize, blocksize);
+
+        A.block(i_rowindice, top_rowindice_col, blocksize, blocksize) -=
+            L.block(i_rowindice, i_rowindice, blocksize, blocksize) *
+            A.block(im1_rowindice, top_rowindice_col, blocksize, blocksize);
+
+        A.block(top_rowindice, ip1_rowindice, blocksize, blocksize) -=
+            L.block(top_rowindice, i_rowindice, blocksize, blocksize) *
+            A.block(im1_rowindice, ip1_rowindice, blocksize, blocksize);
+    }
+
+    return std::make_tuple(L, U);
+}
+
 
 void aggregate_reduced_system_locally(
     Eigen::MatrixXcd& A_schur,
@@ -443,6 +527,37 @@ void produceSchurBottomRightCorner(Eigen::MatrixXcd A,
     }
 }
 
+void produceSchurBottomRightCorner_2(Eigen::MatrixXcd A,
+                                   Eigen::MatrixXcd L,
+                                   Eigen::MatrixXcd U,
+                                   Eigen::MatrixXcd& G,
+                                   int partition_blocksize,
+                                   int blocksize) {
+    int top_blockrow = 0;
+    int bottom_blockrow = partition_blocksize;
+    
+    // Lower right corner produced downwards
+    for (int i = top_blockrow; i < bottom_blockrow - 1; ++i) {
+        int i_rowindice = i * blocksize;
+        int ip1_rowindice = (i + 1) * blocksize;
+        int i_rowindiceCol = i_rowindice + blocksize;
+        int ip1_rowindiceCol = ip1_rowindice + blocksize;
+
+        G.block(i_rowindice, ip1_rowindiceCol, blocksize, blocksize) =
+            -G.block(i_rowindice, i_rowindiceCol, blocksize, blocksize) *
+            L.block(i_rowindice, ip1_rowindiceCol, blocksize, blocksize);
+        
+        G.block(ip1_rowindice, i_rowindiceCol, blocksize, blocksize) =
+            -U.block(ip1_rowindice, i_rowindiceCol, blocksize, blocksize) *
+            G.block(i_rowindice, i_rowindiceCol, blocksize, blocksize);
+        
+        G.block(ip1_rowindice, ip1_rowindiceCol, blocksize, blocksize) =
+            (A.block(ip1_rowindice, ip1_rowindiceCol, blocksize, blocksize).inverse()) -
+            U.block(ip1_rowindice, i_rowindiceCol, blocksize, blocksize) *
+            G.block(i_rowindice, ip1_rowindiceCol, blocksize, blocksize);
+    }
+}
+
 void produceSchurCentral(Eigen::MatrixXcd A,
                          Eigen::MatrixXcd L,
                          Eigen::MatrixXcd U,
@@ -521,6 +636,98 @@ void produceSchurCentral(Eigen::MatrixXcd A,
         G.block(top_rowindice, topp1_rowindice, blocksize, blocksize) -
         U.block(topp1_rowindice, topp2_rowindice, blocksize, blocksize) *
         G.block(topp2_rowindice, topp1_rowindice, blocksize, blocksize);
+}
+
+
+void produceSchurCentral_2(Eigen::MatrixXcd A,
+                         Eigen::MatrixXcd L,
+                         Eigen::MatrixXcd U,
+                         Eigen::MatrixXcd& G,
+                         int partition_blocksize,
+                         int blocksize) {
+    int top_blockrow = 0;
+    int bottom_blockrow = partition_blocksize;
+
+    int top_rowindice = 0;
+    int topp1_rowindice = blocksize;
+    int topp2_rowindice = blocksize << 1;
+
+    int botm1_rowindice = (bottom_blockrow - 2) * blocksize;
+    int bot_rowindice = (bottom_blockrow - 1) * blocksize;
+
+    int top_rowindiceCol = blocksize;
+    int topp1_rowindiceCol = blocksize << 1;
+    int topp2_rowindiceCol = (blocksize << 1) + blocksize;
+
+    int botm1_rowindiceCol = (bottom_blockrow - 1) * blocksize;
+    int bot_rowindiceCol = bottom_blockrow * blocksize;
+
+    G.block(bot_rowindice, botm1_rowindiceCol, blocksize, blocksize) =
+        -1 * (G.block(bot_rowindice, top_rowindiceCol, blocksize, blocksize) *
+              L.block(top_rowindice, botm1_rowindiceCol, blocksize, blocksize) +
+              G.block(bot_rowindice, bot_rowindiceCol, blocksize, blocksize) *
+              L.block(bot_rowindice, botm1_rowindiceCol, blocksize, blocksize));
+
+    G.block(botm1_rowindice, bot_rowindiceCol, blocksize, blocksize) =
+        -1 * (U.block(botm1_rowindice, bot_rowindiceCol, blocksize, blocksize) *
+              G.block(bot_rowindice, bot_rowindiceCol, blocksize, blocksize) +
+              U.block(botm1_rowindice, top_rowindiceCol, blocksize, blocksize) *
+              G.block(top_rowindice, bot_rowindiceCol, blocksize, blocksize));
+
+    for (int i = bottom_blockrow - 2; i > top_blockrow; --i) {
+        int i_rowindice = i * blocksize;
+        int ip1_rowindice = (i + 1) * blocksize;
+	int i_rowindiceCol = i_rowindice + blocksize;
+	int ip1_rowindiceCol = ip1_rowindice + blocksize;
+
+        G.block(top_rowindice, i_rowindiceCol, blocksize, blocksize) =
+            -1 * (G.block(top_rowindice, top_rowindiceCol, blocksize, blocksize) *
+                  L.block(top_rowindice, i_rowindiceCol, blocksize, blocksize) +
+                  G.block(top_rowindice, ip1_rowindiceCol, blocksize, blocksize) *
+                  L.block(ip1_rowindice, i_rowindiceCol, blocksize, blocksize));
+
+        G.block(i_rowindice, top_rowindiceCol, blocksize, blocksize) =
+            -1 * (U.block(i_rowindice, ip1_rowindiceCol, blocksize, blocksize) *
+                  G.block(ip1_rowindice, top_rowindiceCol, blocksize, blocksize) +
+                  U.block(i_rowindice, top_rowindiceCol, blocksize, blocksize) *
+                  G.block(top_rowindice, top_rowindiceCol, blocksize, blocksize));
+    }
+
+    for (int i = bottom_blockrow - 2; i > top_blockrow + 1; --i) {
+        int im1_rowindice = (i - 1) * blocksize;
+        int i_rowindice = i * blocksize;
+        int ip1_rowindice = (i + 1) * blocksize;
+	int im1_rowindiceCol = im1_rowindice + blocksize;
+	int i_rowindiceCol = i_rowindice + blocksize;
+	int ip1_rowindiceCol = ip1_rowindice + blocksize;
+
+        // Compute the inverse block
+        Eigen::MatrixXcd invBlock = A.block(i_rowindice, i_rowindiceCol, blocksize, blocksize).inverse();
+        G.block(i_rowindice, i_rowindiceCol, blocksize, blocksize) = invBlock -
+            U.block(i_rowindice, top_rowindiceCol, blocksize, blocksize) *
+            G.block(top_rowindice, i_rowindiceCol, blocksize, blocksize) -
+            U.block(i_rowindice, ip1_rowindiceCol, blocksize, blocksize) *
+            G.block(ip1_rowindice, i_rowindiceCol, blocksize, blocksize);
+
+        G.block(im1_rowindice, i_rowindiceCol, blocksize, blocksize) =
+            -1 * (U.block(im1_rowindice, top_rowindiceCol, blocksize, blocksize) *
+                  G.block(top_rowindice, i_rowindiceCol, blocksize, blocksize) +
+                  U.block(im1_rowindice, i_rowindiceCol, blocksize, blocksize) *
+                  G.block(i_rowindice, i_rowindiceCol, blocksize, blocksize));
+
+        G.block(i_rowindice, im1_rowindiceCol, blocksize, blocksize) =
+            -1 * (G.block(i_rowindice, top_rowindiceCol, blocksize, blocksize) *
+                  L.block(top_rowindice, im1_rowindiceCol, blocksize, blocksize) +
+                  G.block(i_rowindice, i_rowindiceCol, blocksize, blocksize) *
+                  L.block(i_rowindice, im1_rowindiceCol, blocksize, blocksize));
+    }
+
+    G.block(topp1_rowindice, topp1_rowindiceCol, blocksize, blocksize) =
+        (A.block(topp1_rowindice, topp1_rowindiceCol, blocksize, blocksize).inverse()) -
+        U.block(topp1_rowindice, top_rowindiceCol, blocksize, blocksize) *
+        G.block(top_rowindice, topp1_rowindiceCol, blocksize, blocksize) -
+        U.block(topp1_rowindice, topp2_rowindiceCol, blocksize, blocksize) *
+        G.block(topp2_rowindice, topp1_rowindiceCol, blocksize, blocksize);
 }
 
 void aggregate_Gblocks_tofinalinverse_sequentially(int partitions,
@@ -621,6 +828,44 @@ void fill_buffer(Eigen::MatrixXcd& inMatrix, Eigen::MatrixXcd** eigenA, int part
     }
 }
 
+void fill_buffer_2(Eigen::MatrixXcd& inMatrix, Eigen::MatrixXcd processA, int partition_blocksize, int blocksize, int rank, int partitions) {
+
+    if(rank == 0) {
+	int start_rowindice_remote = (0 + partition_blocksize - 1) * blocksize;
+
+	int start_colindice_remote = (partition_blocksize - 1) * blocksize;
+
+	inMatrix.block(0, 0, blocksize, 2*blocksize) = (processA.block(start_rowindice_remote, start_colindice_remote, blocksize, 2 * blocksize));
+    } else if (rank == partitions-1) {
+	// Assuming comm.recv is equivalent to direct assignment
+	inMatrix.block(0, 0, blocksize, 2*blocksize) = (processA.block(0, 0, blocksize, 2 * blocksize));
+    } else {
+	// Upper right double block of process-local A_schur
+        int start_rowindice_remote = (rank  * partition_blocksize) * blocksize;
+        
+        int start_colindice_remote = (rank * partition_blocksize - 1) * blocksize;
+        
+        inMatrix.block(0, 0, blocksize, 2*blocksize) =  (processA.block(0, 0, blocksize, 2 * blocksize));
+
+        // Upper right single block of process-local A_schur
+        start_colindice_remote = partition_blocksize * blocksize;
+
+        inMatrix.block(0, 2*blocksize, blocksize, blocksize) = (processA.block(0, start_colindice_remote, blocksize, blocksize));
+
+        // Lower left single block of process-local A_schur
+        start_rowindice_remote = (partition_blocksize - 1) * blocksize;
+
+        inMatrix.block(0, 3*blocksize, blocksize, blocksize) = (processA.block(start_rowindice_remote, blocksize, blocksize, blocksize));
+
+        // Lower right double block of process-local A_schur
+        start_colindice_remote = partition_blocksize * blocksize;
+
+        inMatrix.block(0, 4*blocksize, blocksize, 2*blocksize) = (processA.block(start_rowindice_remote, start_colindice_remote, blocksize, 2 * blocksize));
+    }
+}
+
+
+
 void fill_reduced_schur_matrix(Eigen::MatrixXcd& A_schur, double* comm_buf, int in_buf_size, int blocksize, int partitions) {
 
     const int rowSize = blocksize;
@@ -691,22 +936,7 @@ Eigen::MatrixXcd psr_seqsolve(int N,
     Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*n_blocks_schursystem, blocksize*n_blocks_schursystem);
     A_schur.setZero();
 
-    //Start of changes for MPIALLGATHER
-    unsigned long comm_buf_size = (blocksize * blocksize * partitions * 6) << 1; 
-    double* comm_buf = new double[comm_buf_size];
-
-    unsigned long in_buf_size = (blocksize * blocksize * 6) << 1;
-    Eigen::MatrixXcd inMatrix = Eigen::MatrixXcd::Zero(blocksize, 6*blocksize);
-    fill_buffer(inMatrix, eigenA, partition_blocksize, blocksize, rank, partitions);
-
-    double* in_buf = (double*) inMatrix.data();
-    MPI_Allgather(in_buf, in_buf_size, MPI_DOUBLE, comm_buf, in_buf_size, MPI_DOUBLE, MPI_COMM_WORLD);
-
-    fill_reduced_schur_matrix(A_schur, comm_buf, in_buf_size, blocksize, partitions);
-
-    delete[] comm_buf;
-    //aggregate_reduced_system_locally(A_schur, eigenA, n_blocks_schursystem, partition_blocksize, blocksize, partitions);
-    //End of changes
+    aggregate_reduced_system_locally(A_schur, eigenA, n_blocks_schursystem, partition_blocksize, blocksize, partitions);
 
     auto G_schur = A_schur.inverse();
 
@@ -753,6 +983,204 @@ Eigen::MatrixXcd psr_seqsolve(int N,
 
 
 }
+
+
+Eigen::MatrixXcd psr_solve(int N,
+                             int blocksize,
+                             int n_blocks,
+                             int partitions,
+                             int partition_blocksize,
+                             int rank,
+                             int n_blocks_schursystem,
+                             Eigen::MatrixXcd& eigenA_read_in,
+                             bool compare_reference
+){  
+
+    Eigen::MatrixXcd eigenA2 = eigenA_read_in;
+
+    // Referece inverse
+    Eigen::MatrixXcd full_inverse;
+    if(compare_reference){
+        full_inverse = eigenA_read_in.inverse();
+    }
+	
+    //Limit it to the processes partition of A
+    int start_blockrow = rank * partition_blocksize;
+    int rowSizePartition = partition_blocksize * blocksize;
+    int colSizePartition = (partition_blocksize + 2) * blocksize;
+    Eigen::MatrixXcd processA;
+    Eigen::MatrixXcd G,L,U;
+
+    if (rank == 0) {
+	processA = eigenA2.block(0, 0, rowSizePartition, colSizePartition-blocksize);
+	G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
+    }
+
+    if (rank > 0 && rank < partitions - 1) {
+	int startRowIndex = start_blockrow*blocksize;
+	int startColIndex = (start_blockrow-1)*blocksize;
+	processA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition);
+	G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition);
+    }
+    if (rank == partitions - 1) {
+	int startRowIndex = start_blockrow*blocksize;
+	int startColIndex = (start_blockrow-1)*blocksize;
+	processA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition-blocksize);
+	G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
+    }
+
+
+    // Start reduce_schur
+    std::cout << "Process " << rank << " is reducing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+
+
+    if (rank == 0){
+        auto result = reduce_schur_topleftcorner(processA, 0, partition_blocksize, blocksize);
+        L = std::get<0>(result);
+        U = std::get<1>(result);
+    }
+
+    if (rank > 0 && rank < partitions - 1){
+        auto result = reduce_schur_central_2(processA, partition_blocksize, blocksize);
+        L = std::get<0>(result);
+        U = std::get<1>(result);
+    }
+    
+    if (rank == partitions - 1){
+        auto result = reduce_schur_bottomrightcorner_2(processA, partition_blocksize, blocksize);
+        L = std::get<0>(result);
+        U = std::get<1>(result);
+    }
+    // End reduce_schur
+
+    // Start of MPIALLGATHER for reduced_schur_system and inverse of said system
+    Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*n_blocks_schursystem, blocksize*n_blocks_schursystem);
+    A_schur.setZero();
+
+    unsigned long comm_buf_size = (blocksize * blocksize * partitions * 6) << 1; 
+    double* comm_buf = new double[comm_buf_size];
+
+    unsigned long in_buf_size = (blocksize * blocksize * 6) << 1;
+    Eigen::MatrixXcd inMatrix = Eigen::MatrixXcd::Zero(blocksize, 6*blocksize);
+    fill_buffer_2(inMatrix, processA, partition_blocksize, blocksize, rank, partitions);
+
+
+    double* in_buf = (double*) inMatrix.data();
+    MPI_Allgather(in_buf, in_buf_size, MPI_DOUBLE, comm_buf, in_buf_size, MPI_DOUBLE, MPI_COMM_WORLD);
+
+    fill_reduced_schur_matrix(A_schur, comm_buf, in_buf_size, blocksize, partitions);
+
+    delete[] comm_buf;
+
+    auto G_schur = A_schur.inverse();
+    // End of MPIALLGATHER for reduced_schur_system and inverse of said system
+
+    // Start of writeback of reduced inverse to full G partitions
+    if(rank == 0) {
+	int start_rowindice = (partition_blocksize - 1) * blocksize;
+	int start_colindice = (partition_blocksize - 1) * blocksize;
+	G.block(start_rowindice, start_colindice, blocksize, (blocksize << 1)) = G_schur.block(0, 0, blocksize, (blocksize << 1));	
+    }
+    if(rank > 0 && rank < partitions - 1) {
+	// Upper left double block of process-local G
+	int start_rowindice_remote = (1 + ((rank - 1) << 1)) * blocksize; // (rank - 1) * 2 + 1
+	int start_colindice_remote = ((rank - 1) << 1) * blocksize; // (rank - 1) * 2
+	G.block(0, 0, blocksize, (blocksize << 1)) = G_schur.block(start_rowindice_remote, start_colindice_remote, blocksize, (blocksize << 1));
+
+	// Upper right single block of process-local G
+	int start_colindice = partition_blocksize * blocksize;
+	start_colindice_remote += (blocksize << 1);
+	G.block(0, start_colindice, blocksize, blocksize) = G_schur.block(start_rowindice_remote, start_colindice_remote, blocksize, blocksize);
+
+	// Lower left single block of process-local G
+	int start_rowindice = (partition_blocksize - 1) * blocksize;
+	start_colindice = blocksize;
+	start_rowindice_remote += blocksize;
+	start_colindice_remote -= blocksize;
+	G.block(start_rowindice, start_colindice, blocksize, blocksize) = G_schur.block(start_rowindice_remote, start_colindice_remote, blocksize, blocksize);
+
+	// Lower right double block of process-local G
+	start_colindice = partition_blocksize * blocksize;
+	start_colindice_remote += blocksize;
+	G.block(start_rowindice, start_colindice, blocksize, (blocksize << 1)) = G_schur.block(start_rowindice_remote, start_colindice_remote, blocksize, (blocksize << 1));
+    }
+    if(rank == partitions - 1) {
+	int start_rowindice_remote = (1 + ((partitions - 2) << 1)) * blocksize;
+	int start_colindice_remote = start_rowindice_remote - blocksize;
+	G.block(0, 0, blocksize, (blocksize << 1)) = G_schur.block(start_rowindice_remote, start_colindice_remote, blocksize, (blocksize << 1));
+    }
+    // End of writeback of reduced inverse to full G partitions
+
+
+    // Start of produce_schur
+    std::cout << "Process " << rank << " is producing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+
+    if(rank == 0) {
+	produceSchurTopLeftCorner(processA, L, U, G, 0, partition_blocksize, blocksize);
+    }
+    if(rank > 0 && rank < partitions - 1) {
+	produceSchurCentral_2(processA, L, U, G, partition_blocksize, blocksize);
+    }
+    if(rank == partitions - 1) {
+	produceSchurBottomRightCorner_2(processA, L, U, G, partition_blocksize, blocksize);
+    }
+    // End of produce_schur
+
+    // Start of reconstructing Tridiagonal system of the full inverse via MPIALLGATHER    
+    Eigen::MatrixXcd G_final = Eigen::MatrixXcd(N, N);
+    G_final.setZero();
+
+    comm_buf_size = (rowSizePartition * colSizePartition * partitions) << 1;
+    comm_buf = new double[comm_buf_size];
+    in_buf_size = (rowSizePartition * colSizePartition) << 1;
+    // !!!!!!
+    // Attention I am currently purposefully overshooting the boundaries of G.data() for processes 0 and partitions - 1 
+    // in the MPI_Allgather i.e. for those processes G.data() has only size ((rowSizePartition * (colSizePartition - blocksize)) << 1) insted of in_buf_size.
+    // But since I am not writing anything back from that overshoot area it doesn't impact correctness currently
+    // !!!!!
+    in_buf = (double*) G.data();
+    MPI_Allgather(in_buf, in_buf_size, MPI_DOUBLE, comm_buf, in_buf_size, MPI_DOUBLE, MPI_COMM_WORLD);
+
+    
+    for(int i = 0; i < partitions; ++i) {
+	int start_rowindice = i * partition_blocksize * blocksize;
+	int start_colindice = 0;
+	if(i > 0) {
+		start_colindice = start_rowindice - blocksize;
+	}
+	int rowSize = rowSizePartition;
+	int colSize = colSizePartition;
+	if(i == 0 || i == partitions - 1) {
+		colSize -= blocksize;
+	}
+	G_final.block(start_rowindice, start_colindice, rowSize, colSize) =
+			Eigen::Map<Eigen::MatrixXcd> ( (std::complex<double>*) (comm_buf + (i * in_buf_size)), rowSize, colSize);
+
+	// Setting the off Tridiagonal blocks used in the produceSchurCentral step to 0 
+	if(i > 0 && i < partitions - 1) {
+		(G_final.block(start_rowindice, start_colindice + 3 * blocksize, blocksize, (partition_blocksize - 1) * blocksize)).setZero();
+		(G_final.block(start_rowindice + 2 * blocksize, start_colindice + blocksize, (partition_blocksize - 1) * blocksize, blocksize)).setZero();
+	}
+
+    }
+
+    delete[] comm_buf;
+    // End of reconstructing Tridiagonal system of the full inverse via MPIALLGATHER    
+
+    if(compare_reference){
+        compareSINV_referenceInverse_byblock(n_blocks,
+                                     blocksize,
+                                     G_final,
+                                     full_inverse
+        );
+    }
+
+
+    return G_final;
+
+
+}
+
 
 
 

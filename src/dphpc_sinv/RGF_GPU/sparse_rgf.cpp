@@ -33,7 +33,7 @@ inline void cusolverAssert(cusolverStatus_t code, const char *file, int line, bo
    if (code != CUSOLVER_STATUS_SUCCESS) 
    {
         //Did not find a counter part to cudaGetErrorString in cusolver
-        std::printf("CUSOLVERassert: %s %d\n", file, line);
+        std::printf("CUSOLVERassert: %s %s %d\n", cudaGetErrorString((cudaError_t)code), file, line);
         if (abort) exit(code);
    }
 }
@@ -45,7 +45,7 @@ inline void cublasAssert(cublasStatus_t code, const char *file, int line, bool a
    if (code != CUBLAS_STATUS_SUCCESS) 
    {
         //Did not find a counter part to cudaGetErrorString in cublas
-        std::printf("CUBLASassert: %s %d\n", file, line);
+        std::printf("CUBLASassert: %s %s %d\n", cudaGetErrorString((cudaError_t)code), file, line);
         if (abort) exit(code);
    }
 }
@@ -56,7 +56,7 @@ inline void cusparseAssert(cusparseStatus_t code, const char *file, int line, bo
    if (code != CUSPARSE_STATUS_SUCCESS) 
    {
         //Did not find a counter part to cudaGetErrorString in cusolver
-        fprintf(stderr,"CUSPARSEassert: %s %d\n", file, line);
+        fprintf(stderr,"CUSPARSEassert: %s %s %d\n", cudaGetErrorString((cudaError_t)code), file, line);
         if (abort) exit(code);
    }
 }
@@ -123,9 +123,12 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     }
 
     // sparse matrix desciptors
-    cusparseSpMatDescr_t diagblk_descr[n_blocks];
-    cusparseSpMatDescr_t upperblk_descr[n_blocks-1];
-    cusparseSpMatDescr_t lowerblk_descr[n_blocks-1];
+    cusparseSpMatDescr_t diagblk_descr_forward[n_blocks];
+    cusparseSpMatDescr_t upperblk_descr_forward[n_blocks-1];
+    cusparseSpMatDescr_t lowerblk_descr_forward[n_blocks-1];
+
+    cusparseSpMatDescr_t upperblk_descr_backward[n_blocks-1];
+    cusparseSpMatDescr_t lowerblk_descr_backward[n_blocks-1];
 
 
     cudaEvent_t schur_inverted[n_blocks];
@@ -256,7 +259,7 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
 
     cusparseErrchk(
         cusparseCreateCsr(
-            &diagblk_descr[0],
+            &diagblk_descr_forward[0],
             blocksize,
             blocksize,
             diag_nnz[0],
@@ -278,7 +281,7 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
 
     cusparseErrchk(cusparseSparseToDense(
         cusparse_handle[stream_compute],
-        diagblk_descr[0],
+        diagblk_descr_forward[0],
         dense_descr_out,
         CUSPARSE_SPARSETODENSE_ALG_DEFAULT,
         buffer_spmm
@@ -381,7 +384,7 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     // create sparse matrix descriptors
     cusparseErrchk(
         cusparseCreateCsr(
-            &diagblk_descr[1],
+            &diagblk_descr_forward[1],
             blocksize,
             blocksize,
             diag_nnz[1],
@@ -396,7 +399,7 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     );
     cusparseErrchk(
         cusparseCreateCsr(
-            &upperblk_descr[0],
+            &upperblk_descr_forward[0],
             blocksize,
             blocksize,
             upper_nnz[0],
@@ -411,7 +414,7 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     );
     cusparseErrchk(
         cusparseCreateCsr(
-            &lowerblk_descr[0],
+            &lowerblk_descr_forward[0],
             blocksize,
             blocksize,
             lower_nnz[0],
@@ -471,7 +474,7 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
 
             cusparseErrchk(
                 cusparseCreateCsr(
-                    &diagblk_descr[i+1],
+                    &diagblk_descr_forward[i+1],
                     blocksize,
                     blocksize,
                     diag_nnz[i+1],
@@ -486,7 +489,7 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
             );
             cusparseErrchk(
                 cusparseCreateCsr(
-                    &upperblk_descr[i],
+                    &upperblk_descr_forward[i],
                     blocksize,
                     blocksize,
                     upper_nnz[i],
@@ -501,7 +504,7 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
             );
             cusparseErrchk(
                 cusparseCreateCsr(
-                    &lowerblk_descr[i],
+                    &lowerblk_descr_forward[i],
                     blocksize,
                     blocksize,
                     lower_nnz[i],
@@ -532,33 +535,19 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         cusparseErrchk(cusparseDnMatSetValues(dense_descr_in, inv_diagblk_d))
         cusparseErrchk(cusparseDnMatSetValues(dense_descr_out, inv_lowerblk_d))
 
-        cusparseSpMM(
+        cusparseErrchk(cusparseSpMM(
             cusparse_handle[stream_compute],
             CUSPARSE_OPERATION_NON_TRANSPOSE,
             CUSPARSE_OPERATION_NON_TRANSPOSE,
             &alpha,
-            lowerblk_descr[i-1],
+            lowerblk_descr_forward[i-1],
             dense_descr_in,
             &beta,
             dense_descr_out,
             CUDA_C_64F,
             CUSPARSE_SPMM_ALG_DEFAULT,
             buffer_spmm
-        );
-
-        // cublasErrchk(cublasZgemm(
-        //     cublas_handle[stream_compute],
-        //     CUBLAS_OP_N, CUBLAS_OP_N,
-        //     blocksize, blocksize, blocksize,
-        //     &alpha,
-        //     lowerblk_d[stream_compute], blocksize,
-        //     inv_diagblk_d, blocksize,
-        //     &beta,
-        //     inv_lowerblk_d, blocksize));
-
-
-
-
+        ));
 
 
         // problem:
@@ -575,7 +564,7 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         // C for spmm is dense
         cusparseErrchk(cusparseSparseToDense(
             cusparse_handle[stream_compute],
-            diagblk_descr[i],
+            diagblk_descr_forward[i],
             dense_descr_out,
             CUSPARSE_SPARSETODENSE_ALG_DEFAULT,
             buffer_spmm
@@ -603,19 +592,19 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         //MatMul tmp = eig_diagblk[i] - tmp * eig_upperblk[i-1]
         alpha = make_cuDoubleComplex(-1.0, 0.0);
         beta = make_cuDoubleComplex(1.0, 0.0);
-        cusparseSpMM(
+        cusparseErrchk(cusparseSpMM(
             cusparse_handle[stream_compute],
             CUSPARSE_OPERATION_TRANSPOSE,
             CUSPARSE_OPERATION_TRANSPOSE,
             &alpha,
-            upperblk_descr[i-1],
+            upperblk_descr_forward[i-1],
             dense_descr_in,
             &beta,
             dense_descr_out,
             CUDA_C_64F,
             CUSPARSE_SPMM_ALG_DEFAULT,
             buffer_spmm
-        );
+        ));
         // use inv_upperblk_d as buffer for transposed
         alpha = make_cuDoubleComplex(1.0, 0.0);
         beta = make_cuDoubleComplex(0.0, 0.0);
@@ -635,15 +624,6 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         // more ghetto
         // inv_upperblk_d saves now schur complement
 
-        // cublasErrchk(cublasZgemm(
-        //     cublas_handle[stream_compute],
-        //     CUBLAS_OP_N, CUBLAS_OP_N,
-        //     blocksize, blocksize, blocksize,
-        //     &alpha,
-        //     inv_lowerblk_d, blocksize,
-        //     upperblk_d[stream_compute], blocksize,
-        //     &beta,
-        //     diagblk_d[stream_compute], blocksize));
 
         // wait to not overwrite block to unload
         cudaErrchk(cudaStreamWaitEvent(stream[stream_compute], unload[i-1]));
@@ -678,158 +658,340 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     int stream_memload_before = (n_blocks) % 2;
     int stream_compute_before = (n_blocks-1) % 2;
 
-    // cudaErrchk(cudaMemcpyAsync(upperblk_d[stream_memload_before],
-    //             reinterpret_cast<const complex_d*>(matrix_upperblk_h + (n_blocks-2)*blocksize*blocksize),
-    //             blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
-    // cudaErrchk(cudaMemcpyAsync(lowerblk_d[stream_memload_before],
-    //             reinterpret_cast<const complex_d*>(matrix_lowerblk_h + (n_blocks-2)*blocksize*blocksize),
-    //             blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
-    // // possible race condition with unloading of previous loop
-    // // not sure
-    // cudaErrchk(cudaMemcpyAsync(inv_diagblk_small_d[stream_memload_before],
-    //             reinterpret_cast<const complex_d*>(inv_diagblk_h  + (n_blocks-2)*blocksize*blocksize),
-    //             blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
-  
+    // load sparse blocks for foward pass
+    cudaErrchk(cudaMemcpyAsync(upperblk_data_d[stream_memload],
+                reinterpret_cast<const complex_d*>(upperblk_data_h[n_blocks-2]),
+                upper_nnz[n_blocks-2] * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
+    cudaErrchk(cudaMemcpyAsync(upperblk_indices_d[stream_memload],
+                reinterpret_cast<const int*>(upperblk_indices_h[n_blocks-2]),
+                upper_nnz[n_blocks-2] * sizeof(int), cudaMemcpyHostToDevice, stream[stream_memload]));
+    cudaErrchk(cudaMemcpyAsync(upperblk_indptr_d[stream_memload],
+                reinterpret_cast<const int*>(upperblk_indptr_h[n_blocks-2]),
+                (blocksize+1) * sizeof(int), cudaMemcpyHostToDevice, stream[stream_memload]));
+    cudaErrchk(cudaMemcpyAsync(lowerblk_data_d[stream_memload],
+                reinterpret_cast<const complex_d*>(lowerblk_data_h[n_blocks-2]),
+                lower_nnz[n_blocks-2] * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
+    cudaErrchk(cudaMemcpyAsync(lowerblk_indices_d[stream_memload],
+                reinterpret_cast<const int*>(lowerblk_indices_h[n_blocks-2]),
+                lower_nnz[n_blocks-2] * sizeof(int), cudaMemcpyHostToDevice, stream[stream_memload]));
+    cudaErrchk(cudaMemcpyAsync(lowerblk_indptr_d[stream_memload],
+                reinterpret_cast<const int*>(lowerblk_indptr_h[n_blocks-2]),
+                (blocksize+1) * sizeof(int), cudaMemcpyHostToDevice, stream[stream_memload]));
+
+    std::cout << n_blocks-2 << std::endl;
+    cusparseErrchk(
+        cusparseCreateCsr(
+            &upperblk_descr_backward[n_blocks-2],
+            blocksize,
+            blocksize,
+            upper_nnz[n_blocks-2],
+            upperblk_indptr_d[stream_memload],
+            upperblk_indices_d[stream_memload],
+            upperblk_data_d[stream_memload],
+            CUSPARSE_INDEX_32I,
+            CUSPARSE_INDEX_32I,
+            CUSPARSE_INDEX_BASE_ZERO,
+            CUDA_C_64F
+        )
+    );
+    cusparseErrchk(
+        cusparseCreateCsr(
+            &lowerblk_descr_backward[n_blocks-2],
+            blocksize,
+            blocksize,
+            lower_nnz[n_blocks-2],
+            lowerblk_indptr_d[stream_memload],
+            lowerblk_indices_d[stream_memload],
+            lowerblk_data_d[stream_memload],
+            CUSPARSE_INDEX_32I,
+            CUSPARSE_INDEX_32I,
+            CUSPARSE_INDEX_BASE_ZERO,
+            CUDA_C_64F
+        )
+    );
+
+
+    // possible race condition with unloading of previous loop
+    // not sure
+    cudaErrchk(cudaMemcpyAsync(inv_diagblk_small_d[stream_memload_before],
+                reinterpret_cast<const complex_d*>(inv_diagblk_h  + (n_blocks-2)*blocksize*blocksize),
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
+
+    for(int i = 0; i < number_streams; i++){
+        cudaErrchk(cudaStreamSynchronize(stream[i]));
+    }  
 
     // TODO possible to save memory by allocating and freeing
     // memory which is not needed anymore (to reduce max memory consumption at one point)
 
 
-    // // 2. Backward substitution (performed right to left)
-    // for(int i = n_blocks-2; i >= 0; --i){
+    // 2. Backward substitution (performed right to left)
+    for(int i = n_blocks-2; i >= 0; --i){
 
-    //     // fix stream compute to be the stream which loaded
-    //     // blocks before the loop
-    //     stream_memload = (stream_compute_before + (i - n_blocks + 2) ) % 2;
-    //     stream_compute = (stream_memload_before + (i - n_blocks + 2) ) % 2;
-    //     stream_memunload = 2;
+        // fix stream compute to be the stream which loaded
+        // blocks before the loop
+        stream_memload = (stream_compute_before + (i - n_blocks + 2) ) % 2;
+        stream_compute = (stream_memload_before + (i - n_blocks + 2) ) % 2;
+        stream_memunload = 2;
 
-    //     if(i > 0){
-    //         cudaErrchk(cudaMemcpyAsync(upperblk_d[stream_memload],
-    //                     reinterpret_cast<const complex_d*>(matrix_upperblk_h + (i-1)*blocksize*blocksize),
-    //                     blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
-    //         cudaErrchk(cudaMemcpyAsync(lowerblk_d[stream_memload],
-    //                     reinterpret_cast<const complex_d*>(matrix_lowerblk_h + (i-1)*blocksize*blocksize),
-    //                     blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
-    //         cudaErrchk(cudaMemcpyAsync(inv_diagblk_small_d[stream_memload],
-    //                     reinterpret_cast<const complex_d*>(inv_diagblk_h  + (i-1)*blocksize*blocksize),
-    //                     blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));    
-    //     }
+        if(i > 0){
+
+            cudaErrchk(cudaMemcpyAsync(upperblk_data_d[stream_memload],
+                        reinterpret_cast<const complex_d*>(upperblk_data_h[i-1]),
+                        upper_nnz[i-1] * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
+            cudaErrchk(cudaMemcpyAsync(upperblk_indices_d[stream_memload],
+                        reinterpret_cast<const int*>(upperblk_indices_h[i-1]),
+                        upper_nnz[i-1] * sizeof(int), cudaMemcpyHostToDevice, stream[stream_memload]));
+            cudaErrchk(cudaMemcpyAsync(upperblk_indptr_d[stream_memload],
+                        reinterpret_cast<const int*>(upperblk_indptr_h[i-1]),
+                        (blocksize+1) * sizeof(int), cudaMemcpyHostToDevice, stream[stream_memload]));
+            cudaErrchk(cudaMemcpyAsync(lowerblk_data_d[stream_memload],
+                        reinterpret_cast<const complex_d*>(lowerblk_data_h[i-1]),
+                        lower_nnz[i-1] * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
+            cudaErrchk(cudaMemcpyAsync(lowerblk_indices_d[stream_memload],
+                        reinterpret_cast<const int*>(lowerblk_indices_h[i-1]),
+                        lower_nnz[i-1] * sizeof(int), cudaMemcpyHostToDevice, stream[stream_memload]));
+            cudaErrchk(cudaMemcpyAsync(lowerblk_indptr_d[stream_memload],
+                        reinterpret_cast<const int*>(lowerblk_indptr_h[i-1]),
+                        (blocksize+1) * sizeof(int), cudaMemcpyHostToDevice, stream[stream_memload]));
+            std::cout << i << std::endl;
+            cusparseErrchk(
+                cusparseCreateCsr(
+                    &upperblk_descr_backward[i-1],
+                    blocksize,
+                    blocksize,
+                    upper_nnz[i-1],
+                    upperblk_indptr_d[stream_memload],
+                    upperblk_indices_d[stream_memload],
+                    upperblk_data_d[stream_memload],
+                    CUSPARSE_INDEX_32I,
+                    CUSPARSE_INDEX_32I,
+                    CUSPARSE_INDEX_BASE_ZERO,
+                    CUDA_C_64F
+                )
+            );
+            cusparseErrchk(
+                cusparseCreateCsr(
+                    &lowerblk_descr_backward[i-1],
+                    blocksize,
+                    blocksize,
+                    lower_nnz[i-1],
+                    lowerblk_indptr_d[stream_memload],
+                    lowerblk_indices_d[stream_memload],
+                    lowerblk_data_d[stream_memload],
+                    CUSPARSE_INDEX_32I,
+                    CUSPARSE_INDEX_32I,
+                    CUSPARSE_INDEX_BASE_ZERO,
+                    CUDA_C_64F
+                )
+            );
+            // cudaErrchk(cudaMemcpyAsync(upperblk_d[stream_memload],
+            //             reinterpret_cast<const complex_d*>(matrix_upperblk_h + (i-1)*blocksize*blocksize),
+            //             blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
+            // cudaErrchk(cudaMemcpyAsync(lowerblk_d[stream_memload],
+            //             reinterpret_cast<const complex_d*>(matrix_lowerblk_h + (i-1)*blocksize*blocksize),
+            //             blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
+
+            cudaErrchk(cudaMemcpyAsync(inv_diagblk_small_d[stream_memload],
+                        reinterpret_cast<const complex_d*>(inv_diagblk_h  + (i-1)*blocksize*blocksize),
+                        blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));    
+        }
     
 
-    //     // wait for the block of the last iteration
-    //     cudaErrchk(cudaStreamWaitEvent(stream[stream_compute], schur_inverted[i+1]));
+        // wait for the block of the last iteration
+        cudaErrchk(cudaStreamWaitEvent(stream[stream_compute], schur_inverted[i+1]));
 
-    //     //tmp = eig_inv_diagblk[i+1] * eig_lowerblk[i]
-    //     // use identity_cpy_d as tmp
-    //     // reuse inv_diagblk_d from last iteration
-    //     // which is the last true inverse block
-    //     alpha = make_cuDoubleComplex(1.0, 0.0);
-    //     beta = make_cuDoubleComplex(0.0, 0.0);
-    //     cublasErrchk(cublasZgemm(
-    //         cublas_handle[stream_compute],
-    //         CUBLAS_OP_N, CUBLAS_OP_N,
-    //         blocksize, blocksize, blocksize,
-    //         &alpha,
-    //         inv_diagblk_d, blocksize,
-    //         lowerblk_d[stream_compute], blocksize,
-    //         &beta,
-    //         identity_cpy_d, blocksize));
+        //tmp = eig_inv_diagblk[i+1] * eig_lowerblk[i]
+        // use identity_cpy_d as tmp
+        // reuse inv_diagblk_d from last iteration
+        // which is the last true inverse block
 
-    //     // eig_inv_lowerblk[i] = -tmp*eig_inv_diagblk[i];
-    //     alpha = make_cuDoubleComplex(-1.0, 0.0);
-    //     beta = make_cuDoubleComplex(0.0, 0.0);
-        
+        // same problem as in forward pass
+        // C = op(A) @ op(B) + C, but B is sparse in SpMM
+        // but since beta is zero only the output has to be transposed
 
-    //     // use temporary buffer_getrf for inv_lowerblk_d
-    //     cublasErrchk(cublasZgemm(
-    //         cublas_handle[stream_compute],
-    //         CUBLAS_OP_N, CUBLAS_OP_N,
-    //         blocksize, blocksize, blocksize,
-    //         &alpha,
-    //         identity_cpy_d, blocksize,
-    //         inv_diagblk_small_d[stream_compute], blocksize,
-    //         &beta,
-    //         diagblk_d[1], blocksize));
-
-    //     // tmp = eig_inv_diagblk[i] * eig_upperblk[i]
-    //     alpha = make_cuDoubleComplex(1.0, 0.0);
-    //     beta = make_cuDoubleComplex(0.0, 0.0);
-
-    //     cublasErrchk(cublasZgemm(
-    //         cublas_handle[stream_compute],
-    //         CUBLAS_OP_N, CUBLAS_OP_N,
-    //         blocksize, blocksize, blocksize,
-    //         &alpha,
-    //         inv_diagblk_small_d[stream_compute], blocksize,
-    //         upperblk_d[stream_compute], blocksize,
-    //         &beta,
-    //         identity_cpy_d, blocksize));
-
-    //     //eig_inv_upperblk[i] = -tmp * eig_inv_diagblk[i+1];
-    //     alpha = make_cuDoubleComplex(-1.0, 0.0);
-    //     beta = make_cuDoubleComplex(0.0, 0.0);
-
-    //     // use temporary buffer_getrf for inv_upperblk_d
-    //     cublasErrchk(cublasZgemm(
-    //         cublas_handle[stream_compute],
-    //         CUBLAS_OP_N, CUBLAS_OP_N,
-    //         blocksize, blocksize, blocksize,
-    //         &alpha,
-    //         identity_cpy_d, blocksize,
-    //         inv_diagblk_d, blocksize,
-    //         &beta,
-    //         diagblk_d[0], blocksize));
+        cusparseErrchk(cusparseDnMatSetValues(dense_descr_in, inv_diagblk_d))
+        // god have mercy on my soul
+        // because using random buffers as temporary buffers
+        // makes the code unreadable
+        // identity is not used anymore since the inversions are done
+        cusparseErrchk(cusparseDnMatSetValues(dense_descr_out, identity_d))
 
 
-    //     //eig_inv_diagblk[i] -= tmp * eig_inv_lowerblk[i];
-    //     alpha = make_cuDoubleComplex(-1.0, 0.0);
-    //     beta = make_cuDoubleComplex(1.0, 0.0);
+        alpha = make_cuDoubleComplex(1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
 
-    //     cublasErrchk(cublasZgemm(
-    //         cublas_handle[stream_compute],
-    //         CUBLAS_OP_N, CUBLAS_OP_N,
-    //         blocksize, blocksize, blocksize,
-    //         &alpha,
-    //         identity_cpy_d, blocksize,
-    //         diagblk_d[1], blocksize,
-    //         &beta,
-    //         inv_diagblk_small_d[stream_compute], blocksize));
+        // both operations transposed to get (A @ B)^T = B^T @ A^T where B is sparse
+        cusparseErrchk(cusparseSpMM(
+            cusparse_handle[stream_compute],
+            CUSPARSE_OPERATION_TRANSPOSE,
+            CUSPARSE_OPERATION_TRANSPOSE,
+            &alpha,
+            lowerblk_descr_backward[i],
+            dense_descr_in,
+            &beta,
+            dense_descr_out,
+            CUDA_C_64F,
+            CUSPARSE_SPMM_ALG_DEFAULT,
+            buffer_spmm
+        ));
+
+        // cublasErrchk(cublasZgemm(
+        //     cublas_handle[stream_compute],
+        //     CUBLAS_OP_N, CUBLAS_OP_N,
+        //     blocksize, blocksize, blocksize,
+        //     &alpha,
+        //     inv_diagblk_d, blocksize,
+        //     lowerblk_d[stream_compute], blocksize,
+        //     &beta,
+        //     identity_cpy_d, blocksize));
+
+        //transpose output
+        // B point does not matter since beta is zero
+        cublasErrchk(
+            cublasZgeam(
+                cublas_handle[stream_compute],
+                CUBLAS_OP_T, CUBLAS_OP_N,
+                blocksize, blocksize,
+                &alpha,
+                identity_d, blocksize,
+                &beta,
+                inv_lowerblk_d, blocksize,
+                identity_cpy_d, blocksize
+            )
+        );
+
+
+        // eig_inv_lowerblk[i] = -tmp*eig_inv_diagblk[i];
+        alpha = make_cuDoubleComplex(-1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
+
+        // use temporary first_block_d for inv_lowerblk_d
+        cublasErrchk(cublasZgemm(
+            cublas_handle[stream_compute],
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            identity_cpy_d, blocksize,
+            inv_diagblk_small_d[stream_compute], blocksize,
+            &beta,
+            first_block_d, blocksize));
+
+        // tmp = eig_inv_diagblk[i] * eig_upperblk[i]
+        alpha = make_cuDoubleComplex(1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
+
+        // again the same problem
+        // dense descriptors wer already set,
+        // thus no call to cusparseDnMatSetValues for dense_descr_out
+        cusparseErrchk(cusparseDnMatSetValues(dense_descr_in, inv_diagblk_small_d[stream_compute]))
+        cusparseErrchk(cusparseDnMatSetValues(dense_descr_out, identity_d))
+        // both operations transposed to get (A @ B)^T = B^T @ A^T where B is sparse
+        cusparseErrchk(cusparseSpMM(
+            cusparse_handle[stream_compute],
+            CUSPARSE_OPERATION_TRANSPOSE,
+            CUSPARSE_OPERATION_TRANSPOSE,
+            &alpha,
+            upperblk_descr_backward[i],
+            dense_descr_in,
+            &beta,
+            dense_descr_out,
+            CUDA_C_64F,
+            CUSPARSE_SPMM_ALG_DEFAULT,
+            buffer_spmm
+        ));
+
+
+
+        // cublasErrchk(cublasZgemm(
+        //     cublas_handle[stream_compute],
+        //     CUBLAS_OP_N, CUBLAS_OP_N,
+        //     blocksize, blocksize, blocksize,
+        //     &alpha,
+        //     inv_diagblk_small_d[stream_compute], blocksize,
+        //     upperblk_d[stream_compute], blocksize,
+        //     &beta,
+        //     identity_cpy_d, blocksize));
+
+        //transpose output
+        // B point does not matter since beta is zero
+        cublasErrchk(
+            cublasZgeam(
+                cublas_handle[stream_compute],
+                CUBLAS_OP_T, CUBLAS_OP_T,
+                blocksize, blocksize,
+                &alpha,
+                identity_d, blocksize,
+                &beta,
+                inv_lowerblk_d, blocksize,
+                identity_cpy_d, blocksize
+            )
+        );
+
+
+        //eig_inv_upperblk[i] = -tmp * eig_inv_diagblk[i+1];
+        alpha = make_cuDoubleComplex(-1.0, 0.0);
+        beta = make_cuDoubleComplex(0.0, 0.0);
+
+        // use temporary identity_d for inv_upperblk_d
+        cublasErrchk(cublasZgemm(
+            cublas_handle[stream_compute],
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            identity_cpy_d, blocksize,
+            inv_diagblk_d, blocksize,
+            &beta,
+            identity_d, blocksize));
+
+
+        //eig_inv_diagblk[i] -= tmp * eig_inv_lowerblk[i];
+        alpha = make_cuDoubleComplex(-1.0, 0.0);
+        beta = make_cuDoubleComplex(1.0, 0.0);
+
+        cublasErrchk(cublasZgemm(
+            cublas_handle[stream_compute],
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            identity_cpy_d, blocksize,
+            first_block_d, blocksize,
+            &beta,
+            inv_diagblk_small_d[stream_compute], blocksize));
  
 
-    //     // wait to not overwrite blocks to unload
-    //     cudaErrchk(cudaStreamWaitEvent(stream[stream_compute], unload[i+1]));
+        // wait to not overwrite blocks to unload
+        cudaErrchk(cudaStreamWaitEvent(stream[stream_compute], unload[i+1]));
 
-    //     // use allocated buffers for inv
-    //     // since host2host is cheap
-    //     // diagblk_d is only used in forward pass
-    //     cudaErrchk(cudaMemcpyAsync(inv_diagblk_d,
-    //                 inv_diagblk_small_d[stream_compute],
-    //                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice, stream[stream_compute]));
-    //     cudaErrchk(cudaMemcpyAsync(inv_upperblk_d,
-    //                 diagblk_d[0],
-    //                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice, stream[stream_compute]));
-    //     cudaErrchk(cudaMemcpyAsync(inv_lowerblk_d,
-    //                 diagblk_d[1],
-    //                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice, stream[stream_compute]));
-    //     cudaErrchk(cudaEventRecord(schur_inverted[i], stream[stream_compute]));
+        // use allocated buffers for inv
+        // since host2host is cheap
+        // first_block_d is only used in forward pass
+        cudaErrchk(cudaMemcpyAsync(inv_diagblk_d,
+                    inv_diagblk_small_d[stream_compute],
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice, stream[stream_compute]));
+        cudaErrchk(cudaMemcpyAsync(inv_upperblk_d,
+                    identity_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice, stream[stream_compute]));
+        cudaErrchk(cudaMemcpyAsync(inv_lowerblk_d,
+                    first_block_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice, stream[stream_compute]));
+        cudaErrchk(cudaEventRecord(schur_inverted[i], stream[stream_compute]));
 
-    //     // wait to unload for the finish of computations
-    //     cudaErrchk(cudaStreamWaitEvent(stream[stream_memunload], schur_inverted[i]));
+        // wait to unload for the finish of computations
+        cudaErrchk(cudaStreamWaitEvent(stream[stream_memunload], schur_inverted[i]));
 
-    //     cudaErrchk(cudaMemcpyAsync(inv_diagblk_h + i*blocksize*blocksize,
-    //                 inv_diagblk_d,
-    //                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
-    //     cudaErrchk(cudaMemcpyAsync(inv_upperblk_h + i*blocksize*blocksize,
-    //                 inv_upperblk_d,
-    //                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
-    //     cudaErrchk(cudaMemcpyAsync(inv_lowerblk_h + i*blocksize*blocksize,
-    //                 inv_lowerblk_d,
-    //                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
-    //     // unloading finished
-    //     cudaErrchk(cudaEventRecord(unload[i], stream[stream_memunload]));
-    // }
-
+        cudaErrchk(cudaMemcpyAsync(inv_diagblk_h + i*blocksize*blocksize,
+                    inv_diagblk_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
+        cudaErrchk(cudaMemcpyAsync(inv_upperblk_h + i*blocksize*blocksize,
+                    inv_upperblk_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
+        cudaErrchk(cudaMemcpyAsync(inv_lowerblk_h + i*blocksize*blocksize,
+                    inv_lowerblk_d,
+                    blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
+        // unloading finished
+        cudaErrchk(cudaEventRecord(unload[i], stream[stream_memunload]));
+    }
     // synchronize all the streams
     for(int j = 0; j < number_streams; j++){
         cudaErrchk(cudaStreamSynchronize(stream[j]));
@@ -850,16 +1012,22 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         }
     }
     for(unsigned int i = 0; i < n_blocks; i++){
-        if(diagblk_descr[i]) {
-            cusparseErrchk(cusparseDestroySpMat(diagblk_descr[i]));
+        if(diagblk_descr_forward[i]) {
+            cusparseErrchk(cusparseDestroySpMat(diagblk_descr_forward[i]));
         }
     }
     for(unsigned int i = 0; i < n_blocks - 1; i++){
-        if(upperblk_descr[i]) {
-            cusparseErrchk(cusparseDestroySpMat(upperblk_descr[i]));
+        if(upperblk_descr_forward[i]) {
+            cusparseErrchk(cusparseDestroySpMat(upperblk_descr_forward[i]));
         }
-        if(lowerblk_descr[i]) {
-            cusparseErrchk(cusparseDestroySpMat(lowerblk_descr[i]));
+        if(lowerblk_descr_forward[i]) {
+            cusparseErrchk(cusparseDestroySpMat(lowerblk_descr_forward[i]));
+        }
+        if(upperblk_descr_backward[i]) {
+            cusparseErrchk(cusparseDestroySpMat(upperblk_descr_backward[i]));
+        }
+        if(lowerblk_descr_backward[i]) {
+            cusparseErrchk(cusparseDestroySpMat(lowerblk_descr_backward[i]));
         }
     }
     if(dense_descr_in){

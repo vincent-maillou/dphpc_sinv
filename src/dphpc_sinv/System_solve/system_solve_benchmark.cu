@@ -1228,6 +1228,21 @@ __global__ void jacobi_precondition_array(
 
 }
 
+__global__ void jacobi_unprecondition_array(
+    double *array,
+    double *diagonal_values_inv_sqrt,
+    int matrix_size
+)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for(int i = idx; i < matrix_size; i += blockDim.x * gridDim.x){
+        array[i] = array[i] * 1/diagonal_values_inv_sqrt[i];
+    }
+
+}
+
+
 
 
 __global__ void jacobi_precondition_matrix(
@@ -1371,12 +1386,14 @@ double solve_cusparse_CG_jacobi(
     //begin CG
     time = -omp_get_wtime();
 
+    // scale rhs
     jacobi_precondition_array<<<num_blocks, num_threads>>>(
         rhs_d,
         diagonal_values_inv_sqrt_d,
         matrix_size    
     );
     cudaErrchk( cudaDeviceSynchronize() );
+    // scale matrix
     jacobi_precondition_matrix<<<num_blocks, num_threads>>>(
         data_d,
         col_indices_d,
@@ -1385,6 +1402,12 @@ double solve_cusparse_CG_jacobi(
         matrix_size
     );
     cudaErrchk( cudaDeviceSynchronize() );
+    // scale starting guess
+    jacobi_unprecondition_array<<<num_blocks, num_threads>>>(
+        x_d,
+        diagonal_values_inv_sqrt_d,
+        matrix_size    
+    );
 
     cudaErrchk(cudaStreamSynchronize(stream));
     cudaErrchk(cudaDeviceSynchronize());

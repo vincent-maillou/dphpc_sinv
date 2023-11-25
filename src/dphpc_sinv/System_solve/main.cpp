@@ -483,7 +483,7 @@ int main(int argc, char *argv[]){
                 double starting_guess[matrix_size];
                 // bit overkill to set zero in every measurement
                 for(int j = 0; j < matrix_size; j++){
-                    starting_guess[j] = previous_solution[j];
+                    starting_guess[j] = 0.0;
                 }
                 times_cusparse_CG_jacobi[i] = solve_cusparse_CG_jacobi(
                     data,
@@ -514,7 +514,7 @@ int main(int argc, char *argv[]){
                 double starting_guess[matrix_size];
                 // bit overkill to set zero in every measurement
                 for(int j = 0; j < matrix_size; j++){
-                    starting_guess[j] = 0.0;
+                    starting_guess[j] = previous_solution[j];
                 }
                 times_cusparse_CG_jacobi_guess[i] = solve_cusparse_CG_jacobi(
                     data,

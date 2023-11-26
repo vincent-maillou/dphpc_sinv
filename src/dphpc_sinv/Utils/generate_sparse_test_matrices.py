@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import os
 
 SEED = 63
-MAT_SIZE = 10
-BLOCKSIZE = 2
-SPARSITY = 1.2
+MAT_SIZE = 3000
+BLOCKSIZE = 1000
+SPARSITY = 0.5
 PATH_TO_FILE = "../../../tests/tests_cases/"
 PATH_TO_FILE = os.path.join("/home/sem23f28/Documents/dphpc_sinv", "tests/", "tests_cases/")
 
@@ -25,8 +25,7 @@ if __name__ == "__main__":
     # Compute inverse
     inv_matrix = np.linalg.inv(matrix)
 
-    print(inv_matrix)
-    print(matrix)
+
     # Extract diagonal and off-diagonal blocks
     matrix_diag_blk = matrix_utils.extract_diagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE)
     matrix_upper_blk = matrix_utils.extract_offdiagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE, 1)

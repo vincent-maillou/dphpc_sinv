@@ -115,7 +115,7 @@ def generateSparseBandedMatrix(
 
     # assert that the matrix will be invertible
     value_diag = np.sum(np.abs(A), axis=1)
-    np.fill_diagonal(A, value_diag + 1)
+    np.fill_diagonal(A, value_diag)
 
     return A
 

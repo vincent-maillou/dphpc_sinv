@@ -60,9 +60,21 @@ std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_bottomrightcorner(
     int blocksize
 );
 
+std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_bottomrightcorner_2(
+    Eigen::MatrixXcd& A,
+    int partition_blocksize,
+    int blocksize
+);
+
 std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_central(
     Eigen::MatrixXcd& A,
     int start_blockrow,
+    int partition_blocksize,
+    int blocksize
+);
+
+std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_central_2(
+    Eigen::MatrixXcd& A,
     int partition_blocksize,
     int blocksize
 );
@@ -104,6 +116,15 @@ void produceSchurBottomRightCorner(Eigen::MatrixXcd A,
                                    int blocksize
 );   
 
+void produceSchurBottomRightCorner_2(Eigen::MatrixXcd A,
+                                   Eigen::MatrixXcd L,
+                                   Eigen::MatrixXcd U,
+                                   Eigen::MatrixXcd& G,
+                                   int partition_blocksize,
+                                   int blocksize
+);   
+
+
 void produceSchurCentral(Eigen::MatrixXcd A,
                                    Eigen::MatrixXcd L,
                                    Eigen::MatrixXcd U,
@@ -113,9 +134,24 @@ void produceSchurCentral(Eigen::MatrixXcd A,
                                    int blocksize
 );   
 
+void produceSchurCentral_2(Eigen::MatrixXcd A,
+                                   Eigen::MatrixXcd L,
+                                   Eigen::MatrixXcd U,
+                                   Eigen::MatrixXcd& G,
+                                   int partition_blocksize,
+                                   int blocksize
+);   
+
 
 void fill_buffer(Eigen::MatrixXcd& inMatrix,
 		 Eigen::MatrixXcd** eigenA, 
+		 int partition_blocksize, 
+		 int blocksize, 
+		 int rank, 
+		 int partitions);
+
+void fill_buffer_2(Eigen::MatrixXcd& inMatrix,
+		 Eigen::MatrixXcd eigenA, 
 		 int partition_blocksize, 
 		 int blocksize, 
 		 int rank, 
@@ -169,6 +205,17 @@ Eigen::MatrixXcd psr_seqsolve_fulltest(const std::string test_folder,
                              Eigen::MatrixXcd& eigenA_read_in
 ); 
 
+Eigen::MatrixXcd psr_solve_fulltest(const std::string test_folder,
+                             int N,
+                             int num_central_partitions,
+                             int blocksize,
+                             int n_blocks,
+                             int partitions,
+                             int partition_blocksize,
+                             int rank,
+                             int n_blocks_schursystem,
+                             Eigen::MatrixXcd& eigenA_read_in
+); 
 
 Eigen::MatrixXcd psr_seqsolve(int N,
                              int blocksize,

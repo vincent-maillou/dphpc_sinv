@@ -1,5 +1,4 @@
 #include "PSR.h"
-#include <iomanip>
 
 void myFunction(Eigen::MatrixXcd& A) {
     // Your function logic here
@@ -1175,12 +1174,6 @@ Eigen::MatrixXcd psr_solve(int N,
         );
     }
 
-
     return G_final;
-
-
 }
-
-
-
 

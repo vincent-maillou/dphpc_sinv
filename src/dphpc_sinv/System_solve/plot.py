@@ -2,11 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as st
 from matplotlib.ticker import ScalarFormatter, LogLocator, FormatStrFormatter, FixedFormatter, FixedLocator
+import matplotlib
+
 
 if __name__ == "__main__":
 
     measurements = 8
-
 
     times_tot = []
     steps_tot = []
@@ -14,14 +15,10 @@ if __name__ == "__main__":
     for step in range(measurements):
         warmup = 10
         times = np.loadtxt(
-            "/home/sem23f28/Documents/dphpc_sinv/src/dphpc_sinv/System_solve/times"+ str(step) +".txt", dtype=np.float64)[:,warmup:]
-
-    
-
-
+            "/home/sem23f28/Documents/dphpc_sinv/src/dphpc_sinv/System_solve/times" + str(step) + ".txt", dtype=np.float64)[:, warmup:]
 
         steps = np.loadtxt(
-            "/home/sem23f28/Documents/dphpc_sinv/src/dphpc_sinv/System_solve/steps"+ str(step) +".txt", dtype=np.int32)
+            "/home/sem23f28/Documents/dphpc_sinv/src/dphpc_sinv/System_solve/steps" + str(step) + ".txt", dtype=np.int32)
 
         if step != 0 and step != 2:
             times_tot.append(times)
@@ -33,8 +30,8 @@ if __name__ == "__main__":
         interval = np.empty((2, times.shape[0]))
         for i in range(times.shape[0]):
             interval[:, i] = st.t.interval(confidence=confidence, df=len(times[i])-1,
-                                        loc=np.median(times[i]),
-                                        scale=st.sem(times[i]))
+                                           loc=np.median(times[i]),
+                                           scale=st.sem(times[i]))
 
         yer = [interval[:, i].reshape((2, -1)) for i in range(times.shape[0])]
         for i in range(times.shape[0]):
@@ -51,18 +48,18 @@ if __name__ == "__main__":
         fig.set_size_inches(16, 9)
 
         colors = ["blue", "cyan", "olive", "red",
-                "green", "orange", "purple", "gray", "brown", "black", "pink", "yellow"]
+                  "green", "orange", "purple", "gray", "brown", "black", "pink", "yellow"]
 
         labels = [
             "MKL gesv (14 Threads)",
             "MKL posv (14 Threads)",
             "MKL gbsv (14 Threads)",
             "MKL pbsv (14 Threads)",
-            "CuSparse CG ("+str(steps[0]) +" Steps)",
-            "CG with Guess ("+str(steps[1]) +" Steps)",
-            "Precon. CG ("+str(steps[2]) +" Steps)",
-            "Precon. CG with Guess ("+str(steps[3]) +" Steps)",
-            "ILU + CuSparse CG ("+str(steps[4]) +" Steps)",
+            "CuSparse CG ("+str(steps[0]) + " Steps)",
+            "CG with Guess ("+str(steps[1]) + " Steps)",
+            "Precon. CG ("+str(steps[2]) + " Steps)",
+            "Precon. CG with Guess ("+str(steps[3]) + " Steps)",
+            "ILU + CuSparse CG ("+str(steps[4]) + " Steps)",
             "CuSolver dense LU",
             "CuSolver dense Cholesky",
             "CuSolver sparse Cholesky"
@@ -70,7 +67,7 @@ if __name__ == "__main__":
 
         for i in range(times.shape[0]):
             ax.bar(position0[i], means[i], width=barWidth, color=colors[i],
-                edgecolor="black", yerr=yer[i], capsize=7, label=labels[i])
+                   edgecolor="black", yerr=yer[i], capsize=7, label=labels[i])
 
         # general layout
         ax.tick_params(
@@ -80,6 +77,8 @@ if __name__ == "__main__":
             top=False,         # ticks along the top edge are off
             labelbottom=False)  # labels along the bottom edge are off
 
+        ax.set_yscale("log")
+
         # ax.get_yaxis().set_minor_locator(FixedLocator([0.1, 0.2, 0.3, 0.5]))
         # ax.get_yaxis().set_minor_formatter(FixedFormatter(["a", "b", "c", "d"]))
         # ax.tick_params(
@@ -88,11 +87,10 @@ if __name__ == "__main__":
         #     bottom=False,      # ticks along the bottom edge are off
         #     top=False,         # ticks along the top edge are off
         #     labelbottom=False)
-
-        # ax.yaxis.set_ticks([0.05, 0.1, 0.2, 0.5], minor=False)
-        # ax.yaxis.set_ticklabels(["a", "b", "c", "d"], minor=False)
-
-        ax.set_yscale("log")
+        # ax.get_yaxis().get_major_formatter().labelOnlyBase = False
+        ax.set_yticks([1e-2, 1e-1, 1], minor=False)
+        #ax.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+        ax.get_yaxis().get_major_formatter().labelOnlyBase = False
 
 
         ax.set_title(
@@ -101,8 +99,11 @@ if __name__ == "__main__":
         ax.set_xlabel("Methods")
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-        plt.savefig("plot"+ str(step) +".png", bbox_inches='tight', dpi=300)
+        plt.savefig("plot" + str(step) + ".png", bbox_inches='tight', dpi=300)
         plt.close('all')
+
+    if len(times_tot) == 0:
+        exit()
 
     times = times_tot[0]
     steps = steps_tot[0]
@@ -117,8 +118,8 @@ if __name__ == "__main__":
     interval = np.empty((2, times.shape[0]))
     for i in range(times.shape[0]):
         interval[:, i] = st.t.interval(confidence=confidence, df=len(times[i])-1,
-                                    loc=np.median(times[i]),
-                                    scale=st.sem(times[i]))
+                                       loc=np.median(times[i]),
+                                       scale=st.sem(times[i]))
 
     yer = [interval[:, i].reshape((2, -1)) for i in range(times.shape[0])]
     for i in range(times.shape[0]):
@@ -135,18 +136,18 @@ if __name__ == "__main__":
     fig.set_size_inches(16, 9)
 
     colors = ["blue", "cyan", "olive", "red",
-            "green", "orange", "purple", "gray", "brown", "black", "pink", "yellow"]
+              "green", "orange", "purple", "gray", "brown", "black", "pink", "yellow"]
 
     labels = [
         "MKL gesv (14 Threads)",
         "MKL posv (14 Threads)",
         "MKL gbsv (14 Threads)",
         "MKL pbsv (14 Threads)",
-        "CuSparse CG ("+str(steps[0]) +" Steps)",
-        "CG with Guess ("+str(steps[1]) +" Steps)",
-        "Precon. CG ("+str(steps[2]) +" Steps)",
-        "Precon. CG with Guess ("+str(steps[3]) +" Steps)",
-        "ILU + CuSparse CG ("+str(steps[4]) +" Steps)",
+        "CuSparse CG ("+str(steps[0]) + " Steps)",
+        "CG with Guess ("+str(steps[1]) + " Steps)",
+        "Precon. CG ("+str(steps[2]) + " Steps)",
+        "Precon. CG with Guess ("+str(steps[3]) + " Steps)",
+        "ILU + CuSparse CG ("+str(steps[4]) + " Steps)",
         "CuSolver dense LU",
         "CuSolver dense Cholesky",
         "CuSolver sparse Cholesky"
@@ -154,7 +155,7 @@ if __name__ == "__main__":
 
     for i in range(times.shape[0]):
         ax.bar(position0[i], means[i], width=barWidth, color=colors[i],
-            edgecolor="black", yerr=yer[i], capsize=7, label=labels[i])
+               edgecolor="black", yerr=yer[i], capsize=7, label=labels[i])
 
     # general layout
     ax.tick_params(
@@ -177,10 +178,11 @@ if __name__ == "__main__":
     # ax.yaxis.set_ticklabels(["a", "b", "c", "d"], minor=False)
 
     ax.set_yscale("log")
-
-
+    ax.set_yticks([1e-2, 1e-1, 1], minor=False)
+    #ax.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    ax.get_yaxis().get_major_formatter().labelOnlyBase = False
     ax.set_title(
-        "Average on Attelas \n (7165x7165, 1e-10 tolerance)")
+        "Average over Eight KMC Steps \n (7165x7165, 1e-10 tolerance)")
     ax.set_ylabel("Time [s]")
     ax.set_xlabel("Methods")
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))

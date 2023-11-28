@@ -6,7 +6,7 @@
 
 
 bool load_binary_matrix(
-    char *filename, 
+    const char *filename, 
     std::complex<double> *matrix, 
     int rows, 
     int cols);
@@ -26,9 +26,15 @@ void print_matrix(
     int cols);
 
 bool load_matrix_parameters(
-    char *filename, 
+    const char *filename, 
     unsigned int *matrice_size, 
     unsigned int *blocksize);
+
+bool load_matrix_parameters_batched(
+    const char *filename, 
+    unsigned int *matrice_size, 
+    unsigned int *blocksize,
+    unsigned int *batchsize);
 
 template<typename T>
 bool load_text_array(

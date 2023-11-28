@@ -11,9 +11,13 @@
 #include <cuda/std/complex>
 #include <cusolverDn.h>
 #include <cublas_v2.h>
-
+#include "dense_rgf.h"
 
 #include "utils.h"
+
+using complex_h = std::complex<double>;
+using complex_d = cuDoubleComplex;
+
 
 
 #define cudaErrchk(ans) { cudaAssert((ans), __FILE__, __LINE__); }
@@ -49,9 +53,6 @@ inline void cublasAssert(cublasStatus_t code, const char *file, int line, bool a
    }
 }
 
-// both should be equivalent, thus reinterpret_cast should be fine
-using complex_h = std::complex<double>;
-using complex_d = cuDoubleComplex; //cuda::std::complex<double>;
 
 bool rgf_dense_matrix_fits_gpu_memory(
     unsigned int blocksize,
@@ -1200,6 +1201,7 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     complex_h *inv_upperblk_h,
     complex_h *inv_lowerblk_h)
 {
+    
     if(matrix_size % blocksize != 0){
         printf("Error: matrix_size is not a multiple of blocksize\n");
         return false;
@@ -1255,7 +1257,6 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         cudaErrchk(cudaMalloc((void**)&matrix_upperblk_d[i], blocksize * blocksize * sizeof(complex_d)));
         cudaErrchk(cudaMalloc((void**)&matrix_lowerblk_d[i], blocksize * blocksize * sizeof(complex_d)));
     }
-
 
 
     // allocate memory for the inverse
@@ -1352,7 +1353,6 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
 
 
 
-
     // // 1. Forward substitution (performed left to right)
     for (unsigned int i = 1; i < n_blocks; ++i) {
 
@@ -1436,7 +1436,6 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         cudaErrchk(cudaEventRecord(unload[i], stream[stream_memunload]));
 
     }
-
     int stream_memload_before = (n_blocks) % 2;
     int stream_compute_before = (n_blocks-1) % 2;
 
@@ -1591,7 +1590,6 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         // unloading finished
         cudaErrchk(cudaEventRecord(unload[i], stream[stream_memunload]));
     }
-
     // synchronize all the streams
     for(int j = 0; j < number_streams; j++){
         cudaErrchk(cudaStreamSynchronize(stream[j]));
@@ -1663,322 +1661,6 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
 
     return success;
 }
-
-
-int main() {
-
-    if (cudaSetDevice(0) != cudaSuccess) {
-        throw std::runtime_error("Failed to set CUDA device.");
-    }
-
-    if(sizeof(complex_h) != sizeof(complex_d)){
-        printf("Error: complex_h and complex_d have different sizes\n");
-        return 1;
-    }
-    else{
-        printf("complex_h and complex_d have the same size\n");
-    }
- 
-    // Get matrix parameters
-    char f_matparam[] = "../../../tests/tests_cases/dense_blocks_matrix_0_parameters.txt";
-    unsigned int matrix_size;
-    unsigned int blocksize;
-
-    load_matrix_parameters(f_matparam, &matrix_size, &blocksize);
-
-    unsigned int n_blocks = matrix_size / blocksize;
-    unsigned int off_diag_size = matrix_size - blocksize;
-
-    // Print the matrix parameters
-    printf("Matrix parameters:\n");
-    printf("    Matrix size: %d\n", matrix_size);
-    printf("    Block size: %d\n", blocksize);
-    printf("    Number of blocks: %d\n", n_blocks);
-
-
-    // Load matrix to invert
-    std::complex<double>* matrix_diagblk = (std::complex<double>*) malloc(blocksize * matrix_size * sizeof(std::complex<double>));
-    char f_mat_diagblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_diagblk.bin";
-    load_binary_matrix(f_mat_diagblk, matrix_diagblk, blocksize, matrix_size);
-
-    std::complex<double>* matrix_upperblk = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
-    char f_mat_upperblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_upperblk.bin";
-    load_binary_matrix(f_mat_upperblk, matrix_upperblk, blocksize, off_diag_size);
-
-    std::complex<double>* matrix_lowerblk = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
-    char f_mat_lowerblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_lowerblk.bin";
-    load_binary_matrix(f_mat_lowerblk, matrix_lowerblk, blocksize, off_diag_size);
-
-    /*
-    Matrices are saved in the following way:
-
-    matrix_diagblk = [A_0, A_1, ..., A_n]
-    matrix_upperblk = [B_0, B_1, ..., B_n-1]
-    matrix_lowerblk = [C_0, C_1, ..., C_n-1]
-
-    where A_i, B_i, C_i are block matrices of size blocksize x blocksize
-
-    The three above arrays are in Row-Major order which means the blocks are not contiguous in memory.
-
-    Below they will be transformed to the following layout:
-
-    matrix_diagblk_h = [A_0;
-                           A_1;
-                           ...;
-                           A_n]
-    matrix_upperblk_h = [B_0;
-                            B_1;
-                            ...;
-                            B_n-1]
-    matrix_lowerblk_h = [C_0;
-                            C_1;
-                            ...;
-                            C_n-1]
-
-    where blocks are in column major order
-    */
-
-
-    complex_h* matrix_diagblk_h = NULL;
-    complex_h* matrix_upperblk_h = NULL;
-    complex_h* matrix_lowerblk_h = NULL;
-    cudaMallocHost((void**)&matrix_diagblk_h, blocksize * matrix_size * sizeof(complex_h));
-    cudaMallocHost((void**)&matrix_upperblk_h, blocksize * off_diag_size * sizeof(complex_h));
-    cudaMallocHost((void**)&matrix_lowerblk_h, blocksize * off_diag_size * sizeof(complex_h));
-
-    for(unsigned int i = 0; i < blocksize * matrix_size; i++){
-        // block index
-        int k = i / (blocksize * blocksize);
-        // index inside block
-        int h = i % (blocksize * blocksize);
-        // row inside block
-        int m = h % blocksize;
-        // col inside block
-        int n = h / blocksize;
-        matrix_diagblk_h[i] = matrix_diagblk[m*matrix_size + k*blocksize + n];
-    }
-    for(unsigned int i = 0; i < blocksize * off_diag_size; i++){
-        // block index
-        int k = i / (blocksize * blocksize);
-        // index inside block
-        int h = i % (blocksize * blocksize);
-        // row inside block
-        int m = h % blocksize;
-        // col inside block
-        int n = h / blocksize;
-        matrix_upperblk_h[i] = matrix_upperblk[m*off_diag_size + k*blocksize + n];
-        matrix_lowerblk_h[i] = matrix_lowerblk[m*off_diag_size + k*blocksize + n];
-    }
-    // for(unsigned int i = 0; i < blocksize * off_diag_size; i++){
-    //     std::cout << "matrix_upperblk_h[" << i << "] = " << matrix_upperblk_h[i] << std::endl;
-    // }
-
-    // allocate memory for the inverse
-    complex_h* inv_diagblk_h = NULL;
-    complex_h* inv_upperblk_h = NULL;
-    complex_h* inv_lowerblk_h = NULL;
-
-    cudaMallocHost((void**)&inv_diagblk_h, blocksize * matrix_size * sizeof(complex_h));
-    cudaMallocHost((void**)&inv_upperblk_h, blocksize * off_diag_size * sizeof(complex_h));
-    cudaMallocHost((void**)&inv_lowerblk_h, blocksize * off_diag_size * sizeof(complex_h));
-
-    // if(!(rgf_dense_matrix_fits_gpu_memory(blocksize, matrix_size,
-    //                                 matrix_diagblk_h,
-    //                                 matrix_upperblk_h,
-    //                                 matrix_lowerblk_h,
-    //                                 inv_diagblk_h,
-    //                                 inv_upperblk_h,
-    //                                 inv_lowerblk_h))){
-    //     printf("Error: rgf_dense_matrix_fits_gpu_memory failed\n");
-    // }
-    // else{
-    //     printf("rgf_dense_matrix_fits_gpu_memory succeeded\n");
-    // }
-
-    // if(!rgf_dense_matrix_does_not_fit_gpu_memory(blocksize, matrix_size,
-    //                                 matrix_diagblk_h,
-    //                                 matrix_upperblk_h,
-    //                                 matrix_lowerblk_h,
-    //                                 inv_diagblk_h,
-    //                                 inv_upperblk_h,
-    //                                 inv_lowerblk_h)){
-    //     printf("Error: rgf_dense_matrix_does_not_fit_gpu_memory failed\n");
-    // }
-    // else{
-    //     printf("rgf_dense_matrix_does_not_fit_gpu_memory succeeded\n");
-    // }
-    // if(!rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(blocksize, matrix_size,
-    //                                 matrix_diagblk_h,
-    //                                 matrix_upperblk_h,
-    //                                 matrix_lowerblk_h,
-    //                                 inv_diagblk_h,
-    //                                 inv_upperblk_h,
-    //                                 inv_lowerblk_h)){
-    //     printf("Error: rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap failed\n");
-    // }
-    // else{
-    //     printf("rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap succeeded\n");
-    // }
-    if(!rgf_dense_matrix_fits_gpu_memory_with_copy_compute_overlap(blocksize, matrix_size,
-                                    matrix_diagblk_h,
-                                    matrix_upperblk_h,
-                                    matrix_lowerblk_h,
-                                    inv_diagblk_h,
-                                    inv_upperblk_h,
-                                    inv_lowerblk_h)){
-        printf("Error: rgf_dense_matrix_fits_gpu_memory_with_copy_compute_overlap failed\n");
-    }
-    else{
-        printf("rgf_dense_matrix_fits_gpu_memory_with_copy_compute_overlap succeeded\n");
-    }
-
-
-    // ----- RESULT CHECKING SECTION -----
-
-    // Load reference solution of the matrix inverse
-    std::complex<double>* matrix_inv_diagblk_ref = (std::complex<double>*) malloc(blocksize * matrix_size * sizeof(std::complex<double>));
-    char f_mat_inv_diagblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_inverse_diagblk.bin";
-    load_binary_matrix(f_mat_inv_diagblk, matrix_inv_diagblk_ref, blocksize, matrix_size);
-
-    std::complex<double>* matrix_inv_upperblk_ref = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
-    char f_mat_inv_upperblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_inverse_upperblk.bin";
-    load_binary_matrix(f_mat_inv_upperblk, matrix_inv_upperblk_ref, blocksize, off_diag_size);
-    
-    std::complex<double>* matrix_inv_lowerblk_ref = (std::complex<double>*) malloc(blocksize * (off_diag_size) * sizeof(std::complex<double>));
-    char f_mat_inv_lowerblk[] = "../../../tests/tests_cases/dense_blocks_matrix_0_inverse_lowerblk.bin";
-    load_binary_matrix(f_mat_inv_lowerblk, matrix_inv_lowerblk_ref, blocksize, off_diag_size);
-
-
-    // Transform the reference solution to contiguous blocks where the blocks have column-major order
-    complex_h* inv_diagblk_ref = (complex_h*) malloc(blocksize * matrix_size * sizeof(complex_h));
-    complex_h* inv_upperblk_ref = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
-    complex_h* inv_lowerblk_ref = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
-
-
-
-    for(unsigned int i = 0; i < blocksize * matrix_size; i++){
-        // block index
-        int k = i / (blocksize * blocksize);
-        // index inside block
-        int h = i % (blocksize * blocksize);
-        // row inside block
-        int m = h % blocksize;
-        // col inside block
-        int n = h / blocksize;
-        inv_diagblk_ref[i] = matrix_inv_diagblk_ref[m*matrix_size + k*blocksize + n];
-    }
-    for(unsigned int i = 0; i < blocksize * off_diag_size; i++){
-        // block index
-        int k = i / (blocksize * blocksize);
-        // index inside block
-        int h = i % (blocksize * blocksize);
-        // row inside block
-        int m = h % blocksize;
-        // col inside block
-        int n = h / blocksize;
-        inv_upperblk_ref[i] = matrix_inv_upperblk_ref[m*off_diag_size + k*blocksize + n];
-        inv_lowerblk_ref[i] = matrix_inv_lowerblk_ref[m*off_diag_size + k*blocksize + n];
-    }
-
-    // // print last block of inverted matrix
-    // for(unsigned int i = blocksize *(matrix_size-blocksize); i < blocksize * matrix_size; i++){
-    //     std::cout << "inv_diagblk_h[" << i << "] = " << inv_diagblk_h[i] << std::endl;
-    //     std::cout << "inv_diagblk_ref[" << i << "] = " << inv_diagblk_ref[i] << std::endl;
-    // }
-
-    double norm_diagblk = 0.0;
-    double norm_upperblk = 0.0;
-    double norm_lowerblk = 0.0;
-    double diff_diagblk = 0.0;
-    double diff_upperblk = 0.0;
-    double diff_lowerblk = 0.0;
-    for(unsigned int i = 0; i < blocksize * matrix_size; i++){
-        norm_diagblk += std::abs(inv_diagblk_ref[i]);
-        diff_diagblk += std::abs(inv_diagblk_h[i] - inv_diagblk_ref[i]);
-    }
-    for(unsigned int i = 0; i < blocksize * off_diag_size; i++){
-        norm_upperblk += std::abs(inv_upperblk_ref[i]);
-        norm_lowerblk += std::abs(inv_lowerblk_ref[i]);
-        diff_upperblk += std::abs(inv_upperblk_h[i] - inv_upperblk_ref[i]);
-        diff_lowerblk += std::abs(inv_lowerblk_h[i] - inv_lowerblk_ref[i]);
-    }
-    double eps = 1e-12;
-    if(diff_diagblk/norm_diagblk > eps){
-        std::cout << diff_diagblk/norm_diagblk << std::endl;
-        printf("Error: inv_diagblk_h and inv_diagblk_ref are not equal\n");
-    }
-    else{
-        printf("inv_diagblk_h and inv_diagblk_ref are equal\n");
-    }
-    if(diff_upperblk/norm_upperblk > eps){
-        std::cout << diff_upperblk/norm_upperblk << std::endl;
-        printf("Error: inv_upperblk_h and inv_upperblk_ref are not equal\n");
-    }
-    else{
-        printf("inv_upperblk_h and inv_upperblk_ref are equal\n");
-    }
-    if(diff_lowerblk/norm_lowerblk > eps){
-        std::cout << diff_lowerblk/norm_lowerblk << std::endl;
-        printf("Error: inv_lowerblk_h and inv_lowerblk_ref are not equal\n");
-    }
-    else{
-        printf("inv_lowerblk_h and inv_lowerblk_ref are equal\n");
-    }
-
-
-    if(inv_diagblk_h){
-        cudaFreeHost(inv_diagblk_h);
-    }
-    if(inv_upperblk_h){
-        cudaFreeHost(inv_upperblk_h);
-    }
-    if(inv_lowerblk_h){
-        cudaFreeHost(inv_lowerblk_h);
-    }
-    if(matrix_diagblk_h){
-        cudaFreeHost(matrix_diagblk_h);
-    }
-    if(matrix_upperblk_h){
-        cudaFreeHost(matrix_upperblk_h);
-    }
-    if(matrix_lowerblk_h){
-        cudaFreeHost(matrix_lowerblk_h);
-    }
-    if(matrix_diagblk){
-        free(matrix_diagblk);
-    }
-    if(matrix_upperblk){
-        free(matrix_upperblk);
-    }
-    if(matrix_lowerblk){
-        free(matrix_lowerblk);
-    }
-    if(matrix_inv_diagblk_ref){
-        free(matrix_inv_diagblk_ref);
-    }
-    if(matrix_inv_upperblk_ref){
-        free(matrix_inv_upperblk_ref);
-    }
-    if(matrix_inv_lowerblk_ref){
-        free(matrix_inv_lowerblk_ref);
-    }
-    if(inv_diagblk_ref){
-        free(inv_diagblk_ref);
-    }
-    if(inv_upperblk_ref){
-        free(inv_upperblk_ref);
-    }
-    if(inv_lowerblk_ref){
-        free(inv_lowerblk_ref);
-    }
-
-
-
-    return 0;
-}
-
-
-
 
 
 

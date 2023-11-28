@@ -270,3 +270,14 @@ def write_matrix_parameters(
     with open(path_to_file, "w") as f:
         f.write(str(matrix_size) + "\n")
         f.write(str(blocksize) + "\n")
+
+def write_matrix_parameters_batched(
+    path_to_file: str,
+    matrix_size: int,
+    blocksize: int,
+    batchsize: int
+):
+    with open(path_to_file, "w") as f:
+        f.write(str(matrix_size) + "\n")
+        f.write(str(blocksize) + "\n")
+        f.write(str(batchsize) + "\n")

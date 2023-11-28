@@ -11,7 +11,7 @@
 #include "utils.h"
 
 bool load_binary_matrix(
-    char *filename, 
+    const char *filename, 
     std::complex<double> *matrix, 
     int rows, 
     int cols)
@@ -74,9 +74,8 @@ void print_matrix(
     }
 }
 
-
 bool load_matrix_parameters(
-    char *filename, 
+    const char *filename, 
     unsigned int *matrice_size, 
     unsigned int *blocksize)
 {
@@ -89,6 +88,27 @@ bool load_matrix_parameters(
     }
 
     std::fscanf(fp, "%u %u", matrice_size, blocksize);
+
+    std::fclose(fp);
+
+    return false;
+}
+
+bool load_matrix_parameters_batched(
+    const char *filename, 
+    unsigned int *matrice_size, 
+    unsigned int *blocksize,
+    unsigned int *batchsize)
+{
+    FILE *fp;
+
+    fp = std::fopen(filename, "r");
+    if (fp == NULL) {
+        std::printf("Error opening file\n");
+        return true;
+    }
+
+    std::fscanf(fp, "%u %u %u", matrice_size, blocksize, batchsize);
 
     std::fclose(fp);
 

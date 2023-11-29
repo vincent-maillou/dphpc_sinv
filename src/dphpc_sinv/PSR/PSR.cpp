@@ -1504,10 +1504,5 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
     MPI_Type_free(&redschur_blockpatternType);
 
     return G_final;
-
-
 }
-
-
-
 

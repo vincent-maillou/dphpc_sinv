@@ -1446,56 +1446,62 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
 	    produceSchurBottomRightCorner_2(processA, L, U, G, partition_blocksize, blocksize);
     }
     // End of produce_schur
-
-    // Start of reconstructing Tridiagonal system of the full inverse via MPIALLGATHER    
-    Eigen::MatrixXcd G_final = Eigen::MatrixXcd(N, N);
-    G_final.setZero();
-
-    int comm_buf_size = (rowSizePartition * colSizePartition * partitions) << 1;
-    double* comm_buf = new double[comm_buf_size];
-    in_buf_size = (rowSizePartition * colSizePartition) << 1;
-    // !!!!!!
-    // Attention I am currently purposefully overshooting the boundaries of G.data() for processes 0 and partitions - 1 
-    // in the MPI_Allgather i.e. for those processes G.data() has only size ((rowSizePartition * (colSizePartition - blocksize)) << 1) insted of in_buf_size.
-    // But since I am not writing anything back from that overshoot area it doesn't impact correctness currently
-    // !!!!!
-    double* in_buf = (double*) G.data();
-    MPI_Allgather(in_buf, in_buf_size, MPI_DOUBLE, comm_buf, in_buf_size, MPI_DOUBLE, MPI_COMM_WORLD);
+    if(compare_reference){
+        compareSINV_referenceInverse_localprodG_byblock(partitions, blocksize,
+                                                         partition_blocksize, G, full_inverse, rank);
+    }
 
     
-    for(int i = 0; i < partitions; ++i) {
-        int start_rowindice = i * partition_blocksize * blocksize;
-        int start_colindice = 0;
-        if(i > 0) {
-            start_colindice = start_rowindice - blocksize;
-        }
-        int rowSize = rowSizePartition;
-        int colSize = colSizePartition;
-        if(i == 0 || i == partitions - 1) {
-            colSize -= blocksize;
-        }
-        G_final.block(start_rowindice, start_colindice, rowSize, colSize) =
-                Eigen::Map<Eigen::MatrixXcd> ( (std::complex<double>*) (comm_buf + (i * in_buf_size)), rowSize, colSize);
+    // // Start of reconstructing Tridiagonal system of the full inverse via MPIALLGATHER   
+    // This is not necessary as G does not need to be completely reconstructed on each process 
+    // Eigen::MatrixXcd G_final = Eigen::MatrixXcd(N, N);
+    // G_final.setZero();
 
-        // Setting the off Tridiagonal blocks used in the produceSchurCentral step to 0 
-        if(i > 0 && i < partitions - 1) {
-            (G_final.block(start_rowindice, start_colindice + 3 * blocksize, blocksize, (partition_blocksize - 1) * blocksize)).setZero();
-            (G_final.block(start_rowindice + 2 * blocksize, start_colindice + blocksize, (partition_blocksize - 1) * blocksize, blocksize)).setZero();
-        }
+    // int comm_buf_size = (rowSizePartition * colSizePartition * partitions) << 1;
+    // double* comm_buf = new double[comm_buf_size];
+    // in_buf_size = (rowSizePartition * colSizePartition) << 1;
+    // // !!!!!!
+    // // Attention I am currently purposefully overshooting the boundaries of G.data() for processes 0 and partitions - 1 
+    // // in the MPI_Allgather i.e. for those processes G.data() has only size ((rowSizePartition * (colSizePartition - blocksize)) << 1) insted of in_buf_size.
+    // // But since I am not writing anything back from that overshoot area it doesn't impact correctness currently
+    // // !!!!!
+    // double* in_buf = (double*) G.data();
+    // MPI_Allgather(in_buf, in_buf_size, MPI_DOUBLE, comm_buf, in_buf_size, MPI_DOUBLE, MPI_COMM_WORLD);
 
-    }
+    
+    // for(int i = 0; i < partitions; ++i) {
+    //     int start_rowindice = i * partition_blocksize * blocksize;
+    //     int start_colindice = 0;
+    //     if(i > 0) {
+    //         start_colindice = start_rowindice - blocksize;
+    //     }
+    //     int rowSize = rowSizePartition;
+    //     int colSize = colSizePartition;
+    //     if(i == 0 || i == partitions - 1) {
+    //         colSize -= blocksize;
+    //     }
+    //     G_final.block(start_rowindice, start_colindice, rowSize, colSize) =
+    //             Eigen::Map<Eigen::MatrixXcd> ( (std::complex<double>*) (comm_buf + (i * in_buf_size)), rowSize, colSize);
 
-    delete[] comm_buf;
-    // End of reconstructing Tridiagonal system of the full inverse via MPIALLGATHER    
+    //     // Setting the off Tridiagonal blocks used in the produceSchurCentral step to 0 
+    //     if(i > 0 && i < partitions - 1) {
+    //         (G_final.block(start_rowindice, start_colindice + 3 * blocksize, blocksize, (partition_blocksize - 1) * blocksize)).setZero();
+    //         (G_final.block(start_rowindice + 2 * blocksize, start_colindice + blocksize, (partition_blocksize - 1) * blocksize, blocksize)).setZero();
+    //     }
 
-    if(compare_reference){
-        compareSINV_referenceInverse_byblock(n_blocks,
-                                     blocksize,
-                                     G_final,
-                                     full_inverse,
-                                     rank
-        );
-    }
+    // }
+
+    // delete[] comm_buf;
+    // // End of reconstructing Tridiagonal system of the full inverse via MPIALLGATHER    
+
+    // if(compare_reference){
+    //     compareSINV_referenceInverse_byblock(n_blocks,
+    //                                  blocksize,
+    //                                  G_final,
+    //                                  full_inverse,
+    //                                  rank
+    //     );
+    // }
 
 
     MPI_Type_free(&subblockType);
@@ -1503,6 +1509,6 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
     MPI_Type_free(&subblock_ReceiveType);
     MPI_Type_free(&redschur_blockpatternType);
 
-    return G_final;
+    return G;
 }
 

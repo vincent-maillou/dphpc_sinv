@@ -202,6 +202,14 @@ void compareSINV_referenceInverse_byblock(int n_blocks,
                                      int rank
 );
 
+void compareSINV_referenceInverse_localprodG_byblock(int partitions,
+                                     int blocksize,
+                                     int partition_blocksize,
+                                     Eigen::MatrixXcd G_local,
+                                     Eigen::MatrixXcd full_inverse,
+                                     int rank
+);
+
 
 Eigen::MatrixXcd psr_seqsolve_fulltest(const std::string test_folder,
                              int N,

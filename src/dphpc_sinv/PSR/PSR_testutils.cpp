@@ -66,6 +66,101 @@ void compareSINV_referenceInverse_byblock(int n_blocks,
     }
 }
 
+void compareSINV_referenceInverse_localprodG_byblock(int partitions,
+                                     int blocksize,
+                                     int partition_blocksize,
+                                     Eigen::MatrixXcd G_local,
+                                     Eigen::MatrixXcd full_inverse,
+                                     int rank
+){
+    int glob_offset = rank * partition_blocksize;
+
+    if (rank == 0) {
+        for (int i = 0; i < partition_blocksize; ++i) {
+            if(G_local.block(i * blocksize, i * blocksize, blocksize, blocksize).isApprox\
+            (full_inverse.block((glob_offset + i) * blocksize, (glob_offset + i) * blocksize, blocksize, blocksize))){
+                std::cout << "Diagonal Block " << i << " is the same." << std::endl;
+            } else {
+                std::cout << "Diagonal Block " << i << " is different." << std::endl;
+            }
+            if(G_local.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize).isApprox\
+            (full_inverse.block((glob_offset + i) * blocksize, (glob_offset + (i + 1)) * blocksize, blocksize, blocksize))){
+                    std::cout << "Off-Diagonal Block " << i << " is the same." << std::endl;
+                } else {
+                    std::cout << "Off-Diagonal Block " << i << " is different." << std::endl;
+                }
+
+            if(i < partition_blocksize - 1){
+                    if(G_local.block((i + 1) * blocksize, i * blocksize, blocksize, blocksize).isApprox\
+                    (full_inverse.block((glob_offset + (i + 1)) * blocksize, (glob_offset + i) * blocksize, blocksize, blocksize))){
+                        std::cout << "Off-Diagonal Block " << i << " is the same." << std::endl;
+                    } else {
+                        std::cout << "Off-Diagonal Block " << i << " is different." << std::endl;
+                    }
+            }
+        }
+    }
+
+    else if (rank == partitions - 1) {
+        for (int i = 0; i < partition_blocksize; ++i) {
+            if(G_local.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize).isApprox\
+            (full_inverse.block((glob_offset + i) * blocksize, (glob_offset + i) * blocksize, blocksize, blocksize))){
+                std::cout << "Diagonal Block " << i + glob_offset << " is the same." << std::endl;
+            } else {
+                std::cout << "Diagonal Block " << i + glob_offset << " is different." << std::endl;
+            }
+            if(G_local.block(i * blocksize, i * blocksize, blocksize, blocksize).isApprox\
+            (full_inverse.block((glob_offset + i) * blocksize, (glob_offset + (i - 1)) * blocksize, blocksize, blocksize))){
+                    std::cout << "Off-Diagonal Block " << i + glob_offset << " is the same." << std::endl;
+                } else {
+                    std::cout << "Off-Diagonal Block " << i + glob_offset << " is different." << std::endl;
+                }
+
+            if(i < partition_blocksize - 1){
+                    if(G_local.block(i * blocksize, (i + 2) * blocksize, blocksize, blocksize).isApprox\
+                    (full_inverse.block((glob_offset + i) * blocksize, (glob_offset + (i + 1)) * blocksize, blocksize, blocksize))){
+                        std::cout << "Off-Diagonal Block " << i + glob_offset << " is the same." << std::endl;
+                    } else {
+                        std::cout << "Off-Diagonal Block " << i + glob_offset << " is different." << std::endl;
+                    }
+            }
+        }
+    }
+
+    else {
+        for (int i = 0; i < partition_blocksize; ++i) {
+            if(G_local.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize).isApprox\
+            (full_inverse.block((glob_offset + i) * blocksize, (glob_offset + i) * blocksize, blocksize, blocksize))){
+                std::cout << "Diagonal Block " << i + glob_offset << " is the same." << std::endl;
+            } else {
+                std::cout << "Diagonal Block " << i + glob_offset << " is different." << std::endl;
+            }
+            if(G_local.block(i * blocksize, i * blocksize, blocksize, blocksize).isApprox\
+            (full_inverse.block((glob_offset + i) * blocksize, (glob_offset + (i - 1)) * blocksize, blocksize, blocksize))){
+                    std::cout << "Off-Diagonal Block " << i + glob_offset << " is the same." << std::endl;
+                } else {
+                    std::cout << "Off-Diagonal Block " << i + glob_offset << " is different." << std::endl;
+                }
+
+            if(G_local.block(i * blocksize, (i + 2) * blocksize, blocksize, blocksize).isApprox\
+            (full_inverse.block((glob_offset + i) * blocksize, (glob_offset + (i + 1)) * blocksize, blocksize, blocksize))){
+                std::cout << "Off-Diagonal Block " << i + glob_offset << " is the same." << std::endl;
+            } else {
+                std::cout << "Off-Diagonal Block " << i + glob_offset << " is different." << std::endl;
+            }
+
+        }
+    }
+
+    // else {
+    //     for (int i = 0; i < partition_blocksize; ++i) {
+    //         if(G_local.block(i * blocksize, i * blocksize, blocksize, blocksize).isApprox\
+    //         (full_inverse.block(glob_offset + i * blocksize, glob_offset + i * blocksize, blocksize, blocksize))){
+    //             std::cout << "Diagonal Block " << i << " is the same." << std::endl;
+    //         } else {
+    //             std::cout << "Diagonal Block " << i << " is different."
+}
+
 
 
 
@@ -531,7 +626,8 @@ Eigen::MatrixXcd psr_solve_fulltest(const std::string test_folder,
     compareSINV_referenceInverse_byblock(n_blocks,
     			     blocksize,
     			     G_final,
-    			     full_inverse
+    			     full_inverse,
+                     0
     );
 
     // done to avoid more if statements for every check

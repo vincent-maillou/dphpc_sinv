@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import os
 
 SEED = 8000
-MAT_SIZE = 8
-BLOCKSIZE = 2
-BATCHSIZE = 3
+MAT_SIZE = 1000
+BLOCKSIZE = 100
+BATCHSIZE = 100
 PATH_TO_FILE = "../../../tests/tests_cases/"
 
 

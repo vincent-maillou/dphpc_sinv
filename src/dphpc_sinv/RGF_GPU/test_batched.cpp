@@ -8,7 +8,7 @@
 #include <cuda.h>
 #include <cuComplex.h>
 #include <cublas_v2.h>
-#include "magma.h"
+#include "magma_v2.h"
 
 
 #define cudaErrchk(ans) { cudaAssert((ans), __FILE__, __LINE__); }
@@ -49,12 +49,16 @@ using complex_d = cuDoubleComplex; //cuda::complex_h;
 
 
 int main() {
+    cudaSetDevice(0);
     magma_int_t init = magma_init();
+    magma_print_environment();
     if(init != MAGMA_SUCCESS){
         printf("Error: magma_init() failed\n");
         return 1;
     }
-    cudaSetDevice(0);
+    
+
+
 
     if(sizeof(magma_int_t) != sizeof(int)){
         printf("Error: sizeof(magma_int_t) != sizeof(int)\n");
@@ -71,7 +75,7 @@ int main() {
     cublasErrchk(cublasSetStream(cublas_handle, stream));
 
     magma_queue_t magma_queue;
-    magma_queue_create_from_cuda(0, NULL, NULL, NULL, &magma_queue);
+    magma_queue_create(0, &magma_queue);
 
     complex_d* tmp1_ptr_h[batch_size];
     complex_d* tmp2_ptr_h[batch_size];
@@ -183,15 +187,15 @@ int main() {
     cudaErrchk(cudaMalloc((void**)&ldda, batch_size*sizeof(int)));
     cudaErrchk(cudaMemset(ldda, blocksize, batch_size*sizeof(int)));
 
-    ifk1 = magma_zgetrf_batched(
-                            blocksize,
-                            blocksize,
-                            tmp1_ptr_d, 
-                            blocksize,
-                            ipiv_ptr_d,
-                            info_d,
-                            batch_size,
-                            magma_queue);
+
+    cublasZgetrfBatched(
+                    cublas_handle,
+                    blocksize,
+                    tmp1_ptr_d, 
+                    blocksize,
+                    ipiv_d,
+                    info_d,
+                    batch_size);
 
 
     magma_queue_sync(magma_queue);
@@ -261,7 +265,6 @@ int main() {
     cudaErrchk(cudaFree(m_d));
     cudaErrchk(cudaFree(n_d));
 
-    magma_finalize();
     return 0;
 
 }

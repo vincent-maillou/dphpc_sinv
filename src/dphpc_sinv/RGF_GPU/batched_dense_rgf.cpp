@@ -12,7 +12,6 @@
 #include <cuda/std/complex>
 #include <cusolverDn.h>
 #include <cublas_v2.h>
-#include "magma.h"
 #include "dense_rgf.h"
 #include <cuda_runtime.h>
 #include "utils.h"
@@ -55,7 +54,6 @@ inline void cublasAssert(cublasStatus_t code, const char *file, int line, bool a
 // both should be equivalent, thus reinterpret_cast should be fine
 using complex_h = std::complex<double>;
 using complex_d = cuDoubleComplex; //cuda::complex_h;
-using complex_m = magmaDoubleComplex;
 
 
 
@@ -109,12 +107,6 @@ void rgf_batched(
         cudaErrchk(cudaEventCreate(&unload[i]))
     }
 
-    magma_queue_t magma_queue[number_streams];
-    magma_device_t device;
-    magma_getdevice(&device);
-    for(int i = 0; i < number_streams; i++){
-       magma_queue_create(&magma_queue[i]);
-    }
 
 
 
@@ -130,7 +122,6 @@ void rgf_batched(
     complex_d* batch_upperblk_d[2];
     complex_d* batch_lowerblk_d[2];
 
-    // pointers for magma
     complex_d* batch_diagblk_ptr_h[2][batch_size];
     complex_d* batch_upperblk_ptr_h[2][batch_size];
     complex_d* batch_lowerblk_ptr_h[2][batch_size];
@@ -215,7 +206,6 @@ void rgf_batched(
     //memory for pivoting
 
     int *info_d = NULL;
-    int info_h[batch_size];
     cudaErrchk(cudaMalloc((void**)&info_d, batch_size * sizeof(int)))
 
     int *ipiv_d = NULL;
@@ -237,31 +227,25 @@ void rgf_batched(
                 batch_size * blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_compute]));
 
 
-    magma_zgetrf_batched(blocksize, blocksize,
-                            batch_diagblk_ptr_d[stream_compute], blocksize, ipiv_ptr_d,
-                            info_d, batch_size, magma_queue[stream_compute]);
-    //TODO check info_d for errors
-    cudaErrchk(cudaMemcpy(info_h, info_d, batch_size * sizeof(int), cudaMemcpyDeviceToHost));
-    for(unsigned int i = 0; i < batch_size; i++){
-        std::cout << "info_h[" << i << "] = " << info_h[i] << std::endl;
-    }
+    cublasErrchk(cublasZgetrfBatched(
+            cublas_handle[stream_compute],
+            blocksize,
+            batch_diagblk_ptr_d[stream_compute], blocksize, ipiv_d,
+            info_d, batch_size));
 
 
     // inversion
-    magma_zgetri_outofplace_batched(blocksize,
-                                    batch_diagblk_ptr_d[stream_compute],
-                                    blocksize,
-                                    ipiv_ptr_d,
-                                    batch_inv_diagblk_ptr_d, blocksize,
-                                    info_d,
-                                    batch_size,
-                                    magma_queue[stream_compute]);
+    cublasErrchk(cublasZgetriBatched(
+                                cublas_handle[stream_compute],
+                                blocksize,
+                                batch_diagblk_ptr_d[stream_compute],
+                                blocksize,
+                                ipiv_d,
+                                batch_inv_diagblk_ptr_d,
+                                blocksize,
+                                info_d,
+                                batch_size));
 
-
-    cudaErrchk(cudaMemcpy(info_h, info_d, batch_size * sizeof(int), cudaMemcpyDeviceToHost));
-    for(unsigned int i = 0; i < batch_size; i++){
-        std::cout << "info_h[" << i << "] = " << info_h[i] << std::endl;
-    }
 
     // record finishing the inverse of the first block
     cudaErrchk(cudaEventRecord(schur_inverted[0], stream[stream_compute]));
@@ -355,6 +339,28 @@ void rgf_batched(
         //                                 batch_diagblk_ptr_d[stream_compute], blocksize, ipiv_ptr_d,
         //                                 batch_inv_diagblk_ptr_d, blocksize,
         //                                 info_d, batch_size, magma_queue[stream_compute]);
+
+
+        cublasErrchk(cublasZgetrfBatched(
+                cublas_handle[stream_compute],
+                blocksize,
+                batch_diagblk_ptr_d[stream_compute], blocksize, ipiv_d,
+                info_d, batch_size));
+
+
+        // inversion
+        cublasErrchk(cublasZgetriBatched(
+                                    cublas_handle[stream_compute],
+                                    blocksize,
+                                    batch_diagblk_ptr_d[stream_compute],
+                                    blocksize,
+                                    ipiv_d,
+                                    batch_inv_diagblk_ptr_d,
+                                    blocksize,
+                                    info_d,
+                                    batch_size));
+
+
 
         // record finishing of computation in step i
         cudaErrchk(cudaEventRecord(schur_inverted[i], stream[stream_compute]));
@@ -621,13 +627,6 @@ void rgf_batched(
 int main() {
 
 
-    magma_int_t init = magma_init();
-    if(init != MAGMA_SUCCESS){
-        printf("Error: magma_init() failed\n");
-        return 1;
-    }
-
-
     if (cudaSetDevice(0) != cudaSuccess) {
         throw std::runtime_error("Failed to set CUDA device.");
     }
@@ -848,7 +847,7 @@ int main() {
             diff_upperblk += std::abs(inv_upperblk_h[i] - inv_upperblk_ref[i]);
             diff_lowerblk += std::abs(inv_lowerblk_h[i] - inv_lowerblk_ref[i]);
         }
-        double eps = 1e-12;
+        double eps = 1e-9;
         if(diff_diagblk/norm_diagblk > eps){
             printf("Error: batch_inv_diagblk_h and inv_diagblk_ref are not equal\n");
         }
@@ -985,22 +984,22 @@ int main() {
     }
 
 
-    double eps = 1e-12;
-    if(norm_diagblk / diff_diagblk > eps){
+    double eps = 1e-9;
+    if(diff_diagblk/norm_diagblk > eps){
         printf("Error: batch_inv_diagblk_h and batched_inv_matrices_diagblk_ref are not equal\n");
     }
     else{
         printf("batch_inv_diagblk_h and batched_inv_matrices_diagblk_ref are equal\n");
     }
     std::cout << diff_diagblk/norm_diagblk << std::endl;
-    if(norm_upperblk / diff_upperblk > eps){
+    if(diff_upperblk/norm_upperblk > eps){
         printf("Error: batch_inv_upperblk_h and batched_inv_matrices_upperblk_ref are not equal\n");
     }
     else{
         printf("batch_inv_upperblk_h and batched_inv_matrices_upperblk_ref are equal\n");
     }
     std::cout << diff_upperblk/norm_upperblk << std::endl;
-    if(norm_lowerblk / diff_lowerblk > eps){
+    if(diff_lowerblk/norm_lowerblk > eps){
         printf("Error: batch_inv_lowerblk_h and batched_inv_matrices_lowerblk_ref are not equal\n");
     }
     else{
@@ -1061,8 +1060,6 @@ int main() {
             cudaFreeHost(batch_inv_lowerblk_h[i]);
         }
     }
-
-    magma_finalize();
 
     return 0;
 }

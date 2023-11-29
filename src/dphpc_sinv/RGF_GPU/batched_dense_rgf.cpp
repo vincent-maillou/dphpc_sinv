@@ -1091,7 +1091,8 @@ int main() {
         printf("complex_h and complex_d have the same size\n");
     }
  
-    std::string base_path = "../../../tests/tests_cases/";
+    // std::string base_path = "../../../tests/tests_cases/";
+    std::string base_path = "/usr/scratch/mont-fort17/almaeder/rgf_test/";
 
     // Get matrix parameters
     std::string parameter_path = base_path + "batched_matrix_parameters.txt";
@@ -1212,18 +1213,18 @@ int main() {
         cudaMallocHost((void**)&inv_upperblk_h, blocksize * off_diag_size * sizeof(complex_h));
         cudaMallocHost((void**)&inv_lowerblk_h, blocksize * off_diag_size * sizeof(complex_h));
 
-        if(!rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(blocksize, matrix_size,
-                                        matrix_diagblk_h,
-                                        matrix_upperblk_h,
-                                        matrix_lowerblk_h,
-                                        inv_diagblk_h,
-                                        inv_upperblk_h,
-                                        inv_lowerblk_h)){
-            printf("Error: rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap failed\n");
-        }
-        else{
-            printf("rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap succeeded\n");
-        }
+        // if(!rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(blocksize, matrix_size,
+        //                                 matrix_diagblk_h,
+        //                                 matrix_upperblk_h,
+        //                                 matrix_lowerblk_h,
+        //                                 inv_diagblk_h,
+        //                                 inv_upperblk_h,
+        //                                 inv_lowerblk_h)){
+        //     printf("Error: rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap failed\n");
+        // }
+        // else{
+        //     printf("rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap succeeded\n");
+        // }
 
         std::cout << "batch " << batch << std::endl;
 

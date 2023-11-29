@@ -38,28 +38,31 @@ void read_central_testblocks(Eigen::MatrixXcd** A,
 void compareSINV_referenceInverse_byblock(int n_blocks,
                                      int blocksize,
                                      Eigen::MatrixXcd G_final,
-                                     Eigen::MatrixXcd full_inverse
+                                     Eigen::MatrixXcd full_inverse,
+                                     int rank
 ){
-    for (int i = 0; i < n_blocks; ++i) {
-       if(G_final.block(i * blocksize, i * blocksize, blocksize, blocksize).isApprox(full_inverse.block(i * blocksize, i * blocksize, blocksize, blocksize))){
-           std::cout << "Diagonal Block " << i << " is the same." << std::endl;
-       } else {
-           std::cout << "Diagonal Block " << i << " is different." << std::endl;
-       }
+    if (rank == 0) {
+        for (int i = 0; i < n_blocks; ++i) {
+        if(G_final.block(i * blocksize, i * blocksize, blocksize, blocksize).isApprox(full_inverse.block(i * blocksize, i * blocksize, blocksize, blocksize))){
+            std::cout << "Diagonal Block " << i << " is the same." << std::endl;
+        } else {
+            std::cout << "Diagonal Block " << i << " is different." << std::endl;
+        }
 
-       if(i < n_blocks - 1){
-            if(G_final.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize).isApprox(full_inverse.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize))){
-                std::cout << "Off-Diagonal Block " << i << " is the same." << std::endl;
-            } else {
-                std::cout << "Off-Diagonal Block " << i << " is different." << std::endl;
-            }
+        if(i < n_blocks - 1){
+                if(G_final.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize).isApprox(full_inverse.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize))){
+                    std::cout << "Off-Diagonal Block " << i << " is the same." << std::endl;
+                } else {
+                    std::cout << "Off-Diagonal Block " << i << " is different." << std::endl;
+                }
 
-            if(G_final.block((i + 1) * blocksize, i * blocksize, blocksize, blocksize).isApprox(full_inverse.block((i + 1) * blocksize, i * blocksize, blocksize, blocksize))){
-                std::cout << "Off-Diagonal Block " << i << " is the same." << std::endl;
-            } else {
-                std::cout << "Off-Diagonal Block " << i << " is different." << std::endl;
-            }
-       }
+                if(G_final.block((i + 1) * blocksize, i * blocksize, blocksize, blocksize).isApprox(full_inverse.block((i + 1) * blocksize, i * blocksize, blocksize, blocksize))){
+                    std::cout << "Off-Diagonal Block " << i << " is the same." << std::endl;
+                } else {
+                    std::cout << "Off-Diagonal Block " << i << " is different." << std::endl;
+                }
+        }
+        }
     }
 }
 
@@ -202,7 +205,8 @@ Eigen::MatrixXcd psr_seqsolve_fulltest(const std::string test_folder,
     compareSINV_referenceInverse_byblock(n_blocks,
                                      blocksize,
                                      G_final,
-                                     full_inverse
+                                     full_inverse,
+                                     0
     );
 
     // Check if the matrices are the same

@@ -1,5 +1,5 @@
 #include "PSR.h"
-#include <iomanip>
+//#include <iomanip>
 
 void myFunction(Eigen::MatrixXcd& A) {
     // Your function logic here
@@ -896,6 +896,94 @@ void fill_reduced_schur_matrix(Eigen::MatrixXcd& A_schur, double* comm_buf, int 
 
 }
 
+void fill_reduced_schur_matrix_cd(Eigen::MatrixXcd& A_schur, std::complex<double>* comm_buf_custom, int in_buf_size, int blocksize, int partitions, int rank) {
+
+    const int rowSize = blocksize;
+    const int colSizeCorner = blocksize << 1;
+    const int colSizeMiddle = colSizeCorner + blocksize;
+    const int half_buf_size = 6*blocksize*blocksize;
+
+    // Eigen::MatrixXcd A_schur_cd(A_schur.rows(), A_schur.cols());
+    // // A_schur_full is a debug object to check if all the elements have been correctly gathered on all nodes.
+    // Eigen::MatrixXcd A_schur_full = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>(comm_buf_custom, rowSize, blocksize *  ((partitions - 2) * 6 + 2 * 2));
+   
+    // Fill in the 2 blocks from the top process (i.e. rank 0)
+    // A_schur.block( 0, 0, rowSize, colSizeCorner) = 
+    //    	    Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>
+	//     ( (std::complex<double>*) comm_buf, rowSize, colSizeCorner);
+
+    A_schur.block( 0, 0, rowSize, colSizeCorner) = 
+       	    Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>
+        ( comm_buf_custom, rowSize, colSizeCorner);
+
+    
+    // if (!(A_schur.block( 0, 0, rowSize, colSizeCorner).isApprox(A_schur_cd.block( 0, 0, rowSize, colSizeCorner)))) {
+    //     std::cout << "Warning: first block is not equal on rank: " << rank << std::endl;
+    // } 
+    
+    //Fill in the 2 blocks from the bottom process (i.e rank (partitions-1))
+    // A_schur.block( (2*partitions-3)*blocksize, (2*partitions-4)*blocksize, rowSize, colSizeCorner) = 
+    //         Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>
+	//     ( (std::complex<double>*) (comm_buf + (partitions-1)*in_buf_size), rowSize, colSizeCorner);
+
+    A_schur.block(  (2*partitions-3)*blocksize, (2*partitions-4)*blocksize, rowSize, colSizeCorner) = 
+       	    Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>
+        ( comm_buf_custom + (partitions - 2) * in_buf_size / 2 + in_buf_size / 6, rowSize, colSizeCorner);
+
+    // if (!(A_schur.block( (2*partitions-3)*blocksize, (2*partitions-4)*blocksize, rowSize, colSizeCorner).isApprox(A_schur_cd.block( (2*partitions-3)*blocksize, (2*partitions-4)*blocksize, rowSize, colSizeCorner)))) {
+    //     std::cout << "Warning: second last block is not equal on rank: " << rank << std::endl;
+    // }
+
+    //Fill in the the 6 blocks over two rows from the processes in the middle (i.e. rank > 0 && rank < (partitions - 1))
+    for(int i = 1; i < partitions-1; ++i) {
+        // A_schur.block( (2*i-1)*blocksize, (2*i-2)*blocksize, rowSize, colSizeMiddle) = 
+        //     Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>
+        //     ( (std::complex<double>*) (comm_buf + i*in_buf_size), rowSize, colSizeMiddle);
+
+        A_schur.block( (2*i-1)*blocksize, (2*i-2)*blocksize, rowSize, colSizeMiddle) = 
+            Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>
+            (comm_buf_custom + (i-1)*in_buf_size/2 + in_buf_size / 6, rowSize, colSizeMiddle);
+
+        // if (!(A_schur.block( (2*i-1)*blocksize, (2*i-2)*blocksize, rowSize, colSizeMiddle).isApprox(A_schur_cd.block( (2*i-1)*blocksize, (2*i-2)*blocksize, rowSize, colSizeMiddle)))) {
+        //     std::cout << "Warning: middle upper section block: " << i <<  " is not equal on rank: " << rank << std::endl;
+        // }
+
+        // A_schur.block( (2*i)*blocksize, (2*i-1)*blocksize, rowSize, colSizeMiddle) = 
+        //     Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>
+        //     ( (std::complex<double>*) (comm_buf + i*in_buf_size + half_buf_size), rowSize, colSizeMiddle);
+
+        A_schur.block( (2*i)*blocksize, (2*i-1)*blocksize, rowSize, colSizeMiddle) = 
+            Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>
+            (comm_buf_custom + (i-1)*in_buf_size / 2 + in_buf_size / 6 + in_buf_size / 4 , rowSize, colSizeMiddle);
+
+        // if (!(A_schur.block( (2*i)*blocksize, (2*i-1)*blocksize, rowSize, colSizeMiddle).isApprox(A_schur_cd.block( (2*i)*blocksize, (2*i-1)*blocksize, rowSize, colSizeMiddle)))) {
+        //     std::cout << "Warning: middle lower section block: " << i <<  " is not equal on rank: " << rank << std::endl;
+        // }
+
+    }
+
+
+
+    // if (rank == 0)
+    // {   std::cout << "A_schur norm: " << A_schur.norm() << std::endl;
+    //     std::cout << "A_schur_full norm: " << A_schur_full.norm() << std::endl; }
+
+    // if (rank == 0) {
+
+    //     // std::cout << "A_full_schur.block( 0, 0, rowSize, colSizeCorner) = " << A_schur_full.block( 0, 0, rowSize, colSizeCorner) << std::endl;
+    //     // //std::cout << "A_schur_cd.block( 0, 0, rowSize, colSizeCorner) = " << A_schur_cd.block( 0, 0, rowSize, colSizeCorner) << std::endl;
+    //     // std::cout << "A_schur.block( 0, 0, rowSize, colSizeCorner) = " << A_schur.block( 0, 0, rowSize, colSizeCorner) << std::endl;
+    //     // std::cout << "A_schur first partition block: " << A_schur.block( blocksize, 0, blocksize, blocksize) << std::endl;
+    //     // std::cout << "A_schur second partition block: " << A_schur.block( blocksize, blocksize, blocksize, blocksize) << std::endl;
+    //     // std::cout << "A_schur second partition block: " << A_schur.block( blocksize, blocksize, blocksize, blocksize) << std::endl;
+    //     // std::cout << "A_schur second last partition block: " << A_schur.block( blocksize + (partitions - 2 ) * 2 * blocksize, (partitions - 2 ) * 2 * blocksize, blocksize, blocksize) << std::endl;
+    //     // std::cout << "A_schur last partition block: " << A_schur.block( blocksize + (partitions - 2 ) * 2 * blocksize, blocksize + (partitions - 2 ) * 2 * blocksize, blocksize, blocksize) << std::endl;
+    // }
+
+}
+
+
+
 Eigen::MatrixXcd psr_seqsolve(int N,
                              int blocksize,
                              int n_blocks,
@@ -963,7 +1051,8 @@ Eigen::MatrixXcd psr_seqsolve(int N,
         compareSINV_referenceInverse_byblock(n_blocks,
                                      blocksize,
                                      G_final,
-                                     full_inverse
+                                     full_inverse,
+                                     0
         );
     }
 
@@ -1113,7 +1202,7 @@ Eigen::MatrixXcd psr_solve(int N,
 
 
     // Start of produce_schur
-    std::cout << "Process " << rank << " is producing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+    //std::cout << "Process " << rank << " is producing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
 
     if(rank == 0) {
 	produceSchurTopLeftCorner(processA, L, U, G, 0, partition_blocksize, blocksize);
@@ -1171,10 +1260,248 @@ Eigen::MatrixXcd psr_solve(int N,
         compareSINV_referenceInverse_byblock(n_blocks,
                                      blocksize,
                                      G_final,
-                                     full_inverse
+                                     full_inverse,
+                                     rank
+        );
+    }
+    return G_final;
+}
+
+
+Eigen::MatrixXcd psr_solve_customMPI(int N,
+                             int blocksize,
+                             int n_blocks,
+                             int partitions,
+                             int partition_blocksize,
+                             int rank,
+                             int n_blocks_schursystem,
+                             Eigen::MatrixXcd& eigenA_read_in,
+                             bool compare_reference
+){  
+
+    Eigen::MatrixXcd eigenA2 = eigenA_read_in;
+
+    // Referece inverse
+    Eigen::MatrixXcd full_inverse;
+    if(compare_reference){
+        full_inverse = eigenA_read_in.inverse();
+    }
+	
+    //Limit it to the processes partition of A
+    int start_blockrow = rank * partition_blocksize;
+    int rowSizePartition = partition_blocksize * blocksize;
+    int colSizePartition = (partition_blocksize + 2) * blocksize;
+    Eigen::MatrixXcd processA;
+    Eigen::MatrixXcd G,L,U;
+
+    if (rank == 0) {
+        processA = eigenA2.block(0, 0, rowSizePartition, colSizePartition-blocksize);
+        G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
+    }
+
+    if (rank > 0 && rank < partitions - 1) {
+        int startRowIndex = start_blockrow*blocksize;
+        int startColIndex = (start_blockrow-1)*blocksize;
+        processA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition);
+        G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition);
+    }
+    if (rank == partitions - 1) {
+        int startRowIndex = start_blockrow*blocksize;
+        int startColIndex = (start_blockrow-1)*blocksize;
+        processA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition-blocksize);
+        G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
+    }
+
+
+    // Start reduce_schur
+    std::cout << "Process " << rank << " is reducing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+
+
+    if (rank == 0){
+        auto result = reduce_schur_topleftcorner(processA, 0, partition_blocksize, blocksize);
+        L = std::get<0>(result);
+        U = std::get<1>(result);
+    }
+
+    if (rank > 0 && rank < partitions - 1){
+        auto result = reduce_schur_central_2(processA, partition_blocksize, blocksize);
+        L = std::get<0>(result);
+        U = std::get<1>(result);
+    }
+    
+    if (rank == partitions - 1){
+        auto result = reduce_schur_bottomrightcorner_2(processA, partition_blocksize, blocksize);
+        L = std::get<0>(result);
+        U = std::get<1>(result);
+    }
+    // End reduce_schur
+
+    // Start of MPIALLGATHER for reduced_schur_system and inverse of said system
+    Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*n_blocks_schursystem, blocksize*n_blocks_schursystem);
+    A_schur.setZero();
+
+    // Start of creating custom MPI datatypes for block sends
+    MPI_Datatype subblockType;
+    create_subblock_Type(&subblockType, rowSizePartition, blocksize, 1);
+
+    MPI_Datatype subblockType_2;
+    create_subblock_Type(&subblockType_2, rowSizePartition, blocksize, 2);
+
+    MPI_Datatype subblock_ReceiveType;
+    create_subblock_Type(&subblock_ReceiveType, blocksize, blocksize, 1);
+
+    MPI_Datatype redschur_blockpatternType;
+    if (rank == 0){
+        create_ul2_redschur_blockpattern_Type(&redschur_blockpatternType, subblockType_2, blocksize, rowSizePartition, partition_blocksize);
+    }
+    else if (rank == partitions - 1){
+        create_br2_redschur_blockpattern_Type(&redschur_blockpatternType, subblockType_2, blocksize, rowSizePartition, partition_blocksize);
+    }
+    else{
+        create_central_redschur_blockpattern_Type(&redschur_blockpatternType, subblockType, subblockType_2,  blocksize, rowSizePartition, partition_blocksize);
+    }
+
+    // End of creating custom MPI datatypes for block sends
+
+
+    // Perform the same Allgather with custom MPI Datatypes
+    unsigned long comm_custom_buf_size = (blocksize * blocksize * ((partitions - 2) * 6 + 2 * 2));
+    std::complex<double>* comm_custom_buf = new std::complex<double>[comm_custom_buf_size];
+    int *receivecounts = new int[partitions];
+    int *displs = new int[partitions];
+
+
+    for(int i = 0; i < partitions; ++i) {
+        if (i == 0){
+            receivecounts[i] = 2;
+            displs[i] = 0;
+        }
+        else if (i == partitions - 1){
+            receivecounts[i] = 2;
+            displs[i] = (displs[i-1] + receivecounts[i-1]);
+        }
+        else{
+            receivecounts[i] = 6;
+            displs[i] = (displs[i-1] + receivecounts[i-1]);
+        }
+    }
+
+    MPI_Allgatherv(processA.data(), 1, redschur_blockpatternType, comm_custom_buf, receivecounts, displs,  subblock_ReceiveType, MPI_COMM_WORLD);
+    
+    unsigned long in_buf_size = (blocksize * blocksize * 6) << 1;
+    fill_reduced_schur_matrix_cd(A_schur, comm_custom_buf, in_buf_size, blocksize, partitions, rank);
+
+    delete[] comm_custom_buf;
+
+    auto G_schur = A_schur.inverse();
+    // End of MPIALLGATHER for reduced_schur_system and inverse of said system
+
+    // Start of writeback of reduced inverse to full G partitions
+    if(rank == 0) {
+        int start_rowindice = (partition_blocksize - 1) * blocksize;
+        int start_colindice = (partition_blocksize - 1) * blocksize;
+        G.block(start_rowindice, start_colindice, blocksize, (blocksize << 1)) = G_schur.block(0, 0, blocksize, (blocksize << 1));	
+    }
+    if(rank > 0 && rank < partitions - 1) {
+	// Upper left double block of process-local G
+        int start_rowindice_remote = (1 + ((rank - 1) << 1)) * blocksize; // (rank - 1) * 2 + 1
+        int start_colindice_remote = ((rank - 1) << 1) * blocksize; // (rank - 1) * 2
+        G.block(0, 0, blocksize, (blocksize << 1)) = G_schur.block(start_rowindice_remote, start_colindice_remote, blocksize, (blocksize << 1));
+
+        // Upper right single block of process-local G
+        int start_colindice = partition_blocksize * blocksize;
+        start_colindice_remote += (blocksize << 1);
+        G.block(0, start_colindice, blocksize, blocksize) = G_schur.block(start_rowindice_remote, start_colindice_remote, blocksize, blocksize);
+
+        // Lower left single block of process-local G
+        int start_rowindice = (partition_blocksize - 1) * blocksize;
+        start_colindice = blocksize;
+        start_rowindice_remote += blocksize;
+        start_colindice_remote -= blocksize;
+        G.block(start_rowindice, start_colindice, blocksize, blocksize) = G_schur.block(start_rowindice_remote, start_colindice_remote, blocksize, blocksize);
+
+        // Lower right double block of process-local G
+        start_colindice = partition_blocksize * blocksize;
+        start_colindice_remote += blocksize;
+        G.block(start_rowindice, start_colindice, blocksize, (blocksize << 1)) = G_schur.block(start_rowindice_remote, start_colindice_remote, blocksize, (blocksize << 1));
+    }
+    if(rank == partitions - 1) {
+        int start_rowindice_remote = (1 + ((partitions - 2) << 1)) * blocksize;
+        int start_colindice_remote = start_rowindice_remote - blocksize;
+        G.block(0, 0, blocksize, (blocksize << 1)) = G_schur.block(start_rowindice_remote, start_colindice_remote, blocksize, (blocksize << 1));
+    }
+    // End of writeback of reduced inverse to full G partitions
+
+
+    // Start of produce_schur
+    //std::cout << "Process " << rank << " is producing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+
+    if(rank == 0) {
+	    produceSchurTopLeftCorner(processA, L, U, G, 0, partition_blocksize, blocksize);
+    }
+    if(rank > 0 && rank < partitions - 1) {
+	    produceSchurCentral_2(processA, L, U, G, partition_blocksize, blocksize);
+    }
+    if(rank == partitions - 1) {
+	    produceSchurBottomRightCorner_2(processA, L, U, G, partition_blocksize, blocksize);
+    }
+    // End of produce_schur
+
+    // Start of reconstructing Tridiagonal system of the full inverse via MPIALLGATHER    
+    Eigen::MatrixXcd G_final = Eigen::MatrixXcd(N, N);
+    G_final.setZero();
+
+    int comm_buf_size = (rowSizePartition * colSizePartition * partitions) << 1;
+    double* comm_buf = new double[comm_buf_size];
+    in_buf_size = (rowSizePartition * colSizePartition) << 1;
+    // !!!!!!
+    // Attention I am currently purposefully overshooting the boundaries of G.data() for processes 0 and partitions - 1 
+    // in the MPI_Allgather i.e. for those processes G.data() has only size ((rowSizePartition * (colSizePartition - blocksize)) << 1) insted of in_buf_size.
+    // But since I am not writing anything back from that overshoot area it doesn't impact correctness currently
+    // !!!!!
+    double* in_buf = (double*) G.data();
+    MPI_Allgather(in_buf, in_buf_size, MPI_DOUBLE, comm_buf, in_buf_size, MPI_DOUBLE, MPI_COMM_WORLD);
+
+    
+    for(int i = 0; i < partitions; ++i) {
+        int start_rowindice = i * partition_blocksize * blocksize;
+        int start_colindice = 0;
+        if(i > 0) {
+            start_colindice = start_rowindice - blocksize;
+        }
+        int rowSize = rowSizePartition;
+        int colSize = colSizePartition;
+        if(i == 0 || i == partitions - 1) {
+            colSize -= blocksize;
+        }
+        G_final.block(start_rowindice, start_colindice, rowSize, colSize) =
+                Eigen::Map<Eigen::MatrixXcd> ( (std::complex<double>*) (comm_buf + (i * in_buf_size)), rowSize, colSize);
+
+        // Setting the off Tridiagonal blocks used in the produceSchurCentral step to 0 
+        if(i > 0 && i < partitions - 1) {
+            (G_final.block(start_rowindice, start_colindice + 3 * blocksize, blocksize, (partition_blocksize - 1) * blocksize)).setZero();
+            (G_final.block(start_rowindice + 2 * blocksize, start_colindice + blocksize, (partition_blocksize - 1) * blocksize, blocksize)).setZero();
+        }
+
+    }
+
+    delete[] comm_buf;
+    // End of reconstructing Tridiagonal system of the full inverse via MPIALLGATHER    
+
+    if(compare_reference){
+        compareSINV_referenceInverse_byblock(n_blocks,
+                                     blocksize,
+                                     G_final,
+                                     full_inverse,
+                                     rank
         );
     }
 
+
+    MPI_Type_free(&subblockType);
+    MPI_Type_free(&subblockType_2);
+    MPI_Type_free(&subblock_ReceiveType);
+    MPI_Type_free(&redschur_blockpatternType);
 
     return G_final;
 

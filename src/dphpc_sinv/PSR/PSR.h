@@ -128,6 +128,15 @@ void fill_reduced_schur_matrix(Eigen::MatrixXcd& A_schur,
 			       int blocksize, 
 			       int partitions);
 
+void fill_reduced_schur_matrix_cd(Eigen::MatrixXcd& A_schur, 
+                   std::complex<double>* comm_buf_cd,
+			       int in_buf_size, 
+			       int blocksize, 
+			       int partitions,
+                   int rank);
+
+                   
+
 void myFunction(Eigen::MatrixXcd& A);
 
 void load_matrix(
@@ -153,7 +162,8 @@ void read_central_testblocks(Eigen::MatrixXcd** A,
 void compareSINV_referenceInverse_byblock(int n_blocks,
                                      int blocksize,
                                      Eigen::MatrixXcd G_final,
-                                     Eigen::MatrixXcd full_inverse
+                                     Eigen::MatrixXcd full_inverse,
+                                     int rank
 );
 
 
@@ -191,3 +201,26 @@ Eigen::MatrixXcd psr_solve(int N,
                              Eigen::MatrixXcd& eigenA_read_in,
                              bool compare_reference
 );
+
+
+Eigen::MatrixXcd psr_solve_customMPI(int N,
+                             int blocksize,
+                             int n_blocks,
+                             int partitions,
+                             int partition_blocksize,
+                             int rank,
+                             int n_blocks_schursystem,
+                             Eigen::MatrixXcd& eigenA_read_in,
+                             bool compare_reference
+);
+
+void createblockMatrixType(MPI_Datatype* blockMatrixType, int stride, int blocksize);
+
+void create_subblock_Type(MPI_Datatype* subblockType, int stride, int blocksize, int rowblocks);
+void create_resized_subblock_Type(MPI_Datatype* subblockType_resized, MPI_Datatype subblockType, int stride, int blocksize, int rowBlocks);
+
+void create_ul2_redschur_blockpattern_Type(MPI_Datatype* blockPatternType, MPI_Datatype subblockType, int blocksize, int stride, int partition_blocksize);
+
+void create_br2_redschur_blockpattern_Type(MPI_Datatype* blockPatternType, MPI_Datatype subblockType, int blocksize, int stride, int partition_blocksize);
+
+void create_central_redschur_blockpattern_Type(MPI_Datatype* blockPatternType, MPI_Datatype subblockType, MPI_Datatype subblockType_2, int blocksize, int stride, int partition_blocksize);

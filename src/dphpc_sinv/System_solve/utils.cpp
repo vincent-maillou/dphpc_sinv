@@ -106,17 +106,16 @@ void sparse_to_dense(
     int *indptr,
     int matrix_band)
 {
-
     for (int i = 0; i < matrix_band; i++) {
         for (int j = 0; j < matrix_band; j++) {
             // could not work for complex data type
             dense_matrix[i*matrix_band + j] = T(0);
         }
     }
-
     for(int i = 0; i < matrix_band; i++){
         for(int j = indptr[i]; j < indptr[i+1]; j++){
-            dense_matrix[i*matrix_band + indices[j]] = data[j];
+            T tmp = data[j];
+            dense_matrix[i*matrix_band + indices[j]] = tmp;
         }
     }
 }
@@ -218,14 +217,14 @@ bool are_equals(
 }
 
 template<typename T>
-void calc_bandwidth(
+void calc_bandwidth_dense(
     T * matrix,
     int matrix_size,
     int * ku,
     int * kl)
 {
-    int ku_tmp = 1;
-    int kl_tmp = 1;
+    int ku_tmp = 0;
+    int kl_tmp = 0;
     for(int i = 0; i < matrix_size; i++){
         for(int j = 0; j < matrix_size; j++){
             if(matrix[i*matrix_size + j] != T(0)){
@@ -245,7 +244,35 @@ void calc_bandwidth(
     *ku = ku_tmp;
     *kl = kl_tmp;
 }
-template void calc_bandwidth<double>(double * matrix, int matrix_size, int * ku, int * kl);
+template void calc_bandwidth_dense<double>(double * matrix, int matrix_size, int * ku, int * kl);
+
+void calc_bandwidth_sparse(
+    int * indices,
+    int * indptr,
+    int matrix_size,
+    int * ku,
+    int * kl)
+{
+    int ku_tmp = 0;
+    int kl_tmp = 0;
+    for(int i = 0; i < matrix_size; i++){
+        for(int j = indptr[i]; j < indptr[i+1]; j++){
+            if(i > indices[j]){
+                if(kl_tmp < i - indices[j]){
+                    kl_tmp = i - indices[j];
+                }
+            }
+            else{
+                if(ku_tmp < indices[j] - i){
+                    ku_tmp = indices[j] - i;
+                }
+            }
+        }
+    }
+    *ku = ku_tmp;
+    *kl = kl_tmp;
+}
+
 
 template<typename T>
 void dense_to_band_for_LU(
@@ -271,6 +298,33 @@ void dense_to_band_for_LU(
 }
 template void dense_to_band_for_LU<double>(double *dense_matrix, double *matrix_band, int matrix_size, int ku, int kl);
 
+
+template<typename T>
+void sparse_to_band_for_LU(
+    T *data,
+    int *indices,
+    int *indptr,
+    T *matrix_band,
+    int matrix_size,
+    int ku,
+    int kl)
+{
+    for(int i = 0; i<2*ku+1+kl;i++){
+        for(int j = 0; j < matrix_size;j++){
+            matrix_band[i*matrix_size + j] = T(0);
+        }
+    }
+
+    for(int i = 0; i < matrix_size; i++){
+        for(int j = indptr[i]; j < indptr[i+1]; j++){
+            matrix_band[2*ku + i - indices[j] + indices[j]*(2*ku+kl+1)] = data[j];
+        }
+    }
+}
+template void sparse_to_band_for_LU<double>(double *data, int *indices, int *indptr, double *matrix_band, int matrix_size, int ku, int kl);
+
+
+
 template<typename T>
 void dense_to_band_for_U_CHOL(
     T *dense_matrix,
@@ -293,6 +347,32 @@ void dense_to_band_for_U_CHOL(
     }
 }
 template void dense_to_band_for_U_CHOL<double>(double *dense_matrix, double *matrix_band, int matrix_size, int kd);
+
+template<typename T>
+void sparse_to_band_for_U_CHOL(
+    T *data,
+    int *indices,
+    int *indptr,
+    T *matrix_band,
+    int matrix_size,
+    int kd)
+{
+    for(int i = 0; i<1+kd;i++){
+        for(int j = 0; j < matrix_size;j++){
+            matrix_band[i*matrix_size + j] = T(0);
+        }
+    }
+
+    for(int i = 0; i < matrix_size; i++){
+        for(int j = indptr[i]; j < indptr[i+1]; j++){
+            if(indices[j] - i >= 0){
+                matrix_band[kd + i - indices[j] + indices[j]*(kd+1)] = data[j];
+            }
+        }
+    }
+}
+template void sparse_to_band_for_U_CHOL<double>(double *data, int *indices, int *indptr, double *matrix_band, int matrix_size, int kd); 
+
 
 template<typename T>
 bool assert_symmetric(

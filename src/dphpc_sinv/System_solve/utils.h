@@ -58,8 +58,15 @@ bool are_equals(
     unsigned int blocksize);
 
 template<typename T>
-void calc_bandwidth(
+void calc_bandwidth_dense(
     T * matrix,
+    int matrix_size,
+    int * ku,
+    int * kl);
+
+void calc_bandwidth_sparse(
+    int * indices,
+    int * indptr,
     int matrix_size,
     int * ku,
     int * kl);
@@ -73,8 +80,27 @@ void dense_to_band_for_LU(
     int kl);
 
 template<typename T>
+void sparse_to_band_for_LU(
+    T *data,
+    int *indices,
+    int *indptr,
+    T *matrix_band,
+    int matrix_size,
+    int ku,
+    int kl);
+
+template<typename T>
 void dense_to_band_for_U_CHOL(
     T *dense_matrix,
+    T *matrix_band,
+    int matrix_size,
+    int kd);
+
+template<typename T>
+void sparse_to_band_for_U_CHOL(
+    T *data,
+    int *indices,
+    int *indptr,
     T *matrix_band,
     int matrix_size,
     int kd);

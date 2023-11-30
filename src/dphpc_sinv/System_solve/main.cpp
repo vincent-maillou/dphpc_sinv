@@ -80,11 +80,13 @@ int main(int argc, char *argv[]){
     }
 
 
-    int matrix_size = 7165;
-    int number_of_nonzero = 182287;
-    double residual_tol_ILU_CG = 5e-18;
+    int matrix_size = 7302;
+    int number_of_nonzero = 186684;
     bool flag_verbose = false;
     bool flag_failed = false;
+
+
+    bool flag_dense = true;
 
 
     //print the matrix parameters
@@ -92,13 +94,20 @@ int main(int argc, char *argv[]){
     std::printf("Matrix size: %d\n", matrix_size);
     std::printf("Number of nonzero: %d\n", number_of_nonzero);
 
-    double *dense_matrix = (double*)malloc(matrix_size*matrix_size*sizeof(double));
-    double *dense_matrix_ref = (double*)malloc(matrix_size*matrix_size*sizeof(double));
+
+
+    double *dense_matrix = NULL;
+    double *dense_matrix_copy = NULL;
+    if(flag_dense){
+        dense_matrix = (double*)malloc(matrix_size*matrix_size*sizeof(double));
+        dense_matrix_copy = (double*)malloc(matrix_size*matrix_size*sizeof(double));  
+    }
+
     double *data = (double*)malloc(number_of_nonzero*sizeof(double));
     int *indices = (int*)malloc(number_of_nonzero*sizeof(int));
     int *indptr = (int*)malloc((matrix_size+1)*sizeof(int));
     double *rhs = (double*)malloc(matrix_size*sizeof(double));
-    double *dense_matrix_copy = (double*)malloc(matrix_size*matrix_size*sizeof(double));
+    
     double *rhs_copy = (double*)malloc(matrix_size*sizeof(double));
     double *reference_solution = (double*)malloc(matrix_size*sizeof(double));
     double *previous_solution = (double*)malloc(matrix_size*sizeof(double));
@@ -114,6 +123,16 @@ int main(int argc, char *argv[]){
     double *matrix_band_CHOL_copy = (double*)malloc((kkd+1)*matrix_size*sizeof(double));
 
     bool measurements_correct = true;
+
+
+    int steps_CG[steps_to_measure];
+    int steps_CG_guess[steps_to_measure];
+    int steps_CG_jacobi[steps_to_measure];
+    int steps_CG_jacobi_guess[steps_to_measure];
+    int steps_CG_ILU[steps_to_measure];
+
+    std::string base_path = "/usr/scratch/mont-fort17/almaeder/kmc_7k/system_K/";
+
     for(int step = 0; step <= steps_to_measure; step++){
 
         int step_to_measure_previous = step - 1;
@@ -125,22 +144,20 @@ int main(int argc, char *argv[]){
 
 
         // Get matrix parameters
-        std::string base_path = "/usr/scratch/mont-fort17/almaeder/manasa_kmc_matrices/test_matrices/";
-        std::string path_data = base_path + "matrix_sparse_data";
-        std::string path_indices = base_path + "matrix_sparse_indices";
-        std::string path_indptr = base_path + "matrix_sparse_indptr";
-        std::string path_rhs = base_path + "rhs";
+
+        std::string path_data = base_path + "A_data";
+        std::string path_indices = base_path + "A_col_indices";
+        std::string path_indptr = base_path + "A_row_ptr";
+        std::string path_rhs = base_path + "A_rhs";
         std::string path_reference_solution = base_path + "solution";
         std::string path_reference_solution_previous_step = base_path + "solution";
-        std::string path_dense = base_path + "matrix_dense";
 
         path_data += std::to_string(step) + ".bin";
-        path_indices += std::to_string(step) + ".txt";
-        path_indptr += std::to_string(step) + ".txt";
+        path_indices += std::to_string(step) + ".bin";
+        path_indptr += std::to_string(step) + ".bin";
         path_rhs += std::to_string(step) + ".bin";
         path_reference_solution += std::to_string(step) + ".bin";
         path_reference_solution_previous_step += std::to_string(step_to_measure_previous) + ".bin";
-        path_dense += std::to_string(step) + ".bin";
 
         std::cout << path_data << std::endl;
         std::cout << path_indices << std::endl;
@@ -149,27 +166,28 @@ int main(int argc, char *argv[]){
         std::cout << path_reference_solution << std::endl;
         std::cout << path_reference_solution_previous_step << std::endl;
 
-
-
-
         if(!load_binary_array<double>(path_data, data, number_of_nonzero)){
             if(flag_verbose){
                 std::printf("Error loading data\n");
             }
             flag_failed = true;
         }
-        if(!load_text_array<int>(path_indices, indices, number_of_nonzero)){
+        if(!load_binary_array<int>(path_indices, indices, number_of_nonzero)){
             if(flag_verbose){
                 std::printf("Error loading indices\n");
             }
             flag_failed = true;
         }
-        if(!load_text_array<int>(path_indptr, indptr, matrix_size+1)){
+        
+
+        if(!load_binary_array<int>(path_indptr, indptr, matrix_size+1)){
             if(flag_verbose){
                 std::printf("Error loading indptr\n");
             }
             flag_failed = true;
         }
+
+
         if(!load_binary_array<double>(path_rhs, rhs, matrix_size)){
             if(flag_verbose){
                 std::printf("Error loading rhs\n");
@@ -188,29 +206,12 @@ int main(int argc, char *argv[]){
             }
             flag_failed = true;
         }
-        if(!load_binary_array<double>(path_dense, dense_matrix_ref, matrix_size*matrix_size)){
-            if(flag_verbose){
-                std::printf("Error loading dense matrix\n");
-            }
-            flag_failed = true;
-        }
 
-        bool previous = assert_array_magnitude(
-            reference_solution,
-            previous_solution,
-            abstol,
-            reltol,
-            matrix_size
-        );
-        if(!previous){
-            std::printf("Reference solution and previous solution are not the same\n");
-        }
-        else{
-            std::printf("Reference solution and previous solution are the same\n");
-        }
 
         mkl_set_num_threads(14);
-        
+
+        std::printf("Step: %d\n", step);
+
         if(!flag_failed){
             bool correct_measurement = true;
             bool reference_correct = true;
@@ -219,51 +220,125 @@ int main(int argc, char *argv[]){
             double times_posv[nmeas];
             double times_gbsv[nmeas];
             double times_pbsv[nmeas];
-            double times_cusparse_CG[nmeas];
-            double times_cusparse_ILU_CG[nmeas];
-            double times_cusparse_CG_guess[nmeas];
-            double times_cusparse_CG_jacobi[nmeas];
-            double times_cusparse_CG_jacobi_guess[nmeas];
+            double times_CG[nmeas];
+            double times_CG_ILU[nmeas];
+            double times_CG_guess[nmeas];
+            double times_CG_jacobi[nmeas];
+            double times_CG_jacobi_guess[nmeas];
             double times_cusolver_dense_LU[nmeas];
             double times_cusolver_dense_CHOL[nmeas];
             double times_cusolver_sparse_CHOL[nmeas];
             
-            int cg_steps[5];
+            if(flag_dense){
+                sparse_to_dense<double>(
+                    dense_matrix,
+                    data,
+                    indices,
+                    indptr,
+                    matrix_size);
 
-            sparse_to_dense<double>(
-                dense_matrix,
-                data,
-                indices,
-                indptr,
-                matrix_size);
 
-            if(!assert_array_elementwise<double>(dense_matrix,
-                                        dense_matrix_ref,
-                                        abstol,
-                                        reltol,
-                                        matrix_size*matrix_size)){
-                std::printf("Error: dense matrix is not the same as reference\n");
-                correct_measurement = false;
-                reference_correct = false;
+                for(int i = 0; i < nmeas; i++){
+                    copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
+                    copy_array<double>(rhs, rhs_copy, matrix_size);
+
+                    times_gesv[i] = solve_mkl_dgesv(
+                        dense_matrix_copy,
+                        rhs_copy,
+                        reference_solution,
+                        matrix_size,
+                        abstol,
+                        reltol,
+                        flag_verbose);
+                    if(times_gesv[i] < 0.0){
+                        std::printf("Error in MKL dgesv\n");
+                        correct_measurement = false;
+                    }
+                    else{
+                        std::printf("Time MKL dgesv: %f\n", times_gesv[i]);
+                    }
+                }
+
+                for(int i = 0; i < nmeas; i++){
+                    copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
+                    copy_array<double>(rhs, rhs_copy, matrix_size);
+
+                    times_posv[i] = solve_mkl_dposv(
+                        dense_matrix_copy,
+                        rhs_copy,
+                        reference_solution,
+                        matrix_size,
+                        abstol,
+                        reltol,
+                        flag_verbose);
+                    if(times_posv[i] < 0.0){
+                        std::printf("Error in MKL dposv\n");
+                        correct_measurement = false;
+                    }
+                    else{
+                        std::printf("Time MKL dposv: %f\n", times_posv[i]);
+                    }
+                }
+
+
+                for(int i = 0; i < nmeas; i++){
+                    copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
+                    copy_array<double>(rhs, rhs_copy, matrix_size);
+
+                    times_cusolver_dense_LU[i] = solve_cusolver_dense_LU(
+                        dense_matrix_copy,
+                        rhs_copy,
+                        reference_solution,
+                        matrix_size,
+                        abstol,
+                        reltol,
+                        flag_verbose);
+                    if(times_cusolver_dense_LU[i] < 0.0){
+                        std::printf("Error in cusolver dense LU\n");
+                        correct_measurement = false;
+                    }
+                    else{
+                        std::printf("Time cusolver dense LU: %f\n", times_cusolver_dense_LU[i]);
+                    }
+
+                }
+
+                for(int i = 0; i < nmeas; i++){
+                    copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
+                    copy_array<double>(rhs, rhs_copy, matrix_size);
+
+                    times_cusolver_dense_CHOL[i] = solve_cusolver_dense_CHOL(
+                        dense_matrix_copy,
+                        rhs_copy,
+                        reference_solution,
+                        matrix_size,
+                        abstol,
+                        reltol,
+                        flag_verbose);
+                    if(times_cusolver_dense_CHOL[i] < 0.0){
+                        std::printf("Error in cusolver dense CHOL\n");
+                        correct_measurement = false;
+                    }
+                    else{
+                        std::printf("Time cusolver dense CHOL: %f\n", times_cusolver_dense_CHOL[i]);
+                    }
+
+                }
+
+
             }
-            else{
-                std::printf("Dense matrix is the same as reference\n");
-            }
+            std::printf("Step: %d\n", step);
+
+
 
             int ku = 0;
             int kl = 0;
-            calc_bandwidth<double>(
-                dense_matrix,
+            calc_bandwidth_sparse(
+                indices,
+                indptr,
                 matrix_size,
                 &ku,
                 &kl);
-            if(ku != kl && !assert_symmetric<double>(dense_matrix, matrix_size, abstol, reltol)){
-                std::printf("Error: matrix is not symmetric\n");
-                correct_measurement = false;
-            }
-            else{
-                std::printf("Matrix is symmetric\n");
-            }
 
             
             int kd = ku;
@@ -271,65 +346,10 @@ int main(int argc, char *argv[]){
             std::printf("Lower Bandwidth: %d\n", kl);
 
 
-
-            for(int i = 0; i < nmeas; i++){
-                copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
-                copy_array<double>(rhs, rhs_copy, matrix_size);
-
-                times_gesv[i] = solve_mkl_dgesv(
-                    dense_matrix_copy,
-                    rhs_copy,
-                    reference_solution,
-                    matrix_size,
-                    abstol,
-                    reltol,
-                    flag_verbose);
-                if(times_gesv[i] < 0.0){
-                    std::printf("Error in MKL dgesv\n");
-                    correct_measurement = false;
-                }
-                else{
-                    std::printf("Time MKL dgesv: %f\n", times_gesv[i]);
-                }
-            }
-
-            if(!assert_array_elementwise<double>(dense_matrix,
-                                        dense_matrix_ref,
-                                        abstol,
-                                        reltol,
-                                        matrix_size*matrix_size)){
-                std::printf("Error: dense matrix is not the same as reference\n");
-                correct_measurement = false;
-                reference_correct = false;
-            }
-            else{
-                std::printf("Dense matrix is the same as reference\n");
-            }
-
-            for(int i = 0; i < nmeas; i++){
-                copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
-                copy_array<double>(rhs, rhs_copy, matrix_size);
-
-                times_posv[i] = solve_mkl_dposv(
-                    dense_matrix_copy,
-                    rhs_copy,
-                    reference_solution,
-                    matrix_size,
-                    abstol,
-                    reltol,
-                    flag_verbose);
-                if(times_posv[i] < 0.0){
-                    std::printf("Error in MKL dposv\n");
-                    correct_measurement = false;
-                }
-                else{
-                    std::printf("Time MKL dposv: %f\n", times_posv[i]);
-                }
-            }
-
-
-            dense_to_band_for_LU<double>(
-                dense_matrix,
+            sparse_to_band_for_LU<double>(
+                data,
+                indices,
+                indptr,
                 matrix_band_LU,
                 matrix_size,
                 ku,
@@ -359,12 +379,14 @@ int main(int argc, char *argv[]){
             }
 
 
-
-            dense_to_band_for_U_CHOL<double>(
-                dense_matrix,
+            sparse_to_band_for_U_CHOL<double>(
+                data,
+                indices,
+                indptr,
                 matrix_band_CHOL,
                 matrix_size,
                 kd);
+
 
             for(int i = 0; i < nmeas; i++){
                 copy_array<double>(matrix_band_CHOL, matrix_band_CHOL_copy, matrix_size*(kd+1));
@@ -395,7 +417,7 @@ int main(int argc, char *argv[]){
                 for(int j = 0; j < matrix_size; j++){
                     starting_guess[j] = 0.0;
                 }
-                times_cusparse_CG[i] = solve_cusparse_CG(
+                times_CG[i] = solve_cusparse_CG(
                     data,
                     indices,
                     indptr,
@@ -408,13 +430,13 @@ int main(int argc, char *argv[]){
                     reltol,
                     restol,
                     flag_verbose,
-                    &cg_steps[0]);
-                if(times_cusparse_CG[i] < 0.0){
+                    &steps_CG[step]);
+                if(times_CG[i] < 0.0){
                     std::printf("Error in cusparse CG\n");
                     correct_measurement = false;
                 }
                 else{
-                    std::printf("Time cusparse CG: %f\n", times_cusparse_CG[i]);
+                    std::printf("Time cusparse CG: %f\n", times_CG[i]);
                 }
 
             }
@@ -426,7 +448,7 @@ int main(int argc, char *argv[]){
                 for(int j = 0; j < matrix_size; j++){
                     starting_guess[j] = previous_solution[j];
                 }
-                times_cusparse_CG_guess[i] = solve_cusparse_CG(
+                times_CG_guess[i] = solve_cusparse_CG(
                     data,
                     indices,
                     indptr,
@@ -439,13 +461,13 @@ int main(int argc, char *argv[]){
                     reltol,
                     restol,
                     flag_verbose,
-                    &cg_steps[1]);
-                if(times_cusparse_CG_guess[i] < 0.0){
+                    &steps_CG_guess[step]);
+                if(times_CG_guess[i] < 0.0){
                     std::printf("Error in cusparse CG with guess\n");
                     correct_measurement = false;
                 }
                 else{
-                    std::printf("Time cusparse CG with guess: %f\n", times_cusparse_CG_guess[i]);
+                    std::printf("Time cusparse CG with guess: %f\n", times_CG_guess[i]);
                 }
             }
 
@@ -454,7 +476,7 @@ int main(int argc, char *argv[]){
             for(int i = 0; i < nmeas; i++){
                 copy_array<double>(rhs, rhs_copy, matrix_size);
 
-                times_cusparse_ILU_CG[i] = solve_cusparse_ILU_CG(
+                times_CG_ILU[i] = solve_cusparse_ILU_CG(
                     data,
                     indices,
                     indptr,
@@ -464,15 +486,15 @@ int main(int argc, char *argv[]){
                     matrix_size,
                     abstol,
                     reltol,
-                    residual_tol_ILU_CG,
+                    restol,
                     flag_verbose,
-                    &cg_steps[4]);
-                if(times_cusparse_ILU_CG[i] < 0.0){
+                    &steps_CG_ILU[step]);
+                if(times_CG_ILU[i] < 0.0){
                     std::printf("Error in cusparse ILU CG\n");
                     correct_measurement = false;
                 }
                 else{
-                    std::printf("Time cusparse ILU CG: %f\n", times_cusparse_ILU_CG[i]);
+                    std::printf("Time cusparse ILU CG: %f\n", times_CG_ILU[i]);
                 }
 
             }
@@ -485,7 +507,7 @@ int main(int argc, char *argv[]){
                 for(int j = 0; j < matrix_size; j++){
                     starting_guess[j] = 0.0;
                 }
-                times_cusparse_CG_jacobi[i] = solve_cusparse_CG_jacobi(
+                times_CG_jacobi[i] = solve_cusparse_CG_jacobi(
                     data,
                     indices,
                     indptr,
@@ -498,13 +520,13 @@ int main(int argc, char *argv[]){
                     reltol,
                     restol,
                     flag_verbose,
-                    &cg_steps[2]);
-                if(times_cusparse_CG_jacobi[i] < 0.0){
+                    &steps_CG_jacobi[step]);
+                if(times_CG_jacobi[i] < 0.0){
                     std::printf("Error in cusparse jacobi CG\n");
                     correct_measurement = false;
                 }
                 else{
-                    std::printf("Time cusparse jacobi CG: %f\n", times_cusparse_CG_jacobi[i]);
+                    std::printf("Time cusparse jacobi CG: %f\n", times_CG_jacobi[i]);
                 }
 
             }
@@ -516,7 +538,7 @@ int main(int argc, char *argv[]){
                 for(int j = 0; j < matrix_size; j++){
                     starting_guess[j] = previous_solution[j];
                 }
-                times_cusparse_CG_jacobi_guess[i] = solve_cusparse_CG_jacobi(
+                times_CG_jacobi_guess[i] = solve_cusparse_CG_jacobi(
                     data,
                     indices,
                     indptr,
@@ -529,63 +551,19 @@ int main(int argc, char *argv[]){
                     reltol,
                     restol,
                     flag_verbose,
-                    &cg_steps[3]);
-                if(times_cusparse_CG_jacobi_guess[i] < 0.0){
+                    &steps_CG_jacobi_guess[step]);
+                if(times_CG_jacobi_guess[i] < 0.0){
                     std::printf("Error in cusparse jacobi CG with guess\n");
                     correct_measurement = false;
                 }
                 else{
-                    std::printf("Time cusparse jacobi CG with guess: %f\n", times_cusparse_CG_jacobi_guess[i]);
+                    std::printf("Time cusparse jacobi CG with guess: %f\n", times_CG_jacobi_guess[i]);
                 }
 
             }
 
 
 
-            for(int i = 0; i < nmeas; i++){
-                copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
-                copy_array<double>(rhs, rhs_copy, matrix_size);
-
-                times_cusolver_dense_LU[i] = solve_cusolver_dense_LU(
-                    dense_matrix_copy,
-                    rhs_copy,
-                    reference_solution,
-                    matrix_size,
-                    abstol,
-                    reltol,
-                    flag_verbose);
-                if(times_cusolver_dense_LU[i] < 0.0){
-                    std::printf("Error in cusolver dense LU\n");
-                    correct_measurement = false;
-                }
-                else{
-                    std::printf("Time cusolver dense LU: %f\n", times_cusolver_dense_LU[i]);
-                }
-
-            }
-
-
-            for(int i = 0; i < nmeas; i++){
-                copy_array<double>(dense_matrix, dense_matrix_copy, matrix_size*matrix_size);
-                copy_array<double>(rhs, rhs_copy, matrix_size);
-
-                times_cusolver_dense_CHOL[i] = solve_cusolver_dense_CHOL(
-                    dense_matrix_copy,
-                    rhs_copy,
-                    reference_solution,
-                    matrix_size,
-                    abstol,
-                    reltol,
-                    flag_verbose);
-                if(times_cusolver_dense_CHOL[i] < 0.0){
-                    std::printf("Error in cusolver dense CHOL\n");
-                    correct_measurement = false;
-                }
-                else{
-                    std::printf("Time cusolver dense CHOL: %f\n", times_cusolver_dense_CHOL[i]);
-                }
-
-            }
 
 
             for(int i = 0; i < nmeas; i++){
@@ -619,93 +597,284 @@ int main(int argc, char *argv[]){
             else{
                 std::printf("All measurements correct\n");
             }
-            if(!reference_correct){
+            if(flag_dense && !reference_correct){
                 std::printf("Error in reference\n");
             }
             else{
                 std::printf("Reference correct\n");
             }
 
-            std::ofstream outputFile_steps;
-            std::string steps = "steps";
-            steps += std::to_string(step);
-            steps +=  ".txt";
-            outputFile_steps.open(steps);
-            if(outputFile_steps.is_open()){
-                for(int i = 0; i < 5; i++){
-                    outputFile_steps << cg_steps[i] << " ";
+            if(flag_dense){
+                std::ofstream outputFile_times_gesv;
+                std::string file_gesv = base_path + "results/" + "times_gesv";
+                file_gesv += std::to_string(step);
+                file_gesv +=  ".txt";
+                outputFile_times_gesv.open(file_gesv);
+                if(outputFile_times_gesv.is_open()){
+                    for(int i = 0; i < nmeas; i++){
+                        outputFile_times_gesv << times_gesv[i] << " ";
+                    }
+                    outputFile_times_gesv << '\n';
                 }
-                outputFile_steps << '\n';
+                else{
+                    std::printf("Error opening file\n");
+                }
+                outputFile_times_gesv.close();
+
+                std::ofstream outputFile_times_posv;
+                std::string file_posv = base_path + "results/" + "times_posv";
+                file_posv += std::to_string(step);
+                file_posv +=  ".txt";
+                outputFile_times_posv.open(file_posv);
+                if(outputFile_times_posv.is_open()){
+                    for(int i = 0; i < nmeas; i++){
+                        outputFile_times_posv << times_posv[i] << " ";
+                    }
+                    outputFile_times_posv << '\n';
+                }
+                else{
+                    std::printf("Error opening file\n");
+                }
+                outputFile_times_posv.close();
+
+                std::ofstream outputFile_times_cusolver_dense_LU;
+                std::string file_cusolver_dense_LU = base_path + "results/" + "times_cusolver_dense_LU";
+                file_cusolver_dense_LU += std::to_string(step);
+                file_cusolver_dense_LU +=  ".txt";
+                outputFile_times_cusolver_dense_LU.open(file_cusolver_dense_LU);
+                if(outputFile_times_cusolver_dense_LU.is_open()){
+                    for(int i = 0; i < nmeas; i++){
+                        outputFile_times_cusolver_dense_LU << times_cusolver_dense_LU[i] << " ";
+                    }
+                    outputFile_times_cusolver_dense_LU << '\n';
+                }
+                else{
+                    std::printf("Error opening file\n");
+                }
+                outputFile_times_cusolver_dense_LU.close();
+
+                std::ofstream outputFile_times_cusolver_dense_CHOL;
+                std::string file_cusolver_dense_CHOL = base_path + "results/" + "times_cusolver_dense_CHOL";
+                file_cusolver_dense_CHOL += std::to_string(step);
+                file_cusolver_dense_CHOL +=  ".txt";
+                outputFile_times_cusolver_dense_CHOL.open(file_cusolver_dense_CHOL);
+                if(outputFile_times_cusolver_dense_CHOL.is_open()){
+                    for(int i = 0; i < nmeas; i++){
+                        outputFile_times_cusolver_dense_CHOL << times_cusolver_dense_CHOL[i] << " ";
+                    }
+                    outputFile_times_cusolver_dense_CHOL << '\n';
+                }
+                else{
+                    std::printf("Error opening file\n");
+                }
+                outputFile_times_cusolver_dense_CHOL.close();
+
+            }
+
+            std::ofstream outputFile_times_gbsv;
+            std::string file_gbsv = base_path + "results/" + "times_gbsv";
+            file_gbsv += std::to_string(step);
+            file_gbsv +=  ".txt";
+            outputFile_times_gbsv.open(file_gbsv);
+            if(outputFile_times_gbsv.is_open()){
+                for(int i = 0; i < nmeas; i++){
+                    outputFile_times_gbsv << times_gbsv[i] << " ";
+                }
+                outputFile_times_gbsv << '\n';
             }
             else{
                 std::printf("Error opening file\n");
             }
-            outputFile_steps.close();
+            outputFile_times_gbsv.close();
 
-            std::ofstream outputFile_times;
-            std::string file = "times";
-            file += std::to_string(step);
-            file +=  ".txt";
-            outputFile_times.open(file);
-
-            if(outputFile_times.is_open()){
+            std::ofstream outputFile_times_pbsv;
+            std::string file_pbsv = base_path + "results/" + "times_pbsv";
+            file_pbsv += std::to_string(step);
+            file_pbsv +=  ".txt";
+            outputFile_times_pbsv.open(file_pbsv);
+            if(outputFile_times_pbsv.is_open()){
                 for(int i = 0; i < nmeas; i++){
-                    outputFile_times << times_gesv[i] << " ";
+                    outputFile_times_pbsv << times_pbsv[i] << " ";
                 }
-                outputFile_times << '\n';
-                for(int i = 0; i < nmeas; i++){
-                    outputFile_times << times_posv[i] << " ";
-                }
-                outputFile_times << '\n';
-                for(int i = 0; i < nmeas; i++){
-                    outputFile_times << times_gbsv[i] << " ";
-                }
-                outputFile_times << '\n';
-                for(int i = 0; i < nmeas; i++){
-                    outputFile_times << times_pbsv[i] << " ";
-                }
-                outputFile_times << '\n';
-                for(int i = 0; i < nmeas; i++){
-                    outputFile_times << times_cusparse_CG[i] << " ";
-                }
-                outputFile_times << '\n';
-                for(int i = 0; i < nmeas; i++){
-                    outputFile_times << times_cusparse_CG_guess[i] << " ";
-                }
-                outputFile_times << '\n';
-                for(int i = 0; i < nmeas; i++){
-                    outputFile_times << times_cusparse_CG_jacobi[i] << " ";
-                }
-                outputFile_times << '\n';
-                for(int i = 0; i < nmeas; i++){
-                    outputFile_times << times_cusparse_CG_jacobi_guess[i] << " ";
-                }
-                outputFile_times << '\n';
-                for(int i = 0; i < nmeas; i++){
-                    outputFile_times << times_cusparse_ILU_CG[i] << " ";
-                }
-                outputFile_times << '\n';
-                for(int i = 0; i < nmeas; i++){
-                    outputFile_times << times_cusolver_dense_LU[i] << " ";
-                }
-                outputFile_times << '\n';
-                for(int i = 0; i < nmeas; i++){
-                    outputFile_times << times_cusolver_dense_CHOL[i] << " ";
-                }
-                outputFile_times << '\n';
-                for(int i = 0; i < nmeas; i++){
-                    outputFile_times << times_cusolver_sparse_CHOL[i] << " ";
-                }
-                outputFile_times << '\n';
+                outputFile_times_pbsv << '\n';
             }
             else{
                 std::printf("Error opening file\n");
             }
-            outputFile_times.close();
+            outputFile_times_pbsv.close();
+
+            std::ofstream outputFile_times_CG;
+            std::string file_CG = base_path + "results/" + "times_CG";
+            file_CG += std::to_string(step);
+            file_CG +=  ".txt";
+            outputFile_times_CG.open(file_CG);
+            if(outputFile_times_CG.is_open()){
+                for(int i = 0; i < nmeas; i++){
+                    outputFile_times_CG << times_CG[i] << " ";
+                }
+                outputFile_times_CG << '\n';
+            }
+            else{
+                std::printf("Error opening file\n");
+            }
+            outputFile_times_CG.close();
+
+            std::ofstream outputFile_times_CG_guess;
+            std::string file_CG_guess = base_path + "results/" + "times_CG_guess";
+            file_CG_guess += std::to_string(step);
+            file_CG_guess +=  ".txt";
+            outputFile_times_CG_guess.open(file_CG_guess);
+            if(outputFile_times_CG_guess.is_open()){
+                for(int i = 0; i < nmeas; i++){
+                    outputFile_times_CG_guess << times_CG_guess[i] << " ";
+                }
+                outputFile_times_CG_guess << '\n';
+            }
+            else{
+                std::printf("Error opening file\n");
+            }
+            outputFile_times_CG_guess.close();
+
+            std::ofstream outputFile_times_CG_jacobi;
+            std::string file_CG_jacobi = base_path + "results/" + "times_CG_jacobi";
+            file_CG_jacobi += std::to_string(step);
+            file_CG_jacobi +=  ".txt";
+            outputFile_times_CG_jacobi.open(file_CG_jacobi);
+            if(outputFile_times_CG_jacobi.is_open()){
+                for(int i = 0; i < nmeas; i++){
+                    outputFile_times_CG_jacobi << times_CG_jacobi[i] << " ";
+                }
+                outputFile_times_CG_jacobi << '\n';
+            }
+            else{
+                std::printf("Error opening file\n");
+            }
+            outputFile_times_CG_jacobi.close();
+
+            std::ofstream outputFile_times_CG_jacobi_guess;
+            std::string file_CG_jacobi_guess = base_path + "results/" + "times_CG_jacobi_guess";
+            file_CG_jacobi_guess += std::to_string(step);
+            file_CG_jacobi_guess +=  ".txt";
+            outputFile_times_CG_jacobi_guess.open(file_CG_jacobi_guess);
+            if(outputFile_times_CG_jacobi_guess.is_open()){
+                for(int i = 0; i < nmeas; i++){
+                    outputFile_times_CG_jacobi_guess << times_CG_jacobi_guess[i] << " ";
+                }
+                outputFile_times_CG_jacobi_guess << '\n';
+            }
+            else{
+                std::printf("Error opening file\n");
+            }
+            outputFile_times_CG_jacobi_guess.close();
+
+            std::ofstream outputFile_times_CG_ILU;
+            std::string file_CG_ILU = base_path + "results/" + "times_CG_ILU";
+            file_CG_ILU += std::to_string(step);
+            file_CG_ILU +=  ".txt";
+            outputFile_times_CG_ILU.open(file_CG_ILU);
+            if(outputFile_times_CG_ILU.is_open()){
+                for(int i = 0; i < nmeas; i++){
+                    outputFile_times_CG_ILU << times_CG_ILU[i] << " ";
+                }
+                outputFile_times_CG_ILU << '\n';
+            }
+            else{
+                std::printf("Error opening file\n");
+            }
+            outputFile_times_CG_ILU.close();
+
+            std::ofstream outputFile_times_cusolver_sparse_CHOL;
+            std::string file_cusolver_sparse_CHOL = base_path + "results/" + "times_cusolver_sparse_CHOL";
+            file_cusolver_sparse_CHOL += std::to_string(step);
+            file_cusolver_sparse_CHOL +=  ".txt";
+            outputFile_times_cusolver_sparse_CHOL.open(file_cusolver_sparse_CHOL);
+            if(outputFile_times_cusolver_sparse_CHOL.is_open()){
+                for(int i = 0; i < nmeas; i++){
+                    outputFile_times_cusolver_sparse_CHOL << times_cusolver_sparse_CHOL[i] << " ";
+                }
+                outputFile_times_cusolver_sparse_CHOL << '\n';
+            }
+            else{
+                std::printf("Error opening file\n");
+            }
+            outputFile_times_cusolver_sparse_CHOL.close();
+
 
 
         }
     }
+
+    std::ofstream outputFile_steps_CG;
+    std::string path_steps_CG = base_path + "results/" + "steps_CG.txt";
+    outputFile_steps_CG.open(path_steps_CG);
+    if(outputFile_steps_CG.is_open()){
+        for(int i = 0; i < steps_to_measure; i++){
+            outputFile_steps_CG << steps_CG[i] << " ";
+        }
+        outputFile_steps_CG << '\n';
+    }
+    else{
+        std::printf("Error opening file\n");
+    }
+    outputFile_steps_CG.close();
+
+    std::ofstream outputFile_steps_CG_guess;
+    std::string path_steps_CG_guess = base_path + "results/" + "steps_CG_guess.txt";
+    outputFile_steps_CG_guess.open(path_steps_CG_guess);
+    if(outputFile_steps_CG_guess.is_open()){
+        for(int i = 0; i < steps_to_measure; i++){
+            outputFile_steps_CG_guess << steps_CG_guess[i] << " ";
+        }
+        outputFile_steps_CG_guess << '\n';
+    }
+    else{
+        std::printf("Error opening file\n");
+    }
+    outputFile_steps_CG_guess.close();
+
+    std::ofstream outputFile_steps_CG_jacobi;
+    std::string path_steps_CG_jacobi = base_path + "results/" + "steps_CG_jacobi.txt";
+    outputFile_steps_CG_jacobi.open(path_steps_CG_jacobi);
+    if(outputFile_steps_CG_jacobi.is_open()){
+        for(int i = 0; i < steps_to_measure; i++){
+            outputFile_steps_CG_jacobi << steps_CG_jacobi[i] << " ";
+        }
+        outputFile_steps_CG_jacobi << '\n';
+    }
+    else{
+        std::printf("Error opening file\n");
+    }
+    outputFile_steps_CG_jacobi.close();
+
+    std::ofstream outputFile_steps_CG_jacobi_guess;
+    std::string path_steps_CG_jacobi_guess = base_path + "results/" + "steps_CG_jacobi_guess.txt";
+    outputFile_steps_CG_jacobi_guess.open(path_steps_CG_jacobi_guess);
+    if(outputFile_steps_CG_jacobi_guess.is_open()){
+        for(int i = 0; i < steps_to_measure; i++){
+            outputFile_steps_CG_jacobi_guess << steps_CG_jacobi_guess[i] << " ";
+        }
+        outputFile_steps_CG_jacobi_guess << '\n';
+    }
+    else{
+        std::printf("Error opening file\n");
+    }
+    outputFile_steps_CG_jacobi_guess.close();
+
+    std::ofstream outputFile_steps_CG_ILU;
+    std::string path_steps_CG_ILU = base_path + "results/" + "steps_CG_ILU.txt";
+    outputFile_steps_CG_ILU.open(path_steps_CG_ILU);
+    if(outputFile_steps_CG_ILU.is_open()){
+        for(int i = 0; i < steps_to_measure; i++){
+            outputFile_steps_CG_ILU << steps_CG_ILU[i] << " ";
+        }
+        outputFile_steps_CG_ILU << '\n';
+    }
+    else{
+        std::printf("Error opening file\n");
+    }
+    outputFile_steps_CG_ILU.close();
+
+
 
     if(!measurements_correct){
         std::printf("Error in one of the measurements\n");
@@ -714,14 +883,16 @@ int main(int argc, char *argv[]){
         std::printf("All measurements correct\n");
     }
 
+    if(flag_dense){
+        free(dense_matrix);
+        free(dense_matrix_copy);
+    }
+
     free(matrix_band_LU);
     free(matrix_band_LU_copy);
     free(matrix_band_CHOL);
     free(matrix_band_CHOL_copy);
-    free(dense_matrix_copy);
     free(rhs_copy);
-    free(dense_matrix);
-    free(dense_matrix_ref);
     free(data);
     free(indices);
     free(indptr);

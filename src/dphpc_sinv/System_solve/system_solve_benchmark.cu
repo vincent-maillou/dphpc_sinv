@@ -398,6 +398,9 @@ double solve_cusolver_dense_LU(
     if (matrix_dense_d) {
         cudaErrchk(cudaFree(matrix_dense_d));
     }
+    if(rhs_d) {
+        cudaErrchk(cudaFree(rhs_d));
+    }
     if (ipiv_d) {
         cudaErrchk(cudaFree(ipiv_d));
     }
@@ -530,7 +533,9 @@ double solve_cusolver_dense_CHOL(
     if (matrix_dense_d) {
         cudaErrchk(cudaFree(matrix_dense_d));
     }
-
+    if(rhs_d) {
+        cudaErrchk(cudaFree(rhs_d));
+    }
 
     if (handle) {
         cusolverErrchk(cusolverDnDestroy(handle));
@@ -585,7 +590,7 @@ double solve_cusparse_CG(
 
     cusparseSpMatDescr_t matA = NULL;
 
-    const int max_iter = 2000;
+    const int max_iter = 4000;
     double a, b, na;
     double alpha, beta, alpham1, r0, r1;
     size_t bufferSize = 0;
@@ -719,9 +724,7 @@ double solve_cusparse_CG(
     }
 
 
-    if (buffer) {
-        cudaErrchk(cudaFree(buffer));
-    }
+
     if(cusparseHandle) {
         cusparseErrchk(cusparseDestroy(cusparseHandle));
     }
@@ -744,6 +747,9 @@ double solve_cusparse_CG(
         cusparseErrchk(cusparseDestroyDnVec(vecp));
     }
 
+    if (buffer) {
+        cudaErrchk(cudaFree(buffer));
+    }
     if(data_d){
         cudaErrchk(cudaFree(data_d));
     }
@@ -815,7 +821,7 @@ double solve_cusparse_ILU_CG(
     double *omega_d = NULL;
     double *y_d = NULL;
 
-    const int max_iter = 2000;
+    const int max_iter = 4000;
     double alpha, beta, r1;
     double numerator, denominator, nalpha;
     const double doubleone = 1.0;
@@ -1172,8 +1178,14 @@ double solve_cusparse_ILU_CG(
     if(x_d){
         cudaErrchk(cudaFree(x_d));
     }
+    if(y_d){
+        cudaErrchk(cudaFree(y_d));
+    }
     if(p_d){
         cudaErrchk(cudaFree(p_d));
+    }
+    if(omega_d){
+        cudaErrchk(cudaFree(omega_d));
     }
     if(Ax_d){
         cudaErrchk(cudaFree(Ax_d));
@@ -1306,7 +1318,7 @@ double solve_cusparse_CG_jacobi(
 
     cusparseSpMatDescr_t matA = NULL;
 
-    const int max_iter = 2000;
+    const int max_iter = 4000;
     double a, b, na;
     double alpha, beta, alpham1, r0, r1;
     size_t bufferSize = 0;

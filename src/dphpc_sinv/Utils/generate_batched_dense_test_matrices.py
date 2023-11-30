@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import os
 
 SEED = 8000
-MAT_SIZE = 5000
-BLOCKSIZE = 500
+MAT_SIZE = 1000
+BLOCKSIZE = 100
 BATCHSIZE = 100
 #PATH_TO_FILE = "../../../tests/tests_cases/"
 PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"

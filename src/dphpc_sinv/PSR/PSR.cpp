@@ -271,6 +271,15 @@ std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_topleftcorner_gpu(
     if(identity_cpy_d) {
         cudaErrchk(cudaFree(identity_cpy_d));
     }
+    if(buffer) {
+	cudaErrchk(cudaFree(buffer));
+    }
+    if(ipiv_d) {
+        cudaErrchk(cudaFree(ipiv_d));
+    }
+    if(info_d) {
+        cudaErrchk(cudaFree(info_d));
+    }
 
     return std::make_tuple(L, U);
 }

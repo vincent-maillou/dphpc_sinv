@@ -17,6 +17,11 @@
 
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
+// Additional cuda include's
+#include <cuComplex.h>
+#include <cuda/std/complex>
+#include <cublas_v2.h>
+#include <cusolverDn.h>
 
 void reduce_schur_sequentially(Eigen::MatrixXcd** eigenA,
                              Eigen::MatrixXcd** G_matrices,

@@ -1,5 +1,4 @@
 #include "PSR.h"
-//#include <iomanip>
 
 void myFunction(Eigen::MatrixXcd& A) {
     // Your function logic here
@@ -28,6 +27,258 @@ void load_matrix(
         std::cerr << "Failed to open the binary file for reading." << std::endl;
     }
 }
+
+
+// Start of additions for cuda impl
+#define cudaErrchk(ans) { cudaAssert((ans), __FILE__, __LINE__); }
+inline void cudaAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      std::printf("CUDAassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
+#define cusolverErrchk(ans) { cusolverAssert((ans), __FILE__, __LINE__); }
+inline void cusolverAssert(cusolverStatus_t code, const char *file, int line, bool abort=true)
+{
+   if (code != CUSOLVER_STATUS_SUCCESS) 
+   {
+        //Did not find a counter part to cudaGetErrorString in cusolver
+        std::printf("CUSOLVERassert: %s %d\n", file, line);
+        if (abort) exit(code);
+   }
+}
+
+
+#define cublasErrchk(ans) { cublasAssert((ans), __FILE__, __LINE__); }
+inline void cublasAssert(cublasStatus_t code, const char *file, int line, bool abort=true)
+{
+   if (code != CUBLAS_STATUS_SUCCESS) 
+   {
+        //Did not find a counter part to cudaGetErrorString in cublas
+        std::printf("CUBLASassert: %s %d\n", file, line);
+        if (abort) exit(code);
+   }
+}
+
+
+
+std::tuple<Eigen::MatrixXcd, Eigen::MatrixXcd> reduce_schur_topleftcorner_gpu(
+    Eigen::MatrixXcd& A,
+    int start_blockrow,
+    int partition_blocksize,
+    int blocksize
+) {
+    Eigen::MatrixXcd L = Eigen::MatrixXcd::Zero(A.rows(), A.cols());
+    Eigen::MatrixXcd U = Eigen::MatrixXcd::Zero(A.rows(), A.cols());
+
+    // Since cuda has only Col-Major and our Eigen Matrices also use Col-Major
+    int l_dim = A.rows();
+
+    // Initialize a cuda stream
+    cudaStream_t stream = NULL;
+    cudaErrchk(cudaStreamCreate(&stream));
+
+    cusolverDnHandle_t cusolver_handle;
+    cusolverErrchk(cusolverDnCreate(&cusolver_handle));
+    cusolverErrchk(cusolverDnSetStream(cusolver_handle, stream));
+
+    cublasHandle_t cublas_handle;
+    cublasErrchk(cublasCreate(&cublas_handle));
+    cublasErrchk(cublasSetStream(cublas_handle, stream));
+
+    // Initialize Idendity Matrix and a Copy of it which is also used as a buffer for the result of inversions.
+    // create right hand side identity matrix
+    std::complex<double>* identity_h;
+    cudaErrchk(cudaMallocHost((void**)&identity_h, blocksize * blocksize * sizeof(std::complex<double>)));
+
+    for(unsigned int i = 0; i < blocksize * blocksize; i++){
+        identity_h[i] = 0.0;
+        if(i / blocksize == i % blocksize){
+            identity_h[i] = 1.0;
+        }
+    }
+
+    // init right hand side identity matrix on device for inversion 
+    cuDoubleComplex* identity_d = NULL;
+    cuDoubleComplex* identity_cpy_d = NULL;
+
+    cudaErrchk(cudaMalloc((void**)&identity_d, blocksize * blocksize * sizeof(cuDoubleComplex)));
+    cudaErrchk(cudaMalloc((void**)&identity_cpy_d, blocksize * blocksize * sizeof(cuDoubleComplex)));
+
+    cudaErrchk(cudaMemcpy(identity_d, reinterpret_cast<const cuDoubleComplex*>(identity_h),
+                blocksize * blocksize * sizeof(cuDoubleComplex), cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMemcpy(identity_cpy_d, identity_d,
+                blocksize * blocksize * sizeof(cuDoubleComplex), cudaMemcpyDeviceToDevice));
+
+    // Allocate memory for the input Matrix and work Matrix
+    cuDoubleComplex* A_gpu = NULL;
+    cuDoubleComplex* W_gpu = NULL;
+
+    cudaErrchk(cudaMalloc((void**) &A_gpu, A.rows() * A.cols() * sizeof(cuDoubleComplex)));
+    cudaErrchk(cudaMalloc((void**) &W_gpu, A.rows() * A.cols() * sizeof(cuDoubleComplex)));
+
+    // Load input Matrix onto GPU
+    cudaErrchk(cudaMemcpy(A_gpu, reinterpret_cast<const cuDoubleComplex*>(A.data()), A.rows() * A.cols() * sizeof(cuDoubleComplex), cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMemcpy(W_gpu, A_gpu, A.rows() * A.cols() * sizeof(cuDoubleComplex), cudaMemcpyDeviceToDevice)); 
+
+    // Allocate memory for the L and U Matrices
+    cuDoubleComplex* L_gpu = NULL;
+    cuDoubleComplex* U_gpu = NULL;
+
+    cudaErrchk(cudaMalloc((void**) &L_gpu, A.rows() * A.cols() * sizeof(cuDoubleComplex)));
+    cudaErrchk(cudaMalloc((void**) &U_gpu, A.rows() * A.cols() * sizeof(cuDoubleComplex)));
+
+    // Allocate buffer needed for LU-Decompositions of the to-be inverted Matrices + buffers for pivots and info flags
+    int info_h = 0;
+    int *ipiv_d = NULL;
+    int *info_d = NULL;
+    cudaErrchk(cudaMalloc((void**)&info_d, sizeof(int)))
+    cudaErrchk(cudaMalloc((void**)&ipiv_d, blocksize*sizeof(int)));
+
+    cuDoubleComplex *buffer = NULL;
+    int bufferSize = 0;
+    cusolverErrchk(cusolverDnZgetrf_bufferSize(cusolver_handle, blocksize, blocksize,
+                                               W_gpu, l_dim,
+					       &bufferSize));
+    cudaErrchk(cudaMalloc((void**)&buffer, sizeof(cuDoubleComplex) * bufferSize));
+
+    cuDoubleComplex alpha;
+    cuDoubleComplex beta;
+
+    // Corner elimination downward
+    for (int i_blockrow = start_blockrow + 1; i_blockrow < start_blockrow + partition_blocksize; ++i_blockrow) {
+	
+	int colsSkip = (i_blockrow-1) * l_dim * blocksize;
+	int rowOffset = (i_blockrow-1) * blocksize;
+	
+	cudaErrchk(cudaStreamSynchronize(stream));
+
+	// Inversion of Block A_i_i into buffer identity_cpy_d
+	cusolverErrchk(cusolverDnZgetrf(cusolver_handle, blocksize, blocksize,
+        	                        W_gpu+colsSkip+rowOffset, l_dim, buffer, ipiv_d, info_d));
+	
+	cudaErrchk(cudaMemcpy(&info_h, info_d, sizeof(int), cudaMemcpyDeviceToHost));
+
+	if (info_h != 0) {
+		std::printf("Error: LU factorization failed\n");
+		std::printf("info_h = %d\n", info_h);
+        }
+	//else {
+	//	std::cout << "GPU LU factorization completed" << std::endl;
+	//}
+
+        cusolverErrchk(cusolverDnZgetrs(cusolver_handle, CUBLAS_OP_N, blocksize, blocksize,
+					W_gpu+colsSkip+rowOffset, l_dim, ipiv_d,
+					identity_cpy_d, blocksize, info_d));
+
+	cudaErrchk(cudaMemcpy(&info_h, info_d, sizeof(int), cudaMemcpyDeviceToHost));
+
+	if (info_h != 0) {
+		std::printf("Error: Inversion failed\n");
+		std::printf("info_h = %d\n", info_h);
+        } 
+	//else {
+	//	std::cout << "GPU Inversion completed" << std::endl;
+	//}
+	
+
+	// Computation of Block L_(i+1)_i = A_(i+1)_i * (A_i_i)^(-1)
+	alpha = make_cuDoubleComplex(1.0,0.0);
+	beta = make_cuDoubleComplex(0.0,0.0);
+	cublasErrchk(cublasZgemm(
+	            cublas_handle,
+	            CUBLAS_OP_N, CUBLAS_OP_N,
+	            blocksize, blocksize, blocksize,
+	            &alpha,
+	            W_gpu+colsSkip+rowOffset+blocksize, l_dim,
+	            identity_cpy_d, blocksize,
+	            &beta,
+	            L_gpu+colsSkip+rowOffset+blocksize, l_dim));
+
+	// Computation of Block U_i_(i+1) = (A_i_i)^(-1) * A_i_(i+1)
+	cublasErrchk(cublasZgemm(
+	            cublas_handle,
+	            CUBLAS_OP_N, CUBLAS_OP_N,
+	            blocksize, blocksize, blocksize,
+	            &alpha,
+	            identity_cpy_d, blocksize,
+	            W_gpu+colsSkip+rowOffset+l_dim*blocksize, l_dim,
+	            &beta,
+	            U_gpu+colsSkip+rowOffset+l_dim*blocksize, l_dim));
+
+	// Computation of Block A_(i+1)_(i+1) -= L_(i+1)_i * A_i_(i+1)
+	alpha = make_cuDoubleComplex(-1.0,0.0);
+	beta = make_cuDoubleComplex(1.0,0.0);
+	cublasErrchk(cublasZgemm(
+	            cublas_handle,
+	            CUBLAS_OP_N, CUBLAS_OP_N,
+	            blocksize, blocksize, blocksize,
+	            &alpha,
+	            L_gpu+colsSkip+rowOffset+blocksize, l_dim,
+	            W_gpu+colsSkip+rowOffset+l_dim*blocksize, l_dim,
+	            &beta,
+	            W_gpu+colsSkip+rowOffset+l_dim*blocksize+blocksize, l_dim));
+
+
+
+	// Reset identity_cpy_d to the identity Matrix of size blocksize
+	cudaErrchk(cudaMemcpy(identity_cpy_d, identity_d, blocksize * blocksize * sizeof(std::complex<double>),  cudaMemcpyDeviceToDevice));
+
+	// Update Matrix on GPU with the result of the computations
+	
+	// Update Offsets for correct access
+	colsSkip = i_blockrow * l_dim * blocksize;
+	rowOffset = i_blockrow * blocksize;
+
+	for(int j = 0; j < blocksize; ++j) {
+		cudaErrchk(cudaMemcpy(A_gpu+colsSkip+rowOffset+j*l_dim, W_gpu+colsSkip+rowOffset+j*l_dim, blocksize * sizeof(cuDoubleComplex), cudaMemcpyDeviceToDevice));	
+	}
+
+    }
+
+    cudaErrchk(cudaStreamSynchronize(stream));
+    cudaErrchk(cudaMemcpy(A.data(), reinterpret_cast<std::complex<double>*>(A_gpu), A.rows() * A.cols() * sizeof(std::complex<double>), cudaMemcpyDeviceToHost));
+    cudaErrchk(cudaMemcpy(L.data(), reinterpret_cast<std::complex<double>*>(L_gpu), A.rows() * A.cols() * sizeof(std::complex<double>), cudaMemcpyDeviceToHost));
+    cudaErrchk(cudaMemcpy(U.data(), reinterpret_cast<std::complex<double>*>(U_gpu), A.rows() * A.cols() * sizeof(std::complex<double>), cudaMemcpyDeviceToHost));
+
+    if (stream) {
+        cudaErrchk(cudaStreamDestroy(stream));
+    }
+    if(cublas_handle) {
+        cublasErrchk(cublasDestroy(cublas_handle));
+    }
+    if(cusolver_handle) {
+        cusolverErrchk(cusolverDnDestroy(cusolver_handle));
+    }
+    if(A_gpu) {
+        cudaErrchk(cudaFree(A_gpu));
+    }
+    if(W_gpu) {
+        cudaErrchk(cudaFree(W_gpu));
+    }
+    if(L_gpu) {
+        cudaErrchk(cudaFree(L_gpu));
+    }
+    if(U_gpu) {
+        cudaErrchk(cudaFree(U_gpu));
+    }
+    if(identity_d) {
+        cudaErrchk(cudaFree(identity_d));
+    }
+    if(identity_cpy_d) {
+        cudaErrchk(cudaFree(identity_cpy_d));
+    }
+
+    return std::make_tuple(L, U);
+}
+// End of additions for cuda impl
+
+
+
+
 
 void reduce_schur_sequentially(Eigen::MatrixXcd** eigenA,
                              Eigen::MatrixXcd** G_matrices,
@@ -1318,7 +1569,7 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
 
 
     if (rank == 0){
-        auto result = reduce_schur_topleftcorner(processA, 0, partition_blocksize, blocksize);
+        auto result = reduce_schur_topleftcorner_gpu(processA, 0, partition_blocksize, blocksize);
         L = std::get<0>(result);
         U = std::get<1>(result);
     }

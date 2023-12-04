@@ -9,7 +9,7 @@ src = /home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/
 CXXFLAGS = -Wall -Wextra -fopenmp -std=c++14 -I${EIGENROOT} -I${CUDA_ROOT}/include -I${MKLROOT}/include -I${MPIROOT}/include -I${src}
 NVCCFLAGS = -arch=sm_60 -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -std=c++14 -Xcompiler -fopenmp -I${CUDA_ROOT}/include
 LDMKLFLAGS = -L${MKLROOT}/lib/intel64 -Wl,--start-group -lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -Wl,--end-group
-LDFLAGS = -L${CUDA_ROOT}/lib64 -lcudart -lpthread -lm -ldl
+LDFLAGS = -L${CUDA_ROOT}/lib64 -lcudart -lcublas -lcusolver -lpthread -lm -ldl
 SOURCES= PSR.cpp, PSR_testutils.cpp, PSR_MPI_utils.cpp, PSR_main.cpp
 
 CPP_SOURCES = $(SOURCES)

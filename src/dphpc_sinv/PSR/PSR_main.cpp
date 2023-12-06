@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
         );
     }
     else {
-        auto G_final = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, true);
+        auto G_final = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, true);
     }   
 
 

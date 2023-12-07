@@ -93,21 +93,21 @@ double solve_mkl_dgesv(
         if(info > 0){
             std::printf("Singular");
         }
-        return -1.0;
     }
 
     if(flag_verbose){
         std::printf("MKL dgesv done\n");
     }
+    double relative_error[1];
     if(!assert_array_magnitude<double>(rhs,
             reference_solution, 
             abstol,
             reltol,
-            matrix_size)){
+            matrix_size,
+            relative_error)){
         
         
         std::printf("Error: MKL dgesv solution is not the same as the reference solution\n");
-        return -1.0;
     }
     else{
         std::printf("MKL dgesv solution is the same as the reference solution\n");
@@ -148,20 +148,19 @@ double solve_mkl_dposv(
         if(info > 0){
             std::printf("Singular");
         }
-        return -1.0;
     }
 
     if(flag_verbose){
         std::printf("MKL dposv done\n");
     }
-
+    double relative_error[1];
     if(!assert_array_magnitude<double>(rhs,
             reference_solution, 
             abstol,
             reltol,
-            matrix_size)){
+            matrix_size,
+            relative_error)){
         std::printf("Error: MKL dposv solution is not the same as the reference solution\n");
-        return -1.0;
     }
     else{
         std::printf("MKL dposv solution is the same as the reference solution\n");
@@ -200,20 +199,19 @@ double solve_mkl_dgbsv(
         if(info > 0){
             std::printf("Singular");
         }
-        return -1.0;
     }
 
     if(flag_verbose){
         std::printf("MKL dgesv done\n");
     }
-
+    double relative_error[1];
     if(!assert_array_magnitude<double>(rhs,
             reference_solution,
             abstol,
             reltol,
-            matrix_size)){
+            matrix_size,
+            relative_error)){
         std::printf("Error: MKL dgbsv solution is not the same as the reference solution\n");
-        return -1.0;
     }
     else{
         std::printf("MKL dgbsv solution is the same as the reference solution\n");
@@ -259,20 +257,19 @@ double solve_mkl_dpbsv(
         if(info > 0){
             std::printf("Singular");
         }
-        return -1.0;
     }
 
     if(flag_verbose){
         std::printf("MKL pbsv done\n");
     }
-
+    double relative_error[1];
     if(!assert_array_magnitude<double>(rhs,
             reference_solution,
             abstol,
             reltol,
-            matrix_size)){
+            matrix_size,
+            relative_error)){
         std::printf("Error: MKL dpbsv solution is not the same as the reference solution\n");
-        return -1.0;
     }
     else{
         std::printf("MKL dpbsv solution is the same as the reference solution\n");
@@ -375,14 +372,14 @@ double solve_cusolver_dense_LU(
         std::printf("Copy solution to host\n");
     }
     cudaErrchk(cudaMemcpy(rhs_h, rhs_d, matrix_size*sizeof(double), cudaMemcpyDeviceToHost));
-
+    double relative_error[1];
     if(!assert_array_magnitude<double>(rhs_h,
             reference_solution_h,
             abstol,
             reltol,
-            matrix_size)){
+            matrix_size,
+            relative_error)){
         std::printf("Error: CuSolver LU solution is not the same as the reference solution\n");
-        return -1.0;
     }
     else{
         std::printf("CuSolver LU solution is the same as the reference solution\n");
@@ -510,14 +507,14 @@ double solve_cusolver_dense_CHOL(
         std::printf("Copy solution to host\n");
     }
     cudaErrchk(cudaMemcpy(rhs_h, rhs_d, matrix_size*sizeof(double), cudaMemcpyDeviceToHost));
-
+    double relative_error[1];
     if(!assert_array_magnitude<double>(rhs_h,
             reference_solution_h,
             abstol,
             reltol,
-            matrix_size)){
+            matrix_size,
+            relative_error)){
         std::printf("Error: CuSolver CHOL solution is not the same as the reference solution\n");
-        return -1.0;
     }
     else{
         std::printf("CuSolver CHOL solution is the same as the reference solution\n");
@@ -561,7 +558,8 @@ double solve_cusparse_CG(
     double reltol,
     double restol,
     bool flag_verbose,
-    int *steps_taken)
+    int *steps_taken,
+    double *relative_error)
 {
 
     double time = -1.0;
@@ -590,7 +588,7 @@ double solve_cusparse_CG(
 
     cusparseSpMatDescr_t matA = NULL;
 
-    const int max_iter = 4000;
+    const int max_iter = 100000;
     double a, b, na;
     double alpha, beta, alpham1, r0, r1;
     size_t bufferSize = 0;
@@ -709,15 +707,14 @@ double solve_cusparse_CG(
     }
     cudaErrchk(cudaMemcpy(rhs_h, x_d, matrix_size * sizeof(double), cudaMemcpyDeviceToHost));
 
-
     if(!assert_array_magnitude<double>(
             rhs_h,
             reference_solution_h,
             abstol,
             reltol,
-            matrix_size)){
+            matrix_size,
+            relative_error)){
         std::printf("Error: CG solution is not the same as the reference solution\n");
-        return -1.0;
     }
     else{
         std::printf("CG solution is the same as the reference solution\n");
@@ -787,7 +784,8 @@ double solve_cusparse_ILU_CG(
     double reltol,
     double restol,
     bool flag_verbose,
-    int *steps_taken)
+    int *steps_taken,
+    double *relative_error)
 {
 
     double time = -1.0;
@@ -821,7 +819,7 @@ double solve_cusparse_ILU_CG(
     double *omega_d = NULL;
     double *y_d = NULL;
 
-    const int max_iter = 4000;
+    const int max_iter = 100000;
     double alpha, beta, r1;
     double numerator, denominator, nalpha;
     const double doubleone = 1.0;
@@ -1076,14 +1074,13 @@ double solve_cusparse_ILU_CG(
     }
     cudaErrchk(cudaMemcpy(rhs_h, x_d, matrix_size * sizeof(double), cudaMemcpyDeviceToHost));
 
-
     if(!assert_array_magnitude<double>(rhs_h,
             reference_solution_h,
             abstol,
             reltol,
-            matrix_size)){
+            matrix_size,
+            relative_error)){
         std::printf("Error: ILU CG solution is not the same as the reference solution\n");
-        return -1.0;
     }
     else{
         std::printf("ILU CG solution is the same as the reference solution\n");
@@ -1289,7 +1286,8 @@ double solve_cusparse_CG_jacobi(
     double reltol,
     double restol,
     bool flag_verbose,
-    int *steps_taken)
+    int *steps_taken,
+    double *relative_error)
 {
 
     double time = -1.0;
@@ -1318,7 +1316,7 @@ double solve_cusparse_CG_jacobi(
 
     cusparseSpMatDescr_t matA = NULL;
 
-    const int max_iter = 4000;
+    const int max_iter = 100000;
     double a, b, na;
     double alpha, beta, alpham1, r0, r1;
     size_t bufferSize = 0;
@@ -1495,67 +1493,59 @@ double solve_cusparse_CG_jacobi(
             reference_solution_h,
             abstol,
             reltol,
-            matrix_size)){
+            matrix_size,
+            relative_error)){
         std::printf("Error: Jacobi CG solution is not the same as the reference solution\n");
-        return -1.0;
     }
     else{
         std::printf("Jacobi CG solution is the same as the reference solution\n");
     }
 
 
-    if (buffer) {
-        cudaErrchk(cudaFree(buffer));
-    }
-    if(cusparseHandle) {
-        cusparseErrchk(cusparseDestroy(cusparseHandle));
-    }
-    if(cublasHandle) {
-        cublasErrchk(cublasDestroy(cublasHandle));
-    }
-    if(stream) {
-        cudaErrchk(cudaStreamDestroy(stream));
-    }
-    if(matA) {
-        cusparseErrchk(cusparseDestroySpMat(matA));
-    }
-    if(vecx) {
-        cusparseErrchk(cusparseDestroyDnVec(vecx));
-    }
-    if(vecAx) {
-        cusparseErrchk(cusparseDestroyDnVec(vecAx));
-    }
-    if(vecp) {
-        cusparseErrchk(cusparseDestroyDnVec(vecp));
-    }
 
-    if(data_d){
-        cudaErrchk(cudaFree(data_d));
-    }
-    if(col_indices_d){
-        cudaErrchk(cudaFree(col_indices_d));
-    }
-    if(row_indptr_d){
-        cudaErrchk(cudaFree(row_indptr_d));
-    }
-    if(rhs_d){
-        cudaErrchk(cudaFree(rhs_d));
-    }
-    if(x_d){
-        cudaErrchk(cudaFree(x_d));
-    }
-    if(p_d){
-        cudaErrchk(cudaFree(p_d));
-    }
-    if(Ax_d){
-        cudaErrchk(cudaFree(Ax_d));
-    }
-    if(diagonal_values_inv_sqrt_d){
-        cudaErrchk(cudaFree(diagonal_values_inv_sqrt_d));
-    }
-    if(diagonal_values_inv_sqrt_h){
-        free(diagonal_values_inv_sqrt_h);
-    }
+
+    cusparseErrchk(cusparseDestroy(cusparseHandle));
+
+    cublasErrchk(cublasDestroy(cublasHandle));
+
+    cudaErrchk(cudaStreamDestroy(stream));
+
+    cusparseErrchk(cusparseDestroySpMat(matA));
+
+    cusparseErrchk(cusparseDestroyDnVec(vecx));
+
+    cusparseErrchk(cusparseDestroyDnVec(vecAx));
+
+    cusparseErrchk(cusparseDestroyDnVec(vecp));
+
+
+    cudaErrchk(cudaFree(buffer));
+
+
+    cudaErrchk(cudaFree(data_d));
+
+    cudaErrchk(cudaFree(col_indices_d));
+
+
+    cudaErrchk(cudaFree(row_indptr_d));
+
+
+    cudaErrchk(cudaFree(rhs_d));
+
+
+    cudaErrchk(cudaFree(x_d));
+
+
+    cudaErrchk(cudaFree(p_d));
+
+
+    cudaErrchk(cudaFree(Ax_d));
+
+
+    cudaErrchk(cudaFree(diagonal_values_inv_sqrt_d));
+
+    free(diagonal_values_inv_sqrt_h);
+
     return time;
 }
 
@@ -1643,14 +1633,15 @@ double solve_cusolver_sparse_CHOL(
 
     cudaErrchk(cudaMemcpy(rhs_h, x_d, matrix_size * sizeof(double), cudaMemcpyDeviceToHost));
 
+    double relative_error[1];
 
     if(!assert_array_magnitude<double>(rhs_h,
             reference_solution_h,
             abstol,
             reltol,
-            matrix_size)){
+            matrix_size,
+            relative_error)){
         std::printf("Error: CHOL solution is not the same as the reference solution\n");
-        return -1.0;
     }
     else{
         std::printf("CHOL solution is the same as the reference solution\n");

@@ -70,7 +70,8 @@ double solve_cusparse_CG(
     double reltol,
     double restol,
     bool flag_verbose,
-    int *steps_taken);
+    int *steps_taken,
+    double *relative_error);
 
 double solve_cusparse_ILU_CG(
     double *data_h,
@@ -84,7 +85,8 @@ double solve_cusparse_ILU_CG(
     double reltol,
     double restol,
     bool flag_verbose,
-    int *steps_taken);
+    int *steps_taken,
+    double *relative_error);
 
 double solve_cusparse_CG_jacobi(
     double *data_h,
@@ -99,7 +101,8 @@ double solve_cusparse_CG_jacobi(
     double reltol,
     double restol,
     bool flag_verbose,
-    int *steps_taken);
+    int *steps_taken,
+    double *relative_error);
 
 double solve_cusolver_sparse_CHOL(
     double *data_h,

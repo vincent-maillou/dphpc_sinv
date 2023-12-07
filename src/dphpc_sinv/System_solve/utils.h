@@ -21,6 +21,9 @@ bool save_text_array(
     const T* array,
     int size);
 
+template <typename T>
+void save_bin_array(T* array, int numElements, const std::string& filename);
+
 template<typename T>
 void sparse_to_dense(
     T *dense_matrix,
@@ -49,7 +52,8 @@ bool assert_array_magnitude(
     T *array_ref,
     double abstol,
     double reltol,
-    int size);
+    int size,
+    double *relative_error);
 
 bool are_equals(
     std::complex<double> *A,

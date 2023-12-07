@@ -40,6 +40,6 @@ $(BINARY): $(CPP_OBJ_FILES) $(CU_OBJ_FILES)
 
 .PHONY: clean
 clean:
-	rm -f main *.o
+	rm -f $(BINARY) *.o
 
 	

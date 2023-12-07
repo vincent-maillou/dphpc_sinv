@@ -98,6 +98,19 @@ bool save_text_array(
 }
 template bool save_text_array<double>(std::string filename, const double* array, int size);
 
+template <typename T>
+void save_bin_array(T* array, int numElements, const std::string& filename) {
+    std::ofstream file(filename, std::ios::binary);
+    if (file.is_open()) {
+        file.write(reinterpret_cast<char*>(array), numElements*sizeof(T));
+        file.close();
+        std::cout << "Array data written to file: " << filename << std::endl;
+    } else {
+        std::cerr << "Unable to open the file for writing." << std::endl;
+    }
+}
+template void save_bin_array<double>(double* array, int numElements, const std::string& filename);
+
 template<typename T>
 void sparse_to_dense(
     T *dense_matrix,
@@ -170,7 +183,8 @@ bool assert_array_magnitude(
     T *array_ref,
     double abstol,
     double reltol,
-    int size)
+    int size,
+    double *relative_error)
 {
     double sum_difference = 0.0;
     double sum_ref = 0.0;
@@ -181,12 +195,16 @@ bool assert_array_magnitude(
     }
     sum_difference = std::sqrt(sum_difference);
     sum_ref = std::sqrt(sum_ref);
+
+    relative_error[0] = sum_difference / sum_ref;
+
     if (sum_difference > reltol * sum_ref + abstol) {
         std::printf("Arrays are in magnitude not the same\n");
         std::cout << "Difference " << sum_difference << std::endl;
         std::cout << "Mixed tolerance " << reltol * sum_ref + abstol << std::endl;
         return false;
     }
+
 
     return true;
 }
@@ -195,7 +213,8 @@ template bool assert_array_magnitude<double>(
     double *array_ref,
     double abstol,
     double reltol,
-    int size);
+    int size,
+    double *relative_error);
 
 
 

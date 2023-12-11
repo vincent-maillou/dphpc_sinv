@@ -14,6 +14,7 @@
 #include <omp.h>
 #include <mpi.h>
 #include <cuda.h>
+#include "openacc.h"
 
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
@@ -22,6 +23,40 @@
 #include <cuda/std/complex>
 #include <cublas_v2.h>
 #include <cusolverDn.h>
+
+// Start of additions for cuda impl
+#define cudaErrchk(ans) { cudaAssert((ans), __FILE__, __LINE__); }
+inline void cudaAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      std::printf("CUDAassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
+#define cusolverErrchk(ans) { cusolverAssert((ans), __FILE__, __LINE__); }
+inline void cusolverAssert(cusolverStatus_t code, const char *file, int line, bool abort=true)
+{
+   if (code != CUSOLVER_STATUS_SUCCESS) 
+   {
+        //Did not find a counter part to cudaGetErrorString in cusolver
+        std::printf("CUSOLVERassert: %s %d\n", file, line);
+        if (abort) exit(code);
+   }
+}
+
+
+#define cublasErrchk(ans) { cublasAssert((ans), __FILE__, __LINE__); }
+inline void cublasAssert(cublasStatus_t code, const char *file, int line, bool abort=true)
+{
+   if (code != CUBLAS_STATUS_SUCCESS) 
+   {
+        //Did not find a counter part to cudaGetErrorString in cublas
+        std::printf("CUBLASassert: %s %d\n", file, line);
+        if (abort) exit(code);
+   }
+}
 
 void reduce_schur_sequentially(Eigen::MatrixXcd** eigenA,
                              Eigen::MatrixXcd** G_matrices,
@@ -294,3 +329,12 @@ void create_ul2_redschur_blockpattern_Type(MPI_Datatype* blockPatternType, MPI_D
 void create_br2_redschur_blockpattern_Type(MPI_Datatype* blockPatternType, MPI_Datatype subblockType, int blocksize, int stride, int partition_blocksize);
 
 void create_central_redschur_blockpattern_Type(MPI_Datatype* blockPatternType, MPI_Datatype subblockType, MPI_Datatype subblockType_2, int blocksize, int stride, int partition_blocksize);
+
+
+void create_identity_GPU(cuDoubleComplex* I, int matrix_size);
+
+void extract_subblock_from_GPU(cuDoubleComplex* subblock, cuDoubleComplex* GPU_matrix, int blocksize, int stride, int rowBlock, int colBlock);
+void copy_rowblocks_buffer2GPU(cuDoubleComplex* GPU_matrix, cuDoubleComplex* CPU_buffer, int blocksize, int stride, int rowBlocks, int rowBlock, int colBlock, int buffBlock);
+void copy_rowblocks_GPU2GPU(cuDoubleComplex* GPU_matrix1, cuDoubleComplex* GPU_matrix2, int blocksize, int stride1, int stride2, int rowBlocks, int rowBlock1, int colBlock1, int rowBlock2, int colBlock2);
+void invert_GPU_matrix(cuDoubleComplex* GPU_matrix, cuDoubleComplex* I, int blocksize, cusolverDnHandle_t cusolverH, cuDoubleComplex* d_work, int* info_d, int info_h, int* ipiv_d);
+void invert_GPU_matrix_complete(cuDoubleComplex* GPU_matrix, cuDoubleComplex* A_schur_gpu, int blocksize, cusolverDnHandle_t cusolverH);

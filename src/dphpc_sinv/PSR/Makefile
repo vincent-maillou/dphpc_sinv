@@ -1,5 +1,6 @@
 NVCC = nvcc
 CXX = /usr/local/mpich-4.0.2/gcc11/bin/mpic++
+#CXX = g++
 MPIROOT = /usr/local/mpich-4.0.2/gcc11
 CUDA_ROOT = /usr/local/cuda-11.8
 MKLROOT = /usr/pack/intel_compiler-2020-af/x64/compilers_and_libraries_2019.0.117/linux/mkl
@@ -8,15 +9,15 @@ src = /home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/
 
 CXXFLAGS = -Wall -Wextra -fopenmp -std=c++14 -I${EIGENROOT} -I${CUDA_ROOT}/include -I${MKLROOT}/include -I${MPIROOT}/include -I${src}
 NVCCFLAGS = -arch=sm_60 -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -std=c++14 -Xcompiler -fopenmp -I${CUDA_ROOT}/include
-LDMKLFLAGS = -L${MKLROOT}/lib/intel64 -Wl,--start-group -lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -Wl,--end-group
-LDFLAGS = -L${CUDA_ROOT}/lib64 -lcudart -lcublas -lcusolver -lcuda -lpthread -lm -ldl
-SOURCES= PSR.cpp, PSR_testutils.cpp, PSR_MPI_utils.cpp, PSR_main.cpp
+LDMKLFLAGS = -L${MKLROOT}/lib/intel64 -Wl,--start-group -lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -Wl,--end-group -L${MPIROOT}/lib -lmpi
+LDFLAGS = -L${CUDA_ROOT}/lib64 -lcudart -lcublas -lcusolver -lcuda -lpthread -lm -ldl -std=c++14 -lgomp
+SOURCES= PSR.cpp, PSR_testutils.cpp, PSR_MPI_utils.cpp, PSR_CUDA_utils.cpp, PSR_main.cpp
 
 CPP_SOURCES = $(SOURCES)
 CU_SOURCES = $(filter %.cu, $(SOURCES))
 
 #CPP_OBJ_FILES=$(CPP_SOURCES:.cpp=.o)
-CPP_OBJ_FILES = PSR.o PSR_testutils.o PSR_MPI_utils.o PSR_main.o
+CPP_OBJ_FILES = PSR.o PSR_testutils.o PSR_MPI_utils.o PSR_CUDA_utils.o PSR_main.o
 CU_OBJ_FILES =$(CU_SOURCES:.cu=.o)
 BINARY = main
 

@@ -3229,8 +3229,10 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
 
 
     // Perform the same Allgather with custom MPI Datatypes
-    unsigned long comm_custom_buf_size = (blocksize * blocksize * ((partitions - 2) * 6 + 2 * 2));
-    std::complex<double>* comm_custom_buf = new std::complex<double>[comm_custom_buf_size];
+    unsigned long comm_custom_buf_size = (blocksize * blocksize * ((partitions - 2) * 6 + 2 * 2));\
+    std::complex<double>* comm_custom_buf = NULL;
+    cudaMallocHost((void**)&comm_custom_buf, comm_custom_buf_size * sizeof(complex_h));
+    //std::complex<double>* comm_custom_buf = new std::complex<double>[comm_custom_buf_size];
     int *receivecounts = new int[partitions];
     int *displs = new int[partitions];
 
@@ -3328,14 +3330,18 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
     // if(buffer) {
 	// cudaErrchk(cudaFree(buffer));
 
-    std::complex<double>* g_host_rgf_buf = new std::complex<double>[comm_custom_buf_size];
+    //std::complex<double>* g_host_rgf_buf = new std::complex<double>[comm_custom_buf_size];
+    std::complex<double>* g_host_rgf_buf = NULL;
+    cudaMallocHost((void**)&g_host_rgf_buf, comm_custom_buf_size * sizeof(complex_h));
     rgf_for_subsystem(blocksize, n_blocks_schursystem*blocksize, comm_custom_buf, g_host_rgf_buf);
     
     //invert_GPU_matrix_complete(G_schur_gpu, A_schur_gpu, n_blocks_schursystem * blocksize, cusolver_handle);
     //std::complex<double>* host_testblock_complete = new std::complex<double>[blocksize*blocksize];
     //copy_rowblocks_GPU2buffer(G_schur_gpu, reinterpret_cast<cuDoubleComplex*>(host_testblock_complete), blocksize,  n_blocks_schursystem*blocksize, 1, n_blocks_schursystem-1, n_blocks_schursystem-1, 0);
-
-    delete[] comm_custom_buf;
+    if(comm_custom_buf){
+        cudaFreeHost(comm_custom_buf);
+    }
+    // delete[] comm_custom_buf;
 
     //Eigen::MatrixXcd testblock_complete = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>(host_testblock_complete, blocksize, blocksize);
     //Eigen::MatrixXcd testblock_rgf = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>(g_host_rgf_buf + 3*(n_blocks_schursystem-1) * blocksize * blocksize, blocksize, blocksize);

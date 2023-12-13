@@ -24,6 +24,9 @@
 #include <cublas_v2.h>
 #include <cusolverDn.h>
 
+using complex_h = std::complex<double>;
+using complex_d = cuDoubleComplex;
+
 // Start of additions for cuda impl
 #define cudaErrchk(ans) { cudaAssert((ans), __FILE__, __LINE__); }
 inline void cudaAssert(cudaError_t code, const char *file, int line, bool abort=true)
@@ -335,6 +338,7 @@ void create_identity_GPU(cuDoubleComplex* I, int matrix_size);
 
 void extract_subblock_from_GPU(cuDoubleComplex* subblock, cuDoubleComplex* GPU_matrix, int blocksize, int stride, int rowBlock, int colBlock);
 void copy_rowblocks_buffer2GPU(cuDoubleComplex* GPU_matrix, cuDoubleComplex* CPU_buffer, int blocksize, int stride, int rowBlocks, int rowBlock, int colBlock, int buffBlock);
+void copy_rowblocks_GPU2buffer(cuDoubleComplex* GPU_matrix, cuDoubleComplex* CPU_buffer, int blocksize, int stride, int rowBlocks, int rowBlock, int colBlock, int buffBlock);
 void copy_rowblocks_GPU2GPU(cuDoubleComplex* GPU_matrix1, cuDoubleComplex* GPU_matrix2, int blocksize, int stride1, int stride2, int rowBlocks, int rowBlock1, int colBlock1, int rowBlock2, int colBlock2);
 void invert_GPU_matrix(cuDoubleComplex* GPU_matrix, cuDoubleComplex* I, int blocksize, cusolverDnHandle_t cusolverH, cuDoubleComplex* d_work, int* info_d, int info_h, int* ipiv_d);
 void invert_GPU_matrix_complete(cuDoubleComplex* GPU_matrix, cuDoubleComplex* A_schur_gpu, int blocksize, cusolverDnHandle_t cusolverH);

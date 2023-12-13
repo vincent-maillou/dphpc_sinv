@@ -29,6 +29,23 @@ void copy_rowblocks_buffer2GPU(cuDoubleComplex* GPU_matrix, cuDoubleComplex* CPU
     int buff_offset = buffBlock * blocksize * blocksize;
 
     cudaErrchk(cudaMemcpy2D(GPU_matrix + GPU_row_offset + GPU_col_offset, stride * sizeof(std::complex<double>), CPU_buffer + buff_offset, blocksize * sizeof(std::complex<double>), blocksize * sizeof(std::complex<double>), rowBlocks * blocksize, cudaMemcpyHostToDevice));
+   
+}
+
+
+void copy_rowblocks_GPU2buffer(cuDoubleComplex* GPU_matrix, cuDoubleComplex* CPU_buffer, int blocksize, int stride, int rowBlocks, int rowBlock, int colBlock, int buffBlock) {
+    // Copies a contiguous CPU buffer into a GPU pattern matrix
+    // GPU_matrix: pointer to the GPU matrix
+    // CPU_matrix: pointer to the CPU matrix
+    // blocksize: size of the blocks in the matrix
+    // stride: stride of the matrix
+    // rowBlocks: number of row blocks in the matrix
+    // colBlocks: number of column blocks in the matrix
+    int GPU_row_offset = rowBlock * blocksize;
+    int GPU_col_offset = colBlock * blocksize * stride;
+    int buff_offset = buffBlock * blocksize * blocksize;
+
+     cudaErrchk(cudaMemcpy2D(CPU_buffer + buff_offset, blocksize * sizeof(std::complex<double>), GPU_matrix + GPU_row_offset + GPU_col_offset,  stride * sizeof(std::complex<double>), blocksize * sizeof(std::complex<double>), rowBlocks * blocksize, cudaMemcpyDeviceToHost));
 }
 
 void copy_rowblocks_GPU2GPU(cuDoubleComplex* GPU_matrix1, cuDoubleComplex* GPU_matrix2, int blocksize, int stride1, int stride2, int rowBlocks, int rowBlock1, int colBlock1, int rowBlock2, int colBlock2) {

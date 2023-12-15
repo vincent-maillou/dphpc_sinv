@@ -4,9 +4,9 @@ from dphpc_sinv.Utils import matrix_utils
 import numpy as np
 
 SEED = 8000
-MAT_SIZE = 110
-BLOCKSIZE = 11
-BATCHSIZE = 13
+MAT_SIZE = 5408
+BLOCKSIZE = 416
+BATCHSIZE = 112
 PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
 
 if __name__ == "__main__":

@@ -124,12 +124,23 @@ void rgf_lesser_greater_batched_optimized(
     complex_d** system_matrix_diagblk_ptr_d[2];
     complex_d** system_matrix_upperblk_ptr_d[2];
     complex_d** system_matrix_lowerblk_ptr_d[2];
+    complex_d** system_matrix_upper_lowerblk_ptr_d[2];
+
     complex_d** self_energy_lesser_diagblk_ptr_d[2];
-    complex_d** self_energy_lesser_upperblk_ptr_d[2];
     complex_d** self_energy_greater_diagblk_ptr_d[2];
-    complex_d** self_energy_greater_upperblk_ptr_d[2];
+
+    // first part is [0] and second part is [1]
+    complex_d** system_matrix_diagblk_ptr_scuffed_d;
+    complex_d** self_energy_lesser_diagblk_ptr_scuffed_d;
 
 
+    complex_d** system_matrix_lowerblk_ptr_twice_d[2];
+    complex_d** self_energy_lesser_diagblk_ptr_twice_d[2];
+    complex_d** self_energy_greater_diagblk_ptr_twice_d[2];
+
+    // first part is lesser and second part is greater
+    complex_d** self_energy_lesser_greater_diagblk_ptr_d[2];
+    complex_d** self_energy_lesser_greater_upperblk_ptr_d[2];
 
     // allocate single blocks of the matrix
     for(int i = 0; i < 2; i++){
@@ -155,19 +166,47 @@ void rgf_lesser_greater_batched_optimized(
         cudaErrchk(cudaMalloc((void**)&system_matrix_diagblk_ptr_d[i], batch_size * sizeof(complex_d*)));
         cudaErrchk(cudaMalloc((void**)&system_matrix_upperblk_ptr_d[i], batch_size * sizeof(complex_d*)));
         cudaErrchk(cudaMalloc((void**)&system_matrix_lowerblk_ptr_d[i], batch_size * sizeof(complex_d*)));
+        cudaErrchk(cudaMalloc((void**)&system_matrix_upper_lowerblk_ptr_d[i], 2*batch_size * sizeof(complex_d*)));
+
         cudaErrchk(cudaMalloc((void**)&self_energy_lesser_diagblk_ptr_d[i], batch_size * sizeof(complex_d*)));
-        cudaErrchk(cudaMalloc((void**)&self_energy_lesser_upperblk_ptr_d[i], batch_size * sizeof(complex_d*)));
         cudaErrchk(cudaMalloc((void**)&self_energy_greater_diagblk_ptr_d[i], batch_size * sizeof(complex_d*)));
-        cudaErrchk(cudaMalloc((void**)&self_energy_greater_upperblk_ptr_d[i], batch_size * sizeof(complex_d*)));
+
+        cudaErrchk(cudaMalloc((void**)&system_matrix_lowerblk_ptr_twice_d[i], 2*batch_size * sizeof(complex_d*)));
+        cudaErrchk(cudaMalloc((void**)&self_energy_lesser_diagblk_ptr_twice_d[i], 2*batch_size * sizeof(complex_d*)));
+        cudaErrchk(cudaMalloc((void**)&self_energy_greater_diagblk_ptr_twice_d[i], 2*batch_size * sizeof(complex_d*)));
+
+
+        cudaErrchk(cudaMalloc((void**)&self_energy_lesser_greater_diagblk_ptr_d[i], 2*batch_size * sizeof(complex_d*)));
+        cudaErrchk(cudaMalloc((void**)&self_energy_lesser_greater_upperblk_ptr_d[i], 2*batch_size * sizeof(complex_d*)));
 
         cudaErrchk(cudaMemcpy(system_matrix_diagblk_ptr_d[i], system_matrix_diagblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
         cudaErrchk(cudaMemcpy(system_matrix_upperblk_ptr_d[i], system_matrix_upperblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
         cudaErrchk(cudaMemcpy(system_matrix_lowerblk_ptr_d[i], system_matrix_lowerblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(system_matrix_upper_lowerblk_ptr_d[i], system_matrix_upperblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(system_matrix_upper_lowerblk_ptr_d[i] + batch_size, system_matrix_lowerblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+
+
         cudaErrchk(cudaMemcpy(self_energy_lesser_diagblk_ptr_d[i], self_energy_lesser_diagblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
-        cudaErrchk(cudaMemcpy(self_energy_lesser_upperblk_ptr_d[i], self_energy_lesser_upperblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
         cudaErrchk(cudaMemcpy(self_energy_greater_diagblk_ptr_d[i], self_energy_greater_diagblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
-        cudaErrchk(cudaMemcpy(self_energy_greater_upperblk_ptr_d[i], self_energy_greater_upperblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+    
+        cudaErrchk(cudaMemcpy(system_matrix_lowerblk_ptr_twice_d[i], system_matrix_lowerblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(system_matrix_lowerblk_ptr_twice_d[i] + batch_size, system_matrix_lowerblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(self_energy_lesser_diagblk_ptr_twice_d[i], self_energy_lesser_diagblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(self_energy_lesser_diagblk_ptr_twice_d[i] + batch_size, self_energy_lesser_diagblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(self_energy_greater_diagblk_ptr_twice_d[i], self_energy_greater_diagblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(self_energy_greater_diagblk_ptr_twice_d[i] + batch_size, self_energy_greater_diagblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+
+        cudaErrchk(cudaMemcpy(self_energy_lesser_greater_diagblk_ptr_d[i], self_energy_lesser_diagblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(self_energy_lesser_greater_diagblk_ptr_d[i] + batch_size, self_energy_greater_diagblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(self_energy_lesser_greater_upperblk_ptr_d[i], self_energy_lesser_upperblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(self_energy_lesser_greater_upperblk_ptr_d[i] + batch_size, self_energy_greater_upperblk_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
     }
+    cudaErrchk(cudaMalloc((void**)&system_matrix_diagblk_ptr_scuffed_d, 2*batch_size * sizeof(complex_d*)));
+    cudaErrchk(cudaMemcpy(system_matrix_diagblk_ptr_scuffed_d, system_matrix_diagblk_ptr_h[0], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMemcpy(system_matrix_diagblk_ptr_scuffed_d + batch_size, system_matrix_diagblk_ptr_h[1], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMalloc((void**)&self_energy_lesser_diagblk_ptr_scuffed_d, 2*batch_size * sizeof(complex_d*)));
+    cudaErrchk(cudaMemcpy(self_energy_lesser_diagblk_ptr_scuffed_d, self_energy_lesser_diagblk_ptr_h[0], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMemcpy(self_energy_lesser_diagblk_ptr_scuffed_d + batch_size, self_energy_lesser_diagblk_ptr_h[1], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
 
     // allocate memory for the inverse
     complex_d* inv_diagblk_d = NULL;
@@ -189,14 +228,14 @@ void rgf_lesser_greater_batched_optimized(
     complex_d* greater_inv_diagblk_small_ptr_h[2][batch_size];
 
     complex_d** inv_diagblk_ptr_d;
-    complex_d** lesser_inv_diagblk_ptr_d;
-    complex_d** lesser_inv_upperblk_ptr_d;
-    complex_d** greater_inv_diagblk_ptr_d;
-    complex_d** greater_inv_upperblk_ptr_d;
+    complex_d** inv_diagblk_ptr_twice_d;
     complex_d** inv_diagblk_small_ptr_d[2];
-    complex_d** lesser_inv_diagblk_small_ptr_d[2];
-    complex_d** greater_inv_diagblk_small_ptr_d[2];
+    complex_d** inv_diagblk_small_ptr_twice_d[2];
 
+    complex_d** lesser_greater_inv_diagblk_small_ptr_d[2];
+
+    complex_d** lesser_greater_inv_diagblk_ptr_d;
+    complex_d** lesser_greater_inv_upperblk_ptr_d;
 
     cudaErrchk(cudaMalloc((void**)&inv_diagblk_d, batch_size * blocksize * blocksize * sizeof(complex_d)));
     cudaErrchk(cudaMalloc((void**)&lesser_inv_diagblk_d, batch_size * blocksize * blocksize * sizeof(complex_d)));
@@ -223,27 +262,36 @@ void rgf_lesser_greater_batched_optimized(
     }
 
     cudaErrchk(cudaMalloc((void**)&inv_diagblk_ptr_d, batch_size * sizeof(complex_d*)));
-    cudaErrchk(cudaMalloc((void**)&lesser_inv_diagblk_ptr_d, batch_size * sizeof(complex_d*)));
-    cudaErrchk(cudaMalloc((void**)&lesser_inv_upperblk_ptr_d, batch_size * sizeof(complex_d*)));
-    cudaErrchk(cudaMalloc((void**)&greater_inv_diagblk_ptr_d, batch_size * sizeof(complex_d*)));
-    cudaErrchk(cudaMalloc((void**)&greater_inv_upperblk_ptr_d, batch_size * sizeof(complex_d*)));
+    cudaErrchk(cudaMalloc((void**)&inv_diagblk_ptr_twice_d, 2*batch_size * sizeof(complex_d*)));
+
+    cudaErrchk(cudaMalloc((void**)&lesser_greater_inv_diagblk_ptr_d, 2*batch_size * sizeof(complex_d*)));
+    cudaErrchk(cudaMalloc((void**)&lesser_greater_inv_upperblk_ptr_d, 2*batch_size * sizeof(complex_d*)));
+
+
     for(int i = 0; i < 2; i++){
         cudaErrchk(cudaMalloc((void**)&inv_diagblk_small_ptr_d[i], batch_size * sizeof(complex_d*)));
-        cudaErrchk(cudaMalloc((void**)&lesser_inv_diagblk_small_ptr_d[i], batch_size * sizeof(complex_d*)));
-        cudaErrchk(cudaMalloc((void**)&greater_inv_diagblk_small_ptr_d[i], batch_size * sizeof(complex_d*)));
+        cudaErrchk(cudaMalloc((void**)&inv_diagblk_small_ptr_twice_d[i], 2*batch_size * sizeof(complex_d*)));
+        cudaErrchk(cudaMalloc((void**)&lesser_greater_inv_diagblk_small_ptr_d[i], 2*batch_size * sizeof(complex_d*)));
     }
 
     cudaErrchk(cudaMemcpy(inv_diagblk_ptr_d, inv_diagblk_ptr_h, batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
-    cudaErrchk(cudaMemcpy(lesser_inv_diagblk_ptr_d, lesser_inv_diagblk_ptr_h, batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
-    cudaErrchk(cudaMemcpy(lesser_inv_upperblk_ptr_d, lesser_inv_upperblk_ptr_h, batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
-    cudaErrchk(cudaMemcpy(greater_inv_diagblk_ptr_d, greater_inv_diagblk_ptr_h, batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
-    cudaErrchk(cudaMemcpy(greater_inv_upperblk_ptr_d, greater_inv_upperblk_ptr_h, batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+
+    // copy the pointers twice for stacking lesser and greater
+    cudaErrchk(cudaMemcpy(inv_diagblk_ptr_twice_d, inv_diagblk_ptr_h, batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMemcpy(inv_diagblk_ptr_twice_d + batch_size, inv_diagblk_ptr_h, batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+
     for(int i = 0; i < 2; i++){
         cudaErrchk(cudaMemcpy(inv_diagblk_small_ptr_d[i], inv_diagblk_small_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
-        cudaErrchk(cudaMemcpy(lesser_inv_diagblk_small_ptr_d[i], lesser_inv_diagblk_small_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
-        cudaErrchk(cudaMemcpy(greater_inv_diagblk_small_ptr_d[i], greater_inv_diagblk_small_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(inv_diagblk_small_ptr_twice_d[i], inv_diagblk_small_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(inv_diagblk_small_ptr_twice_d[i] + batch_size, inv_diagblk_small_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(lesser_greater_inv_diagblk_small_ptr_d[i], lesser_inv_diagblk_small_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+        cudaErrchk(cudaMemcpy(lesser_greater_inv_diagblk_small_ptr_d[i] + batch_size, greater_inv_diagblk_small_ptr_h[i], batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
     }
 
+    cudaErrchk(cudaMemcpy(lesser_greater_inv_diagblk_ptr_d, lesser_inv_diagblk_ptr_h, batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMemcpy(lesser_greater_inv_diagblk_ptr_d + batch_size, greater_inv_diagblk_ptr_h, batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMemcpy(lesser_greater_inv_upperblk_ptr_d, lesser_inv_upperblk_ptr_h, batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
+    cudaErrchk(cudaMemcpy(lesser_greater_inv_upperblk_ptr_d + batch_size, greater_inv_upperblk_ptr_h, batch_size * sizeof(complex_d*), cudaMemcpyHostToDevice));
 
     //memory for pivoting
     int *ipiv_d = NULL;
@@ -290,8 +338,6 @@ void rgf_lesser_greater_batched_optimized(
     cudaErrchk(cudaEventRecord(schur_inverted[0], stream[stream_compute]));
 
 
-    alpha = make_cuDoubleComplex(1.0, 0.0);
-    beta = make_cuDoubleComplex(0.0, 0.0);
 
     // use self_energy_lesser_upperblk_d[stream_compute]
     // as temporary buffer
@@ -300,43 +346,27 @@ void rgf_lesser_greater_batched_optimized(
     //     Sigma_lesser_greater[0:blocksize, 0:blocksize] @ 
     //     g_retarded[0:blocksize, 0:blocksize].conj().T
 
+    alpha = make_cuDoubleComplex(1.0, 0.0);
+    beta = make_cuDoubleComplex(0.0, 0.0);
 
     cublasErrchk(cublasZgemmBatched(
         cublas_handle[stream_compute],
         CUBLAS_OP_N, CUBLAS_OP_C,
         blocksize, blocksize, blocksize,
         &alpha,
-        self_energy_lesser_diagblk_ptr_d[stream_compute], blocksize,
-        inv_diagblk_ptr_d, blocksize,
+        self_energy_lesser_greater_diagblk_ptr_d[stream_compute], blocksize,
+        inv_diagblk_ptr_twice_d, blocksize,
         &beta,
-        self_energy_lesser_upperblk_ptr_d[stream_compute], blocksize, batch_size));
+        self_energy_lesser_greater_upperblk_ptr_d[stream_compute], blocksize, 2*batch_size));
     cublasErrchk(cublasZgemmBatched(
         cublas_handle[stream_compute],
         CUBLAS_OP_N, CUBLAS_OP_N,
         blocksize, blocksize, blocksize,
         &alpha,
-        inv_diagblk_ptr_d, blocksize,
-        self_energy_lesser_upperblk_ptr_d[stream_compute], blocksize,
+        inv_diagblk_ptr_twice_d, blocksize,
+        self_energy_lesser_greater_upperblk_ptr_d[stream_compute], blocksize,
         &beta,
-        lesser_inv_diagblk_ptr_d, blocksize, batch_size));
-    cublasErrchk(cublasZgemmBatched(
-        cublas_handle[stream_compute],
-        CUBLAS_OP_N, CUBLAS_OP_C,
-        blocksize, blocksize, blocksize,
-        &alpha,
-        self_energy_greater_diagblk_ptr_d[stream_compute], blocksize,
-        inv_diagblk_ptr_d, blocksize,
-        &beta,
-        self_energy_greater_upperblk_ptr_d[stream_compute], blocksize, batch_size));
-    cublasErrchk(cublasZgemmBatched(
-        cublas_handle[stream_compute],
-        CUBLAS_OP_N, CUBLAS_OP_N,
-        blocksize, blocksize, blocksize,
-        &alpha,
-        inv_diagblk_ptr_d, blocksize,
-        self_energy_greater_upperblk_ptr_d[stream_compute], blocksize,
-        &beta,
-        greater_inv_diagblk_ptr_d, blocksize, batch_size));
+        lesser_greater_inv_diagblk_ptr_d, blocksize, 2*batch_size));
     
     cudaErrchk(cudaEventRecord(lesser_greater_calculated[0], stream[stream_compute]));
 
@@ -457,17 +487,19 @@ void rgf_lesser_greater_batched_optimized(
         //System_matrix[i_, i_minus_one_] @ g_lesser_greater[i_minus_one_, i_minus_one_]
         alpha = make_cuDoubleComplex(1.0, 0.0);
         beta = make_cuDoubleComplex(0.0, 0.0);
-        // use  lesser_inv_upperblk_d as temporary buffer
+
+        // use  lesser_inv_upperblk_d as temporary buffer and greater_inv_upperblk_d
         cublasErrchk(cublasZgemmBatched(
             cublas_handle[stream_compute],
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
-            system_matrix_lowerblk_ptr_d[stream_compute], blocksize,
-            lesser_inv_diagblk_ptr_d, blocksize,
+            system_matrix_lowerblk_ptr_twice_d[stream_compute], blocksize,
+            lesser_greater_inv_diagblk_ptr_d, blocksize,
             &beta,
-            lesser_inv_upperblk_ptr_d, blocksize, batch_size));
-    
+            lesser_greater_inv_upperblk_ptr_d, blocksize, 2*batch_size));
+
+        
         // System_matrix[i_, i_minus_one_] @
         //                 g_lesser_greater[i_minus_one_, i_minus_one_]
         //             + Sigma_lesser_greater[i_minus_one_, i_].conj().T @
@@ -479,47 +511,14 @@ void rgf_lesser_greater_batched_optimized(
             CUBLAS_OP_C, CUBLAS_OP_C,
             blocksize, blocksize, blocksize,
             &alpha,
-            self_energy_lesser_upperblk_ptr_d[stream_compute], blocksize,
-            inv_diagblk_ptr_d, blocksize,
+            self_energy_lesser_greater_upperblk_ptr_d[stream_compute], blocksize,
+            inv_diagblk_ptr_twice_d, blocksize,
             &beta,
-            lesser_inv_upperblk_ptr_d, blocksize, batch_size));
-
-        alpha = make_cuDoubleComplex(1.0, 0.0);
-        beta = make_cuDoubleComplex(0.0, 0.0);
-        // use  greater_inv_upperblk_d as temporary buffer
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_N,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            system_matrix_lowerblk_ptr_d[stream_compute], blocksize,
-            greater_inv_diagblk_ptr_d, blocksize,
-            &beta,
-            greater_inv_upperblk_ptr_d, blocksize, batch_size));
-    
-        // System_matrix[i_, i_minus_one_] @
-        //                 g_lesser_greater[i_minus_one_, i_minus_one_]
-        //             + Sigma_lesser_greater[i_minus_one_, i_].conj().T @
-        //                 g_retarded[i_minus_one_, i_minus_one_].conj().T
-
-        beta = make_cuDoubleComplex(1.0, 0.0);
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_C, CUBLAS_OP_C,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            self_energy_greater_upperblk_ptr_d[stream_compute], blocksize,
-            inv_diagblk_ptr_d, blocksize,
-            &beta,
-            greater_inv_upperblk_ptr_d, blocksize, batch_size));
-
-
+            lesser_greater_inv_upperblk_ptr_d, blocksize, 2*batch_size));
 
 
         // wait to not overwrite block to unload_diag
         cudaErrchk(cudaStreamWaitEvent(stream[stream_compute], unload_diag[i-1]));
-
-
 
 
         // inverse schur complement
@@ -550,6 +549,7 @@ void rgf_lesser_greater_batched_optimized(
         // - tmp @
         //     Sigma_lesser_greater[i_minus_one_, i_] 
         // tmp = inv_diagblk_small_d[stream_compute]
+
         alpha = make_cuDoubleComplex(-1.0, 0.0);
         beta = make_cuDoubleComplex(1.0, 0.0);
         cublasErrchk(cublasZgemmBatched(
@@ -557,49 +557,14 @@ void rgf_lesser_greater_batched_optimized(
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
-            inv_diagblk_small_ptr_d[stream_compute], blocksize,
-            self_energy_lesser_upperblk_ptr_d[stream_compute], blocksize,
+            inv_diagblk_small_ptr_twice_d[stream_compute], blocksize,
+            self_energy_lesser_greater_upperblk_ptr_d[stream_compute], blocksize,
             &beta,
-            self_energy_lesser_diagblk_ptr_d[stream_compute], blocksize, batch_size));
-        
-        // Sigma_lesser_greater[i_, i_]
-        // - tmp @
-        //     Sigma_lesser_greater[i_minus_one_, i_]                
-        // + (System_matrix[i_, i_minus_one_] @
-        //     g_lesser_greater[i_minus_one_, i_minus_one_]
-        // - Sigma_lesser_greater[i_, i_minus_one_] @
-        //     g_retarded[i_minus_one_, i_minus_one_].conj().T )@
-        //     System_matrix[i_, i_minus_one_].conj().T
-        alpha = make_cuDoubleComplex(1.0, 0.0);
-        beta = make_cuDoubleComplex(1.0, 0.0);
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_C,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            lesser_inv_upperblk_ptr_d, blocksize,
-            system_matrix_lowerblk_ptr_d[stream_compute], blocksize,
-            &beta,
-            self_energy_lesser_diagblk_ptr_d[stream_compute], blocksize, batch_size));
+            self_energy_lesser_greater_diagblk_ptr_d[stream_compute], blocksize, 2*batch_size));
+
 
         // Sigma_lesser_greater[i_, i_]
         // - tmp @
-        //     Sigma_lesser_greater[i_minus_one_, i_] 
-        // tmp = inv_diagblk_small_d[stream_compute]
-        alpha = make_cuDoubleComplex(-1.0, 0.0);
-        beta = make_cuDoubleComplex(1.0, 0.0);
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_N,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            inv_diagblk_small_ptr_d[stream_compute], blocksize,
-            self_energy_greater_upperblk_ptr_d[stream_compute], blocksize,
-            &beta,
-            self_energy_greater_diagblk_ptr_d[stream_compute], blocksize, batch_size));
-        
-        // Sigma_lesser_greater[i_, i_]
-        // - tmp @
         //     Sigma_lesser_greater[i_minus_one_, i_]                
         // + (System_matrix[i_, i_minus_one_] @
         //     g_lesser_greater[i_minus_one_, i_minus_one_]
@@ -613,10 +578,11 @@ void rgf_lesser_greater_batched_optimized(
             CUBLAS_OP_N, CUBLAS_OP_C,
             blocksize, blocksize, blocksize,
             &alpha,
-            greater_inv_upperblk_ptr_d, blocksize,
-            system_matrix_lowerblk_ptr_d[stream_compute], blocksize,
+            lesser_greater_inv_upperblk_ptr_d, blocksize,
+            system_matrix_lowerblk_ptr_twice_d[stream_compute], blocksize,
             &beta,
-            self_energy_greater_diagblk_ptr_d[stream_compute], blocksize, batch_size));
+            self_energy_lesser_greater_diagblk_ptr_d[stream_compute], blocksize, 2*batch_size));
+
 
         // g_lesser_greater[i_, i_] = (
         //     g_retarded[i_, i_]
@@ -627,42 +593,27 @@ void rgf_lesser_greater_batched_optimized(
         // use self_energy_lesser_upperblk_d[stream_compute] as temporary buffer
         alpha = make_cuDoubleComplex(1.0, 0.0);
         beta = make_cuDoubleComplex(0.0, 0.0);
+        
         cublasErrchk(cublasZgemmBatched(
             cublas_handle[stream_compute],
             CUBLAS_OP_N, CUBLAS_OP_C,
             blocksize, blocksize, blocksize,
             &alpha,
-            self_energy_lesser_diagblk_ptr_d[stream_compute], blocksize,
-            inv_diagblk_ptr_d, blocksize,
+            self_energy_lesser_greater_diagblk_ptr_d[stream_compute], blocksize,
+            inv_diagblk_ptr_twice_d, blocksize,
             &beta,
-            self_energy_lesser_upperblk_ptr_d[stream_compute], blocksize, batch_size));
+            self_energy_lesser_greater_upperblk_ptr_d[stream_compute], blocksize, 2*batch_size));
+
         cublasErrchk(cublasZgemmBatched(
             cublas_handle[stream_compute],
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
-            inv_diagblk_ptr_d, blocksize,
-            self_energy_lesser_upperblk_ptr_d[stream_compute], blocksize,
+            inv_diagblk_ptr_twice_d, blocksize,
+            self_energy_lesser_greater_upperblk_ptr_d[stream_compute], blocksize,
             &beta,
-            lesser_inv_diagblk_ptr_d, blocksize, batch_size));
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_C,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            self_energy_greater_diagblk_ptr_d[stream_compute], blocksize,
-            inv_diagblk_ptr_d, blocksize,
-            &beta,
-            self_energy_greater_upperblk_ptr_d[stream_compute], blocksize, batch_size));
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_N,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            inv_diagblk_ptr_d, blocksize,
-            self_energy_greater_upperblk_ptr_d[stream_compute], blocksize,
-            &beta,
-            greater_inv_diagblk_ptr_d, blocksize, batch_size));
+            lesser_greater_inv_diagblk_ptr_d, blocksize, 2*batch_size));
+
 
         cudaErrchk(cudaEventRecord(lesser_greater_calculated[i], stream[stream_compute]));
 
@@ -759,32 +710,8 @@ void rgf_lesser_greater_batched_optimized(
         // buf4_greater = self_energy_greater_upperblk_d[stream_compute]
         complex_d *buf4_lesser_d = self_energy_lesser_upperblk_d[stream_compute];
         complex_d *buf4_greater_d = self_energy_greater_upperblk_d[stream_compute];
-        complex_d **buf4_lesser_ptr_d = self_energy_lesser_upperblk_ptr_d[stream_compute];
-        complex_d **buf4_greater_ptr_d = self_energy_greater_upperblk_ptr_d[stream_compute];
-        alpha = make_cuDoubleComplex(1.0, 0.0);
-        beta = make_cuDoubleComplex(0.0, 0.0);
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_C,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            inv_diagblk_ptr_d, blocksize,
-            self_energy_lesser_upperblk_ptr_d[stream_compute], blocksize,
-            &beta,
-            self_energy_lesser_diagblk_ptr_d[stream_compute], blocksize, batch_size));
-        // self_energy_lesser_upperblk_d[stream_compute] will be overwritten
-        // okay since it not used anymore
-        alpha = make_cuDoubleComplex(-1.0, 0.0);
-        beta = make_cuDoubleComplex(0.0, 0.0);
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_C,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            self_energy_lesser_diagblk_ptr_d[stream_compute], blocksize,
-            inv_diagblk_small_ptr_d[stream_compute], blocksize,
-            &beta,
-            buf4_lesser_ptr_d, blocksize, batch_size));
+
+        complex_d **buf4_lesser_greater_ptr_d = self_energy_lesser_greater_upperblk_ptr_d[stream_compute];
 
         alpha = make_cuDoubleComplex(1.0, 0.0);
         beta = make_cuDoubleComplex(0.0, 0.0);
@@ -793,11 +720,13 @@ void rgf_lesser_greater_batched_optimized(
             CUBLAS_OP_N, CUBLAS_OP_C,
             blocksize, blocksize, blocksize,
             &alpha,
-            inv_diagblk_ptr_d, blocksize,
-            self_energy_greater_upperblk_ptr_d[stream_compute], blocksize,
+            inv_diagblk_ptr_twice_d, blocksize,
+            self_energy_lesser_greater_upperblk_ptr_d[stream_compute], blocksize,
             &beta,
-            self_energy_lesser_diagblk_ptr_d[stream_compute], blocksize, batch_size));
-        // self_energy_lesser_upperblk_d[stream_compute] will be overwritten
+            self_energy_lesser_greater_diagblk_ptr_d[stream_compute], blocksize, 2*batch_size));
+
+
+        // self_energy_lesser_greater_upperblk_d[stream_compute] will be overwritten
         // okay since it not used anymore
         alpha = make_cuDoubleComplex(-1.0, 0.0);
         beta = make_cuDoubleComplex(0.0, 0.0);
@@ -806,10 +735,10 @@ void rgf_lesser_greater_batched_optimized(
             CUBLAS_OP_N, CUBLAS_OP_C,
             blocksize, blocksize, blocksize,
             &alpha,
-            self_energy_lesser_diagblk_ptr_d[stream_compute], blocksize,
-            inv_diagblk_small_ptr_d[stream_compute], blocksize,
+            self_energy_lesser_greater_diagblk_ptr_d[stream_compute], blocksize,
+            inv_diagblk_small_ptr_twice_d[stream_compute], blocksize,
             &beta,
-            buf4_greater_ptr_d, blocksize, batch_size));
+            buf4_lesser_greater_ptr_d, blocksize, 2*batch_size));
 
 
         // buf2 = (G_tmp @    
@@ -817,6 +746,7 @@ void rgf_lesser_greater_batched_optimized(
         // buf2 = self_energy_lesser_diagblk_d[stream_compute]
         alpha = make_cuDoubleComplex(1.0, 0.0);
         complex_d **buf2_ptr_d = self_energy_lesser_diagblk_ptr_d[stream_compute];
+        complex_d **buf2_ptr_twice_d = self_energy_lesser_diagblk_ptr_twice_d[stream_compute];
         cublasErrchk(cublasZgemmBatched(
             cublas_handle[stream_compute],
             CUBLAS_OP_N, CUBLAS_OP_N,
@@ -833,6 +763,7 @@ void rgf_lesser_greater_batched_optimized(
         // buf1 = self_energy_greater_diagblk_d[stream_compute]
         // since it is only used in the forward pass
         complex_d **buf1_ptr_d = self_energy_greater_diagblk_ptr_d[stream_compute];
+        complex_d **buf1_ptr_twice_d = self_energy_greater_diagblk_ptr_twice_d[stream_compute];
         cublasErrchk(cublasZgemmBatched(
             cublas_handle[stream_compute],
             CUBLAS_OP_N, CUBLAS_OP_N,
@@ -879,10 +810,14 @@ void rgf_lesser_greater_batched_optimized(
         // buf5 = system_matrix_diagblk_d
         // buf5_lesser = system_matrix_diagblk_d[stream_compute]
         // buf5_greater = system_matrix_diagblk_d[stream_memload]
-        complex_d *buf5_lesser_d = system_matrix_diagblk_d[stream_compute];
-        complex_d *buf5_greater_d = system_matrix_diagblk_d[stream_memload];
-        complex_d **buf5_lesser_ptr_d = system_matrix_diagblk_ptr_d[stream_compute];
-        complex_d **buf5_greater_ptr_d = system_matrix_diagblk_ptr_d[stream_memload];
+        // important to fix streams such that pointers do not swap in the combined call
+        complex_d *buf5_lesser_d = system_matrix_diagblk_d[0];
+        complex_d *buf5_greater_d = system_matrix_diagblk_d[1];
+        // scuffed because first half points on stream_compute and second half on stream_memload
+        complex_d **buf5_lesser_greater_ptr_d = system_matrix_diagblk_ptr_scuffed_d;
+
+
+
         alpha = make_cuDoubleComplex(1.0, 0.0);
         beta = make_cuDoubleComplex(0.0, 0.0);
         cublasErrchk(cublasZgemmBatched(
@@ -890,19 +825,10 @@ void rgf_lesser_greater_batched_optimized(
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
-            buf2_ptr_d, blocksize,
-            lesser_inv_diagblk_small_ptr_d[stream_compute], blocksize,
+            buf2_ptr_twice_d, blocksize,
+            lesser_greater_inv_diagblk_small_ptr_d[stream_compute], blocksize,
             &beta,
-            buf5_lesser_ptr_d, blocksize, batch_size));
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_N,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            buf2_ptr_d, blocksize,
-            greater_inv_diagblk_small_ptr_d[stream_compute], blocksize,
-            &beta,
-            buf5_greater_ptr_d, blocksize, batch_size));
+            buf5_lesser_greater_ptr_d, blocksize, 2*batch_size));
 
 
         // buf3 is  for both lesser and greater and now memory for both seperately is needed
@@ -914,27 +840,17 @@ void rgf_lesser_greater_batched_optimized(
         // )
         complex_d *buf3_lesser_d = system_matrix_upperblk_d[stream_compute];
         complex_d *buf3_greater_d = system_matrix_lowerblk_d[stream_compute];
-        complex_d **buf3_lesser_ptr_d = system_matrix_upperblk_ptr_d[stream_compute];
-        complex_d **buf3_greater_ptr_d = system_matrix_lowerblk_ptr_d[stream_compute];
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_C,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            lesser_inv_diagblk_ptr_d, blocksize,
-            buf1_ptr_d, blocksize,
-            &beta,
-            buf3_lesser_ptr_d, blocksize, batch_size));
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_C,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            greater_inv_diagblk_ptr_d, blocksize,
-            buf1_ptr_d, blocksize,
-            &beta,
-            buf3_greater_ptr_d, blocksize, batch_size));
+        complex_d **buf3_lesser_greater_ptr_d = system_matrix_upper_lowerblk_ptr_d[stream_compute];
 
+        cublasErrchk(cublasZgemmBatched(
+            cublas_handle[stream_compute],
+            CUBLAS_OP_N, CUBLAS_OP_C,
+            blocksize, blocksize, blocksize,
+            &alpha,
+            lesser_greater_inv_diagblk_ptr_d, blocksize,
+            buf1_ptr_twice_d, blocksize,
+            &beta,
+            buf3_lesser_greater_ptr_d, blocksize, 2*batch_size));
 
 
         cudaErrchk(cudaStreamWaitEvent(stream[stream_compute], unload_upper[i+1]));
@@ -1016,10 +932,10 @@ void rgf_lesser_greater_batched_optimized(
         // buf6 = (buf1 @ buf4)
         // buf6_lesser = self_energy_lesser_diagblk_d[stream_compute]
         // buf6_greater = self_energy_lesser_diagblk_d[stream_memload]
-        complex_d *buf6_lesser_d = self_energy_lesser_diagblk_d[stream_compute];
-        complex_d *buf6_greater_d = self_energy_lesser_diagblk_d[stream_memload];
-        complex_d **buf6_lesser_ptr_d = self_energy_lesser_diagblk_ptr_d[stream_compute];
-        complex_d **buf6_greater_ptr_d = self_energy_lesser_diagblk_ptr_d[stream_memload];
+        complex_d *buf6_lesser_d = self_energy_lesser_diagblk_d[0];
+        complex_d *buf6_greater_d = self_energy_lesser_diagblk_d[1];
+        complex_d **buf6_lesser_greater_ptr_d = self_energy_lesser_diagblk_ptr_scuffed_d;
+
         alpha = make_cuDoubleComplex(1.0, 0.0);
         beta = make_cuDoubleComplex(0.0, 0.0);
         cublasErrchk(cublasZgemmBatched(
@@ -1027,45 +943,27 @@ void rgf_lesser_greater_batched_optimized(
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
-            buf1_ptr_d, blocksize,
-            buf4_lesser_ptr_d, blocksize,
+            buf1_ptr_twice_d, blocksize,
+            buf4_lesser_greater_ptr_d, blocksize,
             &beta,
-            buf6_lesser_ptr_d, blocksize, batch_size));
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_N,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            buf1_ptr_d, blocksize,
-            buf4_greater_ptr_d, blocksize,
-            &beta,
-            buf6_greater_ptr_d, blocksize, batch_size));
+            buf6_lesser_greater_ptr_d, blocksize, 2*batch_size));
 
         // buf8 = (buf1 @ buf5)
         // buf8_lesser = self_energy_lesser_upperblk_d[stream_compute]
         // buf8_greater = self_energy_greater_upperblk_d[stream_compute]
         complex_d *buf8_lesser_d = self_energy_lesser_upperblk_d[stream_compute];
         complex_d *buf8_greater_d = self_energy_greater_upperblk_d[stream_compute];
-        complex_d **buf8_lesser_ptr_d = self_energy_lesser_upperblk_ptr_d[stream_compute];
-        complex_d **buf8_greater_ptr_d = self_energy_greater_upperblk_ptr_d[stream_compute];
+        complex_d **buf8_lesser_greater_ptr_d = self_energy_lesser_greater_upperblk_ptr_d[stream_compute];
+
         cublasErrchk(cublasZgemmBatched(
             cublas_handle[stream_compute],
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
-            buf1_ptr_d, blocksize,
-            buf5_lesser_ptr_d, blocksize,
+            buf1_ptr_twice_d, blocksize,
+            buf5_lesser_greater_ptr_d, blocksize,
             &beta,
-            buf8_lesser_ptr_d, blocksize, batch_size));
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_N,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            buf1_ptr_d, blocksize,
-            buf5_greater_ptr_d, blocksize,
-            &beta,
-            buf8_greater_ptr_d, blocksize, batch_size));
+            buf8_lesser_greater_ptr_d, blocksize, 2*batch_size));
 
 
         // g_lesser_greater[i_, i_]
@@ -1077,19 +975,11 @@ void rgf_lesser_greater_batched_optimized(
             CUBLAS_OP_N, CUBLAS_OP_N,
             blocksize, blocksize, blocksize,
             &alpha,
-            buf1_ptr_d, blocksize,
-            buf3_lesser_ptr_d, blocksize,
+            buf1_ptr_twice_d, blocksize,
+            buf3_lesser_greater_ptr_d, blocksize,
             &beta,
-            lesser_inv_diagblk_small_ptr_d[stream_compute], blocksize, batch_size));
-        cublasErrchk(cublasZgemmBatched(
-            cublas_handle[stream_compute],
-            CUBLAS_OP_N, CUBLAS_OP_N,
-            blocksize, blocksize, blocksize,
-            &alpha,
-            buf1_ptr_d, blocksize,
-            buf3_greater_ptr_d, blocksize,
-            &beta,
-            greater_inv_diagblk_small_ptr_d[stream_compute], blocksize, batch_size));
+            lesser_greater_inv_diagblk_small_ptr_d[stream_compute], blocksize, 2*batch_size));
+
 
         // playing tricks with geam
         // since the memory is contiguous
@@ -1307,27 +1197,50 @@ void rgf_lesser_greater_batched_optimized(
         if(system_matrix_lowerblk_ptr_d[i]) {
             cudaErrchk(cudaFree(system_matrix_lowerblk_ptr_d[i]));
         }
+        if(system_matrix_upper_lowerblk_ptr_d[i]) {
+            cudaErrchk(cudaFree(system_matrix_upper_lowerblk_ptr_d[i]));
+        }
+
         if(self_energy_lesser_diagblk_ptr_d[i]) {
             cudaErrchk(cudaFree(self_energy_lesser_diagblk_ptr_d[i]));
         }
-        if(self_energy_lesser_upperblk_ptr_d[i]) {
-            cudaErrchk(cudaFree(self_energy_lesser_upperblk_ptr_d[i]));
-        }
+
         if(self_energy_greater_diagblk_ptr_d[i]) {
             cudaErrchk(cudaFree(self_energy_greater_diagblk_ptr_d[i]));
         }
-        if(self_energy_greater_upperblk_ptr_d[i]) {
-            cudaErrchk(cudaFree(self_energy_greater_upperblk_ptr_d[i]));
+
+
+        if(self_energy_lesser_greater_diagblk_ptr_d[i]) {
+            cudaErrchk(cudaFree(self_energy_lesser_greater_diagblk_ptr_d[i]));
         }
+        if(self_energy_lesser_diagblk_ptr_twice_d[i]){
+            cudaErrchk(cudaFree(self_energy_lesser_diagblk_ptr_twice_d[i]));
+        }
+        if(self_energy_greater_diagblk_ptr_twice_d[i]){
+            cudaErrchk(cudaFree(self_energy_greater_diagblk_ptr_twice_d[i]));
+        }
+
+
+        if(self_energy_lesser_greater_upperblk_ptr_d[i]) {
+            cudaErrchk(cudaFree(self_energy_lesser_greater_upperblk_ptr_d[i]));
+        }
+
+        if(system_matrix_lowerblk_ptr_twice_d[i]) {
+            cudaErrchk(cudaFree(system_matrix_lowerblk_ptr_twice_d[i]));
+        }
+
         if(inv_diagblk_small_ptr_d[i]) {
             cudaErrchk(cudaFree(inv_diagblk_small_ptr_d[i]));
         }
-        if(lesser_inv_diagblk_small_ptr_d[i]){
-            cudaErrchk(cudaFree(lesser_inv_diagblk_small_ptr_d[i]));
+        if(inv_diagblk_small_ptr_twice_d){
+            cudaErrchk(cudaFree(inv_diagblk_small_ptr_twice_d[i]));
         }
-        if(greater_inv_diagblk_small_ptr_d[i]){
-            cudaErrchk(cudaFree(greater_inv_diagblk_small_ptr_d[i]));
+
+
+        if(lesser_greater_inv_diagblk_small_ptr_d[i]){
+            cudaErrchk(cudaFree(lesser_greater_inv_diagblk_small_ptr_d[i]));
         }
+
         if(lesser_inv_diagblk_small_d[i]){
             cudaErrchk(cudaFree(lesser_inv_diagblk_small_d[i]));
         }
@@ -1336,26 +1249,27 @@ void rgf_lesser_greater_batched_optimized(
         }
 
     }
-
-
-
-
-    if(lesser_inv_upperblk_ptr_d){
-        cudaErrchk(cudaFree(lesser_inv_upperblk_ptr_d));
+    if(system_matrix_diagblk_ptr_scuffed_d){
+        cudaErrchk(cudaFree(system_matrix_diagblk_ptr_scuffed_d));
     }
-    if(greater_inv_upperblk_ptr_d){
-        cudaErrchk(cudaFree(greater_inv_upperblk_ptr_d));
+    if(self_energy_lesser_diagblk_ptr_scuffed_d){
+        cudaErrchk(cudaFree(self_energy_lesser_diagblk_ptr_scuffed_d));
     }
+
+
     if(inv_diagblk_ptr_d){
         cudaErrchk(cudaFree(inv_diagblk_ptr_d));
     }
-    if(lesser_inv_diagblk_ptr_d){
-        cudaErrchk(cudaFree(lesser_inv_diagblk_ptr_d));
-    }
-    if(greater_inv_diagblk_ptr_d){
-        cudaErrchk(cudaFree(greater_inv_diagblk_ptr_d));
+    if(inv_diagblk_ptr_twice_d){
+        cudaErrchk(cudaFree(inv_diagblk_ptr_twice_d));
     }
 
+    if(lesser_greater_inv_diagblk_ptr_d){
+        cudaErrchk(cudaFree(lesser_greater_inv_diagblk_ptr_d));
+    }
+    if(lesser_greater_inv_upperblk_ptr_d){
+        cudaErrchk(cudaFree(lesser_greater_inv_upperblk_ptr_d));
+    }
 
 
     // dealocate event

@@ -387,18 +387,18 @@ int main() {
         }
     }
 
-    // rgf_lesser_greater_for(blocksize, matrix_size, batch_size,
-    //                             batch_system_matrices_diagblk_h,
-    //                             batch_system_matrices_upperblk_h,
-    //                             batch_system_matrices_lowerblk_h,
-    //                             batch_self_energy_matrices_lesser_diagblk_h,
-    //                             batch_self_energy_matrices_lesser_upperblk_h,
-    //                             batch_self_energy_matrices_greater_diagblk_h,
-    //                             batch_self_energy_matrices_greater_upperblk_h,
-    //                             batch_lesser_inv_matrices_diagblk_h,
-    //                             batch_lesser_inv_matrices_upperblk_h,
-    //                             batch_greater_inv_matrices_diagblk_h,
-    //                             batch_greater_inv_matrices_upperblk_h);
+    rgf_lesser_greater_for(blocksize, matrix_size, batch_size,
+                                batch_system_matrices_diagblk_h,
+                                batch_system_matrices_upperblk_h,
+                                batch_system_matrices_lowerblk_h,
+                                batch_self_energy_matrices_lesser_diagblk_h,
+                                batch_self_energy_matrices_lesser_upperblk_h,
+                                batch_self_energy_matrices_greater_diagblk_h,
+                                batch_self_energy_matrices_greater_upperblk_h,
+                                batch_lesser_inv_matrices_diagblk_h,
+                                batch_lesser_inv_matrices_upperblk_h,
+                                batch_greater_inv_matrices_diagblk_h,
+                                batch_greater_inv_matrices_upperblk_h);
 
     // set ouputs to zero
     for(unsigned int i = 0; i < n_blocks; i++){
@@ -417,6 +417,38 @@ int main() {
             }
         }
     }
+
+    rgf_lesser_greater_for(blocksize, matrix_size, batch_size,
+                                batch_system_matrices_diagblk_h,
+                                batch_system_matrices_upperblk_h,
+                                batch_system_matrices_lowerblk_h,
+                                batch_self_energy_matrices_lesser_diagblk_h,
+                                batch_self_energy_matrices_lesser_upperblk_h,
+                                batch_self_energy_matrices_greater_diagblk_h,
+                                batch_self_energy_matrices_greater_upperblk_h,
+                                batch_lesser_inv_matrices_diagblk_h,
+                                batch_lesser_inv_matrices_upperblk_h,
+                                batch_greater_inv_matrices_diagblk_h,
+                                batch_greater_inv_matrices_upperblk_h);
+
+    // set ouputs to zero
+    for(unsigned int i = 0; i < n_blocks; i++){
+        for(unsigned int batch = 0; batch < batch_size; batch++){
+            for(unsigned int j = 0; j < blocksize * blocksize; j++){
+                batch_lesser_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                batch_greater_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+            }
+        }
+    }
+    for(unsigned int i = 0; i < n_blocks-1; i++){
+        for(unsigned int batch = 0; batch < batch_size; batch++){
+            for(unsigned int j = 0; j < blocksize * blocksize; j++){
+                batch_lesser_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                batch_greater_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+            }
+        }
+    }
+
     rgf_lesser_greater_batched_optimized(blocksize, matrix_size, batch_size,
                                 batch_system_matrices_diagblk_h,
                                 batch_system_matrices_upperblk_h,

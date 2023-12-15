@@ -24,13 +24,9 @@ void rgf_lesser_greater(
     complex_h *system_matrix_lowerblk_h,
     complex_h *self_energy_lesser_diagblk_h,
     complex_h *self_energy_lesser_upperblk_h,
-    complex_h *self_energy_lesser_lowerblk_h,
     complex_h *self_energy_greater_diagblk_h,
     complex_h *self_energy_greater_upperblk_h,
-    complex_h *self_energy_greater_lowerblk_h,
     complex_h *lesser_inv_diagblk_h,
     complex_h *lesser_inv_upperblk_h,
-    complex_h *lesser_inv_lowerblk_h,
     complex_h *greater_inv_diagblk_h,
-    complex_h *greater_inv_upperblk_h,
-    complex_h *greater_inv_lowerblk_h);
+    complex_h *greater_inv_upperblk_h);

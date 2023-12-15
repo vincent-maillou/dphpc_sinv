@@ -16,23 +16,7 @@
 using complex_h = std::complex<double>;
 using complex_d = cuDoubleComplex;
 
-void rgf_lesser_greater_batched(
-    unsigned int blocksize,
-    unsigned int matrix_size,
-    unsigned int batch_size,
-    complex_h **system_matrix_diagblk_h,
-    complex_h **system_matrix_upperblk_h,
-    complex_h **system_matrix_lowerblk_h,
-    complex_h **self_energy_lesser_diagblk_h,
-    complex_h **self_energy_lesser_upperblk_h,
-    complex_h **self_energy_greater_diagblk_h,
-    complex_h **self_energy_greater_upperblk_h,
-    complex_h **lesser_inv_diagblk_h,
-    complex_h **lesser_inv_upperblk_h,
-    complex_h **greater_inv_diagblk_h,
-    complex_h **greater_inv_upperblk_h);
-
-void rgf_lesser_greater_for(
+void rgf_lesser_greater_batched_optimized(
     unsigned int blocksize,
     unsigned int matrix_size,
     unsigned int batch_size,

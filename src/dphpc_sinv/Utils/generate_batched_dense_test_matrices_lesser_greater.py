@@ -4,9 +4,9 @@ from dphpc_sinv.Utils import matrix_utils
 import numpy as np
 
 SEED = 8000
-MAT_SIZE = 8
-BLOCKSIZE = 2
-BATCHSIZE = 2
+MAT_SIZE = 110
+BLOCKSIZE = 11
+BATCHSIZE = 13
 PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
 
 if __name__ == "__main__":
@@ -17,12 +17,14 @@ if __name__ == "__main__":
 
     # Generate random matrices
     for i in range(BATCHSIZE):
-        system_matrix = matrix_utils.generateBandedMatrix(MAT_SIZE, BLOCKSIZE, SEED)
+        print("Generating matrix " + str(i+1) + " of " + str(BATCHSIZE))
 
-        self_energy_lesser = matrix_utils.generateBandedMatrix(MAT_SIZE, BLOCKSIZE, SEED+1)
+        system_matrix = matrix_utils.generateBandedMatrix(MAT_SIZE, BLOCKSIZE, SEED) + i * np.eye(MAT_SIZE)
+
+        self_energy_lesser = matrix_utils.generateBandedMatrix(MAT_SIZE, BLOCKSIZE, SEED+1) + 2*i * np.eye(MAT_SIZE)
         self_energy_lesser = self_energy_lesser - self_energy_lesser.conj().T
 
-        self_energy_greater = matrix_utils.generateBandedMatrix(MAT_SIZE, BLOCKSIZE, SEED+2)
+        self_energy_greater = matrix_utils.generateBandedMatrix(MAT_SIZE, BLOCKSIZE, SEED+2) + 3*i * np.eye(MAT_SIZE)
         self_energy_greater = self_energy_greater - self_energy_greater.conj().T
 
         # Assert system_matrix to be invertible

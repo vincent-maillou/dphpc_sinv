@@ -7,6 +7,9 @@ SEED = 8000
 MAT_SIZE = 5408
 BLOCKSIZE = 416
 BATCHSIZE = 112
+MAT_SIZE = 1000
+BLOCKSIZE = 100
+BATCHSIZE = 100
 PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
 
 if __name__ == "__main__":

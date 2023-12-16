@@ -299,10 +299,6 @@ void rgf_lesser_greater_batched_optimized(
     cudaErrchk(cudaMalloc((void**)&info_d, batch_size * sizeof(int)))
     cudaErrchk(cudaMalloc((void**)&ipiv_d, batch_size * blocksize*sizeof(int)));
 
-    // memory for small g
-    // large RAM consumption
-    complex_h* small_inv_diagblk_h;
-    cudaErrchk(cudaMallocHost((void**)&small_inv_diagblk_h, batch_size * n_blocks * blocksize * blocksize * sizeof(complex_h)));
 
     
     // ----- END OF INIT SECTION -----
@@ -373,7 +369,7 @@ void rgf_lesser_greater_batched_optimized(
     //wait for the inverse of the first block
     cudaErrchk(cudaStreamWaitEvent(stream[stream_memunload], schur_inverted[0]));
     // 0. Inverse of the first block
-    cudaErrchk(cudaMemcpyAsync(small_inv_diagblk_h, inv_diagblk_d,
+    cudaErrchk(cudaMemcpyAsync(lesser_inv_upperblk_h[0], inv_diagblk_d,
                 batch_size * blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
     cudaErrchk(cudaStreamWaitEvent(stream[stream_memunload], lesser_greater_calculated[0]));
     cudaErrchk(cudaMemcpyAsync(lesser_inv_diagblk_h[0], lesser_inv_diagblk_d,
@@ -619,9 +615,13 @@ void rgf_lesser_greater_batched_optimized(
 
         // wait to unload_diag for the finish of computations
         cudaErrchk(cudaStreamWaitEvent(stream[stream_memunload], schur_inverted[i]));
-        cudaErrchk(cudaMemcpyAsync(small_inv_diagblk_h + i*batch_size*blocksize*blocksize,
-                    inv_diagblk_d,
-                    batch_size * blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
+        // lesser inv upperblk  for the small g
+        // last small g is not needed
+        if(i < n_blocks-1){
+            cudaErrchk(cudaMemcpyAsync(lesser_inv_upperblk_h[i],
+                        inv_diagblk_d,
+                        batch_size * blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));            
+        }
 
         cudaErrchk(cudaStreamWaitEvent(stream[stream_memunload], lesser_greater_calculated[i]));
         cudaErrchk(cudaMemcpyAsync(lesser_inv_diagblk_h[i],
@@ -644,7 +644,7 @@ void rgf_lesser_greater_batched_optimized(
                 reinterpret_cast<const complex_d*>(system_matrix_lowerblk_h[n_blocks-2]),
                 batch_size * blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
     cudaErrchk(cudaMemcpyAsync(inv_diagblk_small_d[stream_memload_before],
-                reinterpret_cast<const complex_d*>(small_inv_diagblk_h + (n_blocks-2)*batch_size*blocksize*blocksize),
+                reinterpret_cast<const complex_d*>(lesser_inv_upperblk_h[n_blocks-2]),
                 batch_size * blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
     cudaErrchk(cudaMemcpyAsync(lesser_inv_diagblk_small_d[stream_memload_before],
                 reinterpret_cast<const complex_d*>(lesser_inv_diagblk_h[n_blocks-2]),
@@ -678,8 +678,16 @@ void rgf_lesser_greater_batched_optimized(
             cudaErrchk(cudaMemcpyAsync(system_matrix_lowerblk_d[stream_memload],
                         reinterpret_cast<const complex_d*>(system_matrix_lowerblk_h[i-1]),
                         batch_size * blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
+
+            // synchronization between streams
+            // is scuffed for the unload for lesser_inv_upperblk_h which saves the small g 
+            // to avoid another cudaMallocHost
+            // n_blocks-2 is loadded before the loop and then computations are done with it
+            // n_blocks-2 can be only overwritten after the computations are done
+            // thus the memunloading and the memloading does not need synchronization
+            // stream which loads the data and computes is the same and then the unloading is synchronized  with the computations
             cudaErrchk(cudaMemcpyAsync(inv_diagblk_small_d[stream_memload],
-                        reinterpret_cast<const complex_d*>(small_inv_diagblk_h + (i-1)*batch_size*blocksize*blocksize),
+                        reinterpret_cast<const complex_d*>(lesser_inv_upperblk_h[i-1]),
                         batch_size * blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload]));
 
             cudaErrchk(cudaMemcpyAsync(lesser_inv_diagblk_small_d[stream_memload],
@@ -1175,9 +1183,7 @@ void rgf_lesser_greater_batched_optimized(
         cudaErrchk(cudaFree(greater_inv_upperblk_d));
     }
 
-    if(small_inv_diagblk_h){
-        cudaErrchk(cudaFreeHost(small_inv_diagblk_h));
-    }
+
 
     if(ipiv_d){
         cudaErrchk(cudaFree(ipiv_d));

@@ -2,6 +2,9 @@
 #include "batched_lesser_greater.h"
 #include "batched_lesser_greater_optimized.h"
 
+#include <omp.h>
+#include <fstream>
+
 #define cudaErrchk(ans) { cudaAssert((ans), __FILE__, __LINE__); }
 inline void cudaAssert(cudaError_t code, const char *file, int line, bool abort=true)
 {
@@ -387,81 +390,186 @@ int main() {
         }
     }
 
-    rgf_lesser_greater_for(blocksize, matrix_size, batch_size,
-                                batch_system_matrices_diagblk_h,
-                                batch_system_matrices_upperblk_h,
-                                batch_system_matrices_lowerblk_h,
-                                batch_self_energy_matrices_lesser_diagblk_h,
-                                batch_self_energy_matrices_lesser_upperblk_h,
-                                batch_self_energy_matrices_greater_diagblk_h,
-                                batch_self_energy_matrices_greater_upperblk_h,
-                                batch_lesser_inv_matrices_diagblk_h,
-                                batch_lesser_inv_matrices_upperblk_h,
-                                batch_greater_inv_matrices_diagblk_h,
-                                batch_greater_inv_matrices_upperblk_h);
+    int number_of_measurements = 110;
+    double times_for[number_of_measurements];
+    double times_batched[number_of_measurements];
+    double times_batched2[number_of_measurements];
+    double times_batched_optimized[number_of_measurements];
+    double time = 0.0;
 
-    // set ouputs to zero
-    for(unsigned int i = 0; i < n_blocks; i++){
-        for(unsigned int batch = 0; batch < batch_size; batch++){
-            for(unsigned int j = 0; j < blocksize * blocksize; j++){
-                batch_lesser_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
-                batch_greater_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
-            }
-        }
-    }
-    for(unsigned int i = 0; i < n_blocks-1; i++){
-        for(unsigned int batch = 0; batch < batch_size; batch++){
-            for(unsigned int j = 0; j < blocksize * blocksize; j++){
-                batch_lesser_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
-                batch_greater_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
-            }
-        }
+    for(int i = 0; i < number_of_measurements; i++){
+        time = -omp_get_wtime();
+        rgf_lesser_greater_for(blocksize, matrix_size, batch_size,
+                                    batch_system_matrices_diagblk_h,
+                                    batch_system_matrices_upperblk_h,
+                                    batch_system_matrices_lowerblk_h,
+                                    batch_self_energy_matrices_lesser_diagblk_h,
+                                    batch_self_energy_matrices_lesser_upperblk_h,
+                                    batch_self_energy_matrices_greater_diagblk_h,
+                                    batch_self_energy_matrices_greater_upperblk_h,
+                                    batch_lesser_inv_matrices_diagblk_h,
+                                    batch_lesser_inv_matrices_upperblk_h,
+                                    batch_greater_inv_matrices_diagblk_h,
+                                    batch_greater_inv_matrices_upperblk_h);
+        time += omp_get_wtime();
+        times_for[i] = time;
     }
 
-    rgf_lesser_greater_for(blocksize, matrix_size, batch_size,
-                                batch_system_matrices_diagblk_h,
-                                batch_system_matrices_upperblk_h,
-                                batch_system_matrices_lowerblk_h,
-                                batch_self_energy_matrices_lesser_diagblk_h,
-                                batch_self_energy_matrices_lesser_upperblk_h,
-                                batch_self_energy_matrices_greater_diagblk_h,
-                                batch_self_energy_matrices_greater_upperblk_h,
-                                batch_lesser_inv_matrices_diagblk_h,
-                                batch_lesser_inv_matrices_upperblk_h,
-                                batch_greater_inv_matrices_diagblk_h,
-                                batch_greater_inv_matrices_upperblk_h);
 
-    // set ouputs to zero
-    for(unsigned int i = 0; i < n_blocks; i++){
-        for(unsigned int batch = 0; batch < batch_size; batch++){
-            for(unsigned int j = 0; j < blocksize * blocksize; j++){
-                batch_lesser_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
-                batch_greater_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
-            }
+
+    // // set ouputs to zero
+    // for(unsigned int i = 0; i < n_blocks; i++){
+    //     for(unsigned int batch = 0; batch < batch_size; batch++){
+    //         for(unsigned int j = 0; j < blocksize * blocksize; j++){
+    //             batch_lesser_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+    //             batch_greater_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+    //         }
+    //     }
+    // }
+    // for(unsigned int i = 0; i < n_blocks-1; i++){
+    //     for(unsigned int batch = 0; batch < batch_size; batch++){
+    //         for(unsigned int j = 0; j < blocksize * blocksize; j++){
+    //             batch_lesser_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+    //             batch_greater_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+    //         }
+    //     }
+    // }
+    for(int i = 0; i < number_of_measurements; i++){
+        time = -omp_get_wtime();
+        rgf_lesser_greater_batched(blocksize, matrix_size, batch_size,
+                                    batch_system_matrices_diagblk_h,
+                                    batch_system_matrices_upperblk_h,
+                                    batch_system_matrices_lowerblk_h,
+                                    batch_self_energy_matrices_lesser_diagblk_h,
+                                    batch_self_energy_matrices_lesser_upperblk_h,
+                                    batch_self_energy_matrices_greater_diagblk_h,
+                                    batch_self_energy_matrices_greater_upperblk_h,
+                                    batch_lesser_inv_matrices_diagblk_h,
+                                    batch_lesser_inv_matrices_upperblk_h,
+                                    batch_greater_inv_matrices_diagblk_h,
+                                    batch_greater_inv_matrices_upperblk_h);
+        time += omp_get_wtime();
+        times_batched[i] = time;
+        
+    }
+    // // set ouputs to zero
+    // for(unsigned int i = 0; i < n_blocks; i++){
+    //     for(unsigned int batch = 0; batch < batch_size; batch++){
+    //         for(unsigned int j = 0; j < blocksize * blocksize; j++){
+    //             batch_lesser_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+    //             batch_greater_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+    //         }
+    //     }
+    // }
+    // for(unsigned int i = 0; i < n_blocks-1; i++){
+    //     for(unsigned int batch = 0; batch < batch_size; batch++){
+    //         for(unsigned int j = 0; j < blocksize * blocksize; j++){
+    //             batch_lesser_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+    //             batch_greater_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+    //         }
+    //     }
+    // }
+    for(int i = 0; i < number_of_measurements; i++){
+        time = -omp_get_wtime();
+        rgf_lesser_greater_batched2(blocksize, matrix_size, batch_size,
+                                    batch_system_matrices_diagblk_h,
+                                    batch_system_matrices_upperblk_h,
+                                    batch_system_matrices_lowerblk_h,
+                                    batch_self_energy_matrices_lesser_diagblk_h,
+                                    batch_self_energy_matrices_lesser_upperblk_h,
+                                    batch_self_energy_matrices_greater_diagblk_h,
+                                    batch_self_energy_matrices_greater_upperblk_h,
+                                    batch_lesser_inv_matrices_diagblk_h,
+                                    batch_lesser_inv_matrices_upperblk_h,
+                                    batch_greater_inv_matrices_diagblk_h,
+                                    batch_greater_inv_matrices_upperblk_h);
+        time += omp_get_wtime();
+        times_batched2[i] = time;
+        
+    }
+    // // set ouputs to zero
+    // for(unsigned int i = 0; i < n_blocks; i++){
+    //     for(unsigned int batch = 0; batch < batch_size; batch++){
+    //         for(unsigned int j = 0; j < blocksize * blocksize; j++){
+    //             batch_lesser_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+    //             batch_greater_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+    //         }
+    //     }
+    // }
+    // for(unsigned int i = 0; i < n_blocks-1; i++){
+    //     for(unsigned int batch = 0; batch < batch_size; batch++){
+    //         for(unsigned int j = 0; j < blocksize * blocksize; j++){
+    //             batch_lesser_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+    //             batch_greater_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+    //         }
+    //     }
+    // }
+    for(int i = 0; i < number_of_measurements; i++){
+        time = -omp_get_wtime();
+        rgf_lesser_greater_batched_optimized(blocksize, matrix_size, batch_size,
+                                    batch_system_matrices_diagblk_h,
+                                    batch_system_matrices_upperblk_h,
+                                    batch_system_matrices_lowerblk_h,
+                                    batch_self_energy_matrices_lesser_diagblk_h,
+                                    batch_self_energy_matrices_lesser_upperblk_h,
+                                    batch_self_energy_matrices_greater_diagblk_h,
+                                    batch_self_energy_matrices_greater_upperblk_h,
+                                    batch_lesser_inv_matrices_diagblk_h,
+                                    batch_lesser_inv_matrices_upperblk_h,
+                                    batch_greater_inv_matrices_diagblk_h,
+                                    batch_greater_inv_matrices_upperblk_h);
+        time += omp_get_wtime();
+        times_batched_optimized[i] = time;
+        
+    }
+
+    std::ofstream outputFile_times_for;
+    outputFile_times_for.open("times_for.txt");
+    if(outputFile_times_for.is_open()){
+        for(int i = 0; i < number_of_measurements; i++){
+            outputFile_times_for << times_for[i] << std::endl;
         }
     }
-    for(unsigned int i = 0; i < n_blocks-1; i++){
-        for(unsigned int batch = 0; batch < batch_size; batch++){
-            for(unsigned int j = 0; j < blocksize * blocksize; j++){
-                batch_lesser_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
-                batch_greater_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
-            }
+    else{
+        std::cout << "Unable to open file" << std::endl;
+    }
+    outputFile_times_for.close();
+
+    std::ofstream outputFile_times_batched;
+    outputFile_times_batched.open("times_batched.txt");
+    if(outputFile_times_batched.is_open()){
+        for(int i = 0; i < number_of_measurements; i++){
+            outputFile_times_batched << times_batched[i] << std::endl;
         }
     }
+    else{
+        std::cout << "Unable to open file" << std::endl;
+    }
+    outputFile_times_batched.close();
 
-    rgf_lesser_greater_batched_optimized(blocksize, matrix_size, batch_size,
-                                batch_system_matrices_diagblk_h,
-                                batch_system_matrices_upperblk_h,
-                                batch_system_matrices_lowerblk_h,
-                                batch_self_energy_matrices_lesser_diagblk_h,
-                                batch_self_energy_matrices_lesser_upperblk_h,
-                                batch_self_energy_matrices_greater_diagblk_h,
-                                batch_self_energy_matrices_greater_upperblk_h,
-                                batch_lesser_inv_matrices_diagblk_h,
-                                batch_lesser_inv_matrices_upperblk_h,
-                                batch_greater_inv_matrices_diagblk_h,
-                                batch_greater_inv_matrices_upperblk_h);
+    std::ofstream outputFile_times_batched2;
+    outputFile_times_batched2.open("times_batched2.txt");
+    if(outputFile_times_batched2.is_open()){
+        for(int i = 0; i < number_of_measurements; i++){
+            outputFile_times_batched2 << times_batched2[i] << std::endl;
+        }
+    }
+    else{
+        std::cout << "Unable to open file" << std::endl;
+    }
+    outputFile_times_batched2.close();
 
+    std::ofstream outputFile_times_batched_optimized;
+    outputFile_times_batched_optimized.open("times_batched_optimized.txt");
+    if(outputFile_times_batched_optimized.is_open()){
+        for(int i = 0; i < number_of_measurements; i++){
+            outputFile_times_batched_optimized << times_batched_optimized[i] << std::endl;
+        }
+    }
+    else{
+        std::cout << "Unable to open file" << std::endl;
+    }
+    outputFile_times_batched_optimized.close();
 
     // print last block of inverted matrix
     // for(unsigned int i = 0; i < batch_size; i++){

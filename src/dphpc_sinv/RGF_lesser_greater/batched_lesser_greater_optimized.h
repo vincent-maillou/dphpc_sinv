@@ -1,3 +1,4 @@
+#pragma once
 #include <stdio.h>
 #include <stdlib.h>
 #include <complex>
@@ -12,6 +13,7 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 #include "utils.h"
+#include "batched_geam.h"
 
 using complex_h = std::complex<double>;
 using complex_d = cuDoubleComplex;

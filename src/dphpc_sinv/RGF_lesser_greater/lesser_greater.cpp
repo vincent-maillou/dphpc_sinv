@@ -596,8 +596,12 @@ void rgf_lesser_greater(
         cudaErrchk(cudaEventRecord(unload_diag[i], stream[stream_memunload]));
 
     }
+
+
+
     int stream_memload_before = (n_blocks) % 2;
     int stream_compute_before = (n_blocks-1) % 2;
+   
 
     cudaErrchk(cudaMemcpyAsync(system_matrix_upperblk_d[stream_memload_before],
                 reinterpret_cast<const complex_d*>(system_matrix_upperblk_h + (n_blocks-2)*blocksize*blocksize),
@@ -605,6 +609,16 @@ void rgf_lesser_greater(
     cudaErrchk(cudaMemcpyAsync(system_matrix_lowerblk_d[stream_memload_before],
                 reinterpret_cast<const complex_d*>(system_matrix_lowerblk_h + (n_blocks-2)*blocksize*blocksize),
                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
+
+    cudaErrchk(cudaMemcpyAsync(self_energy_lesser_upperblk_d[stream_memload_before],
+                reinterpret_cast<const complex_d*>(self_energy_lesser_upperblk_h + (n_blocks-2)*blocksize*blocksize),
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
+    cudaErrchk(cudaMemcpyAsync(self_energy_greater_upperblk_d[stream_memload_before],
+                reinterpret_cast<const complex_d*>(self_energy_greater_upperblk_h + (n_blocks-2)*blocksize*blocksize),
+                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
+  
+    cudaErrchk(cudaStreamWaitEvent(stream[stream_memload_before], unload_diag[n_blocks-2])); 
+
     cudaErrchk(cudaMemcpyAsync(inv_diagblk_small_d[stream_memload_before],
                 reinterpret_cast<const complex_d*>(small_inv_diagblk_h  + (n_blocks-2)*blocksize*blocksize),
                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
@@ -615,13 +629,6 @@ void rgf_lesser_greater(
                 reinterpret_cast<const complex_d*>(greater_inv_diagblk_h + (n_blocks-2)*blocksize*blocksize),
                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
 
-    cudaErrchk(cudaMemcpyAsync(self_energy_lesser_upperblk_d[stream_memload_before],
-                reinterpret_cast<const complex_d*>(self_energy_lesser_upperblk_h + (n_blocks-2)*blocksize*blocksize),
-                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
-    cudaErrchk(cudaMemcpyAsync(self_energy_greater_upperblk_d[stream_memload_before],
-                reinterpret_cast<const complex_d*>(self_energy_greater_upperblk_h + (n_blocks-2)*blocksize*blocksize),
-                blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
-  
 
 
     // 2. Backward substitution (performed right to left)
@@ -909,6 +916,8 @@ void rgf_lesser_greater(
         cudaErrchk(cudaMemcpyAsync(greater_inv_upperblk_h + i*blocksize*blocksize,
                     greater_inv_upperblk_d,
                     blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToHost, stream[stream_memunload]));
+
+        cudaErrchk(cudaEventRecord(unload_upper[i], stream[stream_memunload]));
 
         // buf6 = (buf1 @ buf4)
         // buf6_lesser = self_energy_lesser_diagblk_d[stream_compute]

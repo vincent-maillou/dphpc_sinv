@@ -1,8 +1,19 @@
+// Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
+#pragma once
 #include <complex>
+#include <cuda_runtime_api.h>
+#include <cuda.h>
+#include <cuComplex.h>
+#include <cuda/std/complex>
+#include <cusolverDn.h>
+#include <cublas_v2.h>
+#include "cudaerrchk.h"
 
 using complex_h = std::complex<double>;
+using complex_d = cuDoubleComplex;
 
-bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
+
+void rgf_dense_matrix_fits_gpu_memory(
     unsigned int blocksize,
     unsigned int matrix_size,
     complex_h *matrix_diagblk_h,
@@ -11,3 +22,34 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     complex_h *inv_diagblk_h,
     complex_h *inv_upperblk_h,
     complex_h *inv_lowerblk_h);
+
+void rgf_dense_matrix_fits_gpu_memory_with_copy_compute_overlap(
+    unsigned int blocksize,
+    unsigned int matrix_size,
+    complex_h *matrix_diagblk_h,
+    complex_h *matrix_upperblk_h,
+    complex_h *matrix_lowerblk_h,
+    complex_h *inv_diagblk_h,
+    complex_h *inv_upperblk_h,
+    complex_h *inv_lowerblk_h);
+
+void rgf_dense_matrix_does_not_fit_gpu_memory(
+    unsigned int blocksize,
+    unsigned int matrix_size,
+    complex_h *matrix_diagblk_h,
+    complex_h *matrix_upperblk_h,
+    complex_h *matrix_lowerblk_h,
+    complex_h *inv_diagblk_h,
+    complex_h *inv_upperblk_h,
+    complex_h *inv_lowerblk_h);
+
+void rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
+    unsigned int blocksize,
+    unsigned int matrix_size,
+    complex_h *matrix_diagblk_h,
+    complex_h *matrix_upperblk_h,
+    complex_h *matrix_lowerblk_h,
+    complex_h *inv_diagblk_h,
+    complex_h *inv_upperblk_h,
+    complex_h *inv_lowerblk_h);
+

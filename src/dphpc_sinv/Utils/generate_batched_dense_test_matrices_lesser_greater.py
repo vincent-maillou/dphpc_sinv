@@ -7,10 +7,16 @@ SEED = 8000
 MAT_SIZE = 5408
 BLOCKSIZE = 416
 BATCHSIZE = 112
+PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
 MAT_SIZE = 1000
 BLOCKSIZE = 100
 BATCHSIZE = 100
 PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
+
+# MAT_SIZE = 6
+# BLOCKSIZE = 2
+# BATCHSIZE = 1
+# PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
 
 if __name__ == "__main__":
 
@@ -79,53 +85,72 @@ if __name__ == "__main__":
             greater_inv, MAT_SIZE, BLOCKSIZE, -1)
 
 
+        matrix_inv_diag_blk = matrix_utils.extract_diagonal_blocks(
+            inv_matrix, MAT_SIZE, BLOCKSIZE)
+        matrix_inv_upper_blk = matrix_utils.extract_offdiagonal_blocks(
+            inv_matrix, MAT_SIZE, BLOCKSIZE, 1)
+        matrix_inv_lower_blk = matrix_utils.extract_offdiagonal_blocks(
+            inv_matrix, MAT_SIZE, BLOCKSIZE, -1)
+
         # Save matrices to file
-        filename = "system_matrix_" + str(i) + "_diagblk.bin"
+
+        filename = ("system_matrix_" + str(i) + "_diagblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
+
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, system_matrix_diagblk)
-        filename = "system_matrix_" + str(i) + "_upperblk.bin"
+        filename = ("system_matrix_" + str(i) + "_upperblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, system_matrix_upperblk)
-        filename = "system_matrix_" + str(i) + "_lowerblk.bin"
+        filename = ("system_matrix_" + str(i) + "_lowerblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, system_matrix_lowerblk)
 
-        filename = "self_energy_lesser_" + str(i) + "_diagblk.bin"
+        filename = "dense_blocks_matrix_" + str(i) + "_inverse_diagblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin"
+        matrix_utils.write_matrix_to_file(
+            PATH_TO_FILE+filename, matrix_inv_diag_blk)
+        filename = "dense_blocks_matrix_" + str(i) + "_inverse_upperblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin"
+        matrix_utils.write_matrix_to_file(
+            PATH_TO_FILE+filename, matrix_inv_upper_blk)
+        filename = "dense_blocks_matrix_" + str(i) + "_inverse_lowerblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin"
+        matrix_utils.write_matrix_to_file(
+            PATH_TO_FILE+filename, matrix_inv_lower_blk)
+
+        filename = ("self_energy_lesser_" + str(i) + "_diagblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, self_energy_lesser_diagblk)
-        filename = "self_energy_lesser_" + str(i) + "_upperblk.bin"
+        filename = ("self_energy_lesser_" + str(i) + "_upperblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, self_energy_lesser_upperblk)
-        filename = "self_energy_lesser_" + str(i) + "_lowerblk.bin"
+        filename = ("self_energy_lesser_" + str(i) + "_lowerblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, self_energy_lesser_lowerblk)
         
-        filename = "self_energy_greater_" + str(i) + "_diagblk.bin"
+        filename = ("self_energy_greater_" + str(i) + "_diagblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, self_energy_greater_diagblk)
-        filename = "self_energy_greater_" + str(i) + "_upperblk.bin"
+        filename = ("self_energy_greater_" + str(i) + "_upperblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, self_energy_greater_upperblk)
-        filename = "self_energy_greater_" + str(i) + "_lowerblk.bin"
+        filename = ("self_energy_greater_" + str(i) + "_lowerblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, self_energy_greater_lowerblk)
 
-        filename = "lesser_" + str(i) + "_inv_diagblk.bin"
+        filename = ("lesser_" + str(i) + "_inv_diagblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, lesser_diagblk)
-        filename = "lesser_" + str(i) + "_inv_upperblk.bin"
+        filename = ("lesser_" + str(i) + "_inv_upperblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, lesser_upperblk)
-        filename = "lesser_" + str(i) + "_inv_lowerblk.bin"
+        filename = ("lesser_" + str(i) + "_inv_lowerblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, lesser_lowerblk)
 
-        filename = "greater_" + str(i) + "_inv_diagblk.bin"
+        filename = ("greater_" + str(i) + "_inv_diagblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, greater_diagblk)
-        filename = "greater_" + str(i) + "_inv_upperblk.bin"
+        filename = ("greater_" + str(i) + "_inv_upperblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, greater_upperblk)
-        filename = "greater_" + str(i) + "_inv_lowerblk.bin"
+        filename = ("greater_" + str(i) + "_inv_lowerblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
         matrix_utils.write_matrix_to_file(
             PATH_TO_FILE+filename, greater_lowerblk)

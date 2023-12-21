@@ -49,7 +49,7 @@ void rgf_lesser_greater_for(
     complex_h **greater_inv_upperblk_h);
 
 
-void rgf_lesser_greater_batched2(
+void rgf_lesser_greater_batched_without_hostmalloc(
     unsigned int blocksize,
     unsigned int matrix_size,
     unsigned int batch_size,

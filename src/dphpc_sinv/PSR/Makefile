@@ -5,8 +5,8 @@ MPIROOT = /usr/local/mpich-4.0.2/gcc11
 CUDA_ROOT = /usr/local/cuda-11.8
 MKLROOT = /usr/pack/intel_compiler-2020-af/x64/compilers_and_libraries_2019.0.117/linux/mkl
 EIGENROOT = /usr/scratch/mont-fort17/almaeder/libraries/eigen/
-src = /home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/
-#src = /home/vmaillou/Documents/dphpc_sinv/src/dphpc_sinv/PSR
+#src = /home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/
+src = /home/vmaillou/Documents/dphpc_sinv/src/dphpc_sinv/PSR
 
 CXXFLAGS = -Wall -Wextra -fopenmp -std=c++14 -I${EIGENROOT} -I${CUDA_ROOT}/include -I${MKLROOT}/include -I${MPIROOT}/include -I${src}
 NVCCFLAGS = -arch=sm_60 -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -std=c++14 -Xcompiler -fopenmp -I${CUDA_ROOT}/include

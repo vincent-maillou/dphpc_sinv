@@ -25,6 +25,7 @@ int main(int argc, char *argv[]) {
     // End of Partition Parameters
 
     bool FullSeqTest = false;
+    bool check_result = true;
 
     // Memory allocation for each "process"
     std::complex<double>* A = new std::complex<double>[N * N];
@@ -48,8 +49,24 @@ int main(int argc, char *argv[]) {
         );
     }
     else {
-        auto G_final = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, true);
+        //auto G_final = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, check_result);
+        auto G_final = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, check_result);
     }   
+
+    // Synchonization
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    check_result = false;
+    int nruns = 3;
+
+    for (int i = 0; i < nruns; i++) {
+        if(rank == 0){
+            std::cout << "Run: " << i << " ..starting";
+        }
+        //auto G_final = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, check_result);
+        auto G_final = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, check_result);
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
 
 
     // if (rank == 0) {

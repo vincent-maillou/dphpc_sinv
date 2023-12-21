@@ -2883,7 +2883,13 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
 
 
     // Start reduce_schur
-    std::cout << "Process " << rank << " is reducing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+    //std::cout << "Process " << rank << " is reducing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+
+
+    // ----- Start timing -----
+    MPI_Barrier(MPI_COMM_WORLD);
+    double start_time = MPI_Wtime();
+
 
 
     if (rank == 0){
@@ -3014,7 +3020,35 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
     if(rank == partitions - 1) {
 	    produceSchurBottomRightCorner_2(processA, L, U, G, partition_blocksize, blocksize);
     }
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    double end_time = MPI_Wtime();
+    // ----- End timing -----
+
+    double elapsed_time = end_time - start_time;
+
+    if(compare_reference == false){
+        if(rank == 0) {
+            std::cout << " ..took: " << elapsed_time << " s" << std::endl;
+        }
+
+        // Write the elapsed time to a file
+        if(rank == 0) {
+            std::ofstream time_file;
+
+            // Format a string for the name of the file using the blocksize and the number of blocks
+            std::string filename = "PSR_CPU_bs" + std::to_string(blocksize) + "_nb" + std::to_string(n_blocks) + "_world" + std::to_string(partitions) + ".txt";
+
+            time_file.open(filename, std::ios::app);
+            time_file << "Elapsed time: " << elapsed_time << " s" << std::endl;
+            time_file.close();
+        }
+    }
+    
+
     // End of produce_schur
+
+
     if(compare_reference){
         compareSINV_referenceInverse_localprodG_byblock(partitions, blocksize,
                                                          partition_blocksize, G, full_inverse, rank);
@@ -3176,7 +3210,12 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
 
 
     // Start reduce_schur
-    std::cout << "Process " << rank << " is reducing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+    //std::cout << "Process " << rank << " is reducing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+
+
+    // ----- Start timing -----
+    MPI_Barrier(MPI_COMM_WORLD);
+    double start_time = MPI_Wtime();
 
 
     L = Eigen::MatrixXcd::Zero(processA.rows(), processA.cols());
@@ -3473,7 +3512,36 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
         produceSchurBottomRightCorner_gpu(partition_blocksize, blocksize, stream, cusolver_handle, cublas_handle, A_gpu,  G_gpu, L_gpu, U_gpu, identity_d, l_dim);
         cudaErrchk(cudaMemcpy(G.data(), reinterpret_cast<std::complex<double>*>(G_gpu), processA.rows() * processA.cols() * sizeof(std::complex<double>), cudaMemcpyDeviceToHost));
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    double end_time = MPI_Wtime();
+    // ----- End timing -----
+
+    double elapsed_time = end_time - start_time;
+
+    if(compare_reference == false){
+        if(rank == 0) {
+            std::cout << " ..took: " << elapsed_time << " s" << std::endl;
+        }
+
+        // Write the elapsed time to a file
+        if(rank == 0) {
+            std::ofstream time_file;
+
+            // Format a string for the name of the file using the blocksize and the number of blocks
+            std::string filename = "PSR_GPU_bs" + std::to_string(blocksize) + "_nb" + std::to_string(n_blocks) + "_world" + std::to_string(partitions) + ".txt";
+
+            time_file.open(filename, std::ios::app);
+            time_file << "Elapsed time: " << elapsed_time << " s" << std::endl;
+            time_file.close();
+        }
+    }
+    
+
     // End of produce_schur
+    
+    
+    
     if(compare_reference){
         compareSINV_referenceInverse_localprodG_byblock(partitions, blocksize,
                                                          partition_blocksize, G, full_inverse, rank);

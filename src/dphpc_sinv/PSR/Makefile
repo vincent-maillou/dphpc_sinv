@@ -6,6 +6,7 @@ CUDA_ROOT = /usr/local/cuda-11.8
 MKLROOT = /usr/pack/intel_compiler-2020-af/x64/compilers_and_libraries_2019.0.117/linux/mkl
 EIGENROOT = /usr/scratch/mont-fort17/almaeder/libraries/eigen/
 src = /home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/
+#src = /home/vmaillou/Documents/dphpc_sinv/src/dphpc_sinv/PSR
 
 CXXFLAGS = -Wall -Wextra -fopenmp -std=c++14 -I${EIGENROOT} -I${CUDA_ROOT}/include -I${MKLROOT}/include -I${MPIROOT}/include -I${src}
 NVCCFLAGS = -arch=sm_60 -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -std=c++14 -Xcompiler -fopenmp -I${CUDA_ROOT}/include
@@ -19,7 +20,7 @@ CU_SOURCES = $(filter %.cu, $(SOURCES))
 #CPP_OBJ_FILES=$(CPP_SOURCES:.cpp=.o)
 CPP_OBJ_FILES = PSR.o PSR_testutils.o PSR_MPI_utils.o PSR_CUDA_utils.o PSR_main.o
 CU_OBJ_FILES =$(CU_SOURCES:.cu=.o)
-BINARY = main
+BINARY = main.o
 
 
 .PHONY: all

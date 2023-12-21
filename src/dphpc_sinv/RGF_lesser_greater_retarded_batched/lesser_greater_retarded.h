@@ -16,7 +16,7 @@ using complex_h = std::complex<double>;
 using complex_d = cuDoubleComplex;
 
 
-void rgf_lesser_greater(
+void rgf_lesser_greater_retarded(
     unsigned int blocksize,
     unsigned int matrix_size,
     complex_h *system_matrix_diagblk_h,
@@ -29,4 +29,7 @@ void rgf_lesser_greater(
     complex_h *lesser_inv_diagblk_h,
     complex_h *lesser_inv_upperblk_h,
     complex_h *greater_inv_diagblk_h,
-    complex_h *greater_inv_upperblk_h);
+    complex_h *greater_inv_upperblk_h,
+    complex_h *retarded_inv_diagblk_h,
+    complex_h *retarded_inv_upperblk_h,
+    complex_h *retarded_inv_lowerblk_h);

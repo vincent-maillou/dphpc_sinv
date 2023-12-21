@@ -1,3 +1,4 @@
+#pragma once
 #include <stdio.h>
 #include <stdlib.h>
 #include <complex>
@@ -12,11 +13,12 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 #include "utils.h"
+#include "batched_geam.h"
 
 using complex_h = std::complex<double>;
 using complex_d = cuDoubleComplex;
 
-void rgf_lesser_greater_batched_optimized(
+void rgf_lesser_greater_batched(
     unsigned int blocksize,
     unsigned int matrix_size,
     unsigned int batch_size,
@@ -30,4 +32,7 @@ void rgf_lesser_greater_batched_optimized(
     complex_h **lesser_inv_diagblk_h,
     complex_h **lesser_inv_upperblk_h,
     complex_h **greater_inv_diagblk_h,
-    complex_h **greater_inv_upperblk_h);
+    complex_h **greater_inv_upperblk_h,
+    complex_h **retarded_inv_diagblk_h,
+    complex_h **retarded_inv_upperblk_h,
+    complex_h **retarded_inv_lowerblk_h);

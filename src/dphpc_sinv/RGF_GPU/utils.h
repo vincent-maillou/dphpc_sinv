@@ -1,8 +1,12 @@
 // Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
-
+#pragma once
+#include <cstdio>
 #include <cstdlib>
 #include <complex>
-#include <cstdio>
+#include <fstream>
+#include <vector>
+#include <iostream>
+#include <string>
 
 
 bool load_binary_matrix(

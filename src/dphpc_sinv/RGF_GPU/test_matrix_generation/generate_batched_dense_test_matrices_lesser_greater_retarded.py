@@ -1,6 +1,6 @@
 # Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 
-from dphpc_sinv.Utils import matrix_utils
+import matrix_utils
 import numpy as np
 
 SEED = 8000

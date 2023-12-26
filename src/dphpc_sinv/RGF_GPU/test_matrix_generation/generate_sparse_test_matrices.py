@@ -1,6 +1,6 @@
 # Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 
-from dphpc_sinv.Utils import matrix_utils
+import matrix_utils
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,8 +10,7 @@ SEED = 63
 MAT_SIZE = 3000
 BLOCKSIZE = 1000
 SPARSITY = 0.5
-PATH_TO_FILE = "../../../tests/tests_cases/"
-PATH_TO_FILE = os.path.join("/home/sem23f28/Documents/dphpc_sinv", "tests/", "tests_cases/")
+PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
 
 
 if __name__ == "__main__":

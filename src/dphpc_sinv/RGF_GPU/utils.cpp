@@ -1,13 +1,4 @@
 // Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
-
-#include <cstdio>
-#include <cstdlib>
-#include <complex>
-#include <fstream>
-#include <vector>
-#include <iostream>
-#include <string>
-
 #include "utils.h"
 
 bool load_binary_matrix(
@@ -21,6 +12,7 @@ bool load_binary_matrix(
     fp = std::fopen(filename, "rb");
     if (fp == nullptr) {
         std::printf("Error opening file\n");
+        std::printf("Filename: %s\n", filename);
         return false;
     }
 

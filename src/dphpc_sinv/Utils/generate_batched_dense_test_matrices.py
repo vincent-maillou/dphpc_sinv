@@ -12,6 +12,12 @@ BLOCKSIZE = 100
 BATCHSIZE = 100
 #PATH_TO_FILE = "../../../tests/tests_cases/"
 PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
+MAT_SIZE = 6
+BLOCKSIZE = 2
+BATCHSIZE = 3
+#PATH_TO_FILE = "../../../tests/tests_cases/"
+PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
+
 
 if __name__ == "__main__":
 
@@ -21,6 +27,7 @@ if __name__ == "__main__":
 
     # Generate random matrices
     for i in range(BATCHSIZE):
+        print("Generating matrix " + str(i) + "...")
         matrix = matrix_utils.generateBandedMatrix(MAT_SIZE, BLOCKSIZE, SEED)
         # Assert matrix to be invertible
         assert np.allclose(np.linalg.inv(matrix) @ matrix, np.eye(MAT_SIZE))

@@ -1,60 +1,7 @@
 // Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <complex>
-#include <iostream>
-
-#include <cuda_runtime_api.h>
-#include <cuda.h>
-#include <cuComplex.h>
-#include <cuda/std/complex>
-#include <cusolverDn.h>
-#include <cublas_v2.h>
 #include "dense_rgf.h"
 
-#include "utils.h"
-
-using complex_h = std::complex<double>;
-using complex_d = cuDoubleComplex;
-
-
-
-#define cudaErrchk(ans) { cudaAssert((ans), __FILE__, __LINE__); }
-inline void cudaAssert(cudaError_t code, const char *file, int line, bool abort=true)
-{
-   if (code != cudaSuccess) 
-   {
-      std::printf("CUDAassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
-}
-
-#define cusolverErrchk(ans) { cusolverAssert((ans), __FILE__, __LINE__); }
-inline void cusolverAssert(cusolverStatus_t code, const char *file, int line, bool abort=true)
-{
-   if (code != CUSOLVER_STATUS_SUCCESS) 
-   {
-        //Did not find a counter part to cudaGetErrorString in cusolver
-        std::printf("CUSOLVERassert: %s %d\n", file, line);
-        if (abort) exit(code);
-   }
-}
-
-
-#define cublasErrchk(ans) { cublasAssert((ans), __FILE__, __LINE__); }
-inline void cublasAssert(cublasStatus_t code, const char *file, int line, bool abort=true)
-{
-   if (code != CUBLAS_STATUS_SUCCESS) 
-   {
-        //Did not find a counter part to cudaGetErrorString in cublas
-        std::printf("CUBLASassert: %s %d\n", file, line);
-        if (abort) exit(code);
-   }
-}
-
-
-bool rgf_dense_matrix_fits_gpu_memory(
+void rgf_dense_matrix_fits_gpu_memory(
     unsigned int blocksize,
     unsigned int matrix_size,
     complex_h *matrix_diagblk_h,
@@ -66,11 +13,9 @@ bool rgf_dense_matrix_fits_gpu_memory(
 {
     if(matrix_size % blocksize != 0){
         printf("Error: matrix_size is not a multiple of blocksize\n");
-        return false;
     }
     unsigned int n_blocks = matrix_size / blocksize;
     unsigned int off_diag_size = matrix_size - blocksize;
-    bool success = true;
 
     // Init cuda stuff
     cudaStream_t stream = NULL;
@@ -131,7 +76,7 @@ bool rgf_dense_matrix_fits_gpu_memory(
                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyDeviceToDevice));
     // ----- END OF INIT SECTION -----
 
-    int info_h = 0;
+
     int *ipiv_d = NULL;
     int *info_d = NULL;
     cudaErrchk(cudaMalloc((void**)&info_d, sizeof(int)))
@@ -150,27 +95,12 @@ bool rgf_dense_matrix_fits_gpu_memory(
     cusolverErrchk(cusolverDnZgetrf(cusolver_handle, blocksize, blocksize,
                                 matrix_diagblk_d, blocksize, buffer, ipiv_d, info_d));
     
-    //copy info to host
-    cudaErrchk(cudaMemcpy(&info_h, info_d, sizeof(int), cudaMemcpyDeviceToHost));
-
-    if (info_h != 0) {
-        std::printf("Error: LU factorization failed\n");
-        success = false;
-    }
-
 
     //back substitution
     cusolverErrchk(cusolverDnZgetrs(cusolver_handle, CUBLAS_OP_N, blocksize,
                                     blocksize, matrix_diagblk_d, blocksize, ipiv_d,
                                     identity_cpy_d, blocksize, info_d));
     cudaErrchk(cudaStreamSynchronize(stream));
-    //copy info to host
-    cudaErrchk(cudaMemcpy(&info_h, info_d, sizeof(int), cudaMemcpyDeviceToHost));
-
-    if (info_h != 0) {
-        std::printf("Error: Backsub failed\n");
-        success = false;
-    }
 
 
     // // 0. Inverse of the first block
@@ -218,14 +148,6 @@ bool rgf_dense_matrix_fits_gpu_memory(
                                     matrix_diagblk_d + i*blocksize*blocksize,
                                     blocksize, buffer, ipiv_d, info_d));
         
-        //copy info to host
-        cudaErrchk(cudaMemcpy(&info_h, info_d, sizeof(int), cudaMemcpyDeviceToHost));
-
-        if (info_h != 0) {
-            std::printf("Error: LU factorization failed\n");
-            std::printf("info_h = %d\n", info_h);
-            success = false;
-        }
 
 
         //back substitution
@@ -235,14 +157,7 @@ bool rgf_dense_matrix_fits_gpu_memory(
                                         blocksize, ipiv_d,
                                         identity_cpy_d, blocksize, info_d));
         cudaErrchk(cudaStreamSynchronize(stream));
-        //copy info to host
-        cudaErrchk(cudaMemcpy(&info_h, info_d, sizeof(int), cudaMemcpyDeviceToHost));
 
-        if (info_h != 0) {
-            std::printf("Error: Backsub failed\n");
-            std::printf("info_h = %d\n", info_h);
-            success = false;
-        }
 
         cudaErrchk(cudaMemcpy(inv_diagblk_d + i*blocksize*blocksize,
                     identity_cpy_d,
@@ -371,11 +286,10 @@ bool rgf_dense_matrix_fits_gpu_memory(
     if(info_d){
         cudaErrchk(cudaFree(info_d));
     }
-    return success;
 }
 
 
-bool rgf_dense_matrix_fits_gpu_memory_with_copy_compute_overlap(
+void rgf_dense_matrix_fits_gpu_memory_with_copy_compute_overlap(
     unsigned int blocksize,
     unsigned int matrix_size,
     complex_h *matrix_diagblk_h,
@@ -387,10 +301,8 @@ bool rgf_dense_matrix_fits_gpu_memory_with_copy_compute_overlap(
 {
     if(matrix_size % blocksize != 0){
         printf("Error: matrix_size is not a multiple of blocksize\n");
-        return false;
     }
     unsigned int n_blocks = matrix_size / blocksize;
-    bool success = true;
 
     // Init cuda stuff
 
@@ -821,10 +733,9 @@ bool rgf_dense_matrix_fits_gpu_memory_with_copy_compute_overlap(
         }
     }
 
-    return success;
 }
 
-bool rgf_dense_matrix_does_not_fit_gpu_memory(
+void rgf_dense_matrix_does_not_fit_gpu_memory(
     unsigned int blocksize,
     unsigned int matrix_size,
     complex_h *matrix_diagblk_h,
@@ -836,10 +747,8 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory(
 {
     if(matrix_size % blocksize != 0){
         printf("Error: matrix_size is not a multiple of blocksize\n");
-        return false;
     }
     unsigned int n_blocks = matrix_size / blocksize;
-    bool success = true;
 
     // Init cuda stuff
     cudaStream_t stream = NULL;
@@ -905,7 +814,6 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory(
                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice));
 
 
-    int info_h = 0;
     int *ipiv_d = NULL;
     int *info_d = NULL;
     cudaErrchk(cudaMalloc((void**)&info_d, sizeof(int)))
@@ -924,13 +832,7 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory(
     cusolverErrchk(cusolverDnZgetrf(cusolver_handle, blocksize, blocksize,
                                 matrix_diagblk_d, blocksize, buffer, ipiv_d, info_d));
     
-    //copy info to host
-    cudaErrchk(cudaMemcpy(&info_h, info_d, sizeof(int), cudaMemcpyDeviceToHost));
 
-    if (info_h != 0) {
-        std::printf("Error: LU factorization failed\n");
-        success = false;
-    }
 
 
     //back substitution
@@ -938,13 +840,7 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory(
                                     blocksize, matrix_diagblk_d, blocksize, ipiv_d,
                                     identity_cpy_d, blocksize, info_d));
     cudaErrchk(cudaStreamSynchronize(stream));
-    //copy info to host
-    cudaErrchk(cudaMemcpy(&info_h, info_d, sizeof(int), cudaMemcpyDeviceToHost));
 
-    if (info_h != 0) {
-        std::printf("Error: Backsub failed\n");
-        success = false;
-    }
 
 
     // // 0. Inverse of the first block
@@ -1008,14 +904,6 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory(
                                     matrix_diagblk_d,
                                     blocksize, buffer, ipiv_d, info_d));
         
-        //copy info to host
-        cudaErrchk(cudaMemcpy(&info_h, info_d, sizeof(int), cudaMemcpyDeviceToHost));
-
-        if (info_h != 0) {
-            std::printf("Error: LU factorization failed\n");
-            std::printf("info_h = %d\n", info_h);
-            success = false;
-        }
 
 
         //back substitution
@@ -1025,14 +913,7 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory(
                                         blocksize, ipiv_d,
                                         identity_cpy_d, blocksize, info_d));
         cudaErrchk(cudaStreamSynchronize(stream));
-        //copy info to host
-        cudaErrchk(cudaMemcpy(&info_h, info_d, sizeof(int), cudaMemcpyDeviceToHost));
 
-        if (info_h != 0) {
-            std::printf("Error: Backsub failed\n");
-            std::printf("info_h = %d\n", info_h);
-            success = false;
-        }
 
         cudaErrchk(cudaMemcpy(inv_diagblk_d,
                     identity_cpy_d,
@@ -1187,11 +1068,10 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory(
     if(info_d){
         cudaErrchk(cudaFree(info_d));
     }
-    return success;
 }
 
 
-bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
+void rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     unsigned int blocksize,
     unsigned int matrix_size,
     complex_h *matrix_diagblk_h,
@@ -1204,10 +1084,8 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     
     if(matrix_size % blocksize != 0){
         printf("Error: matrix_size is not a multiple of blocksize\n");
-        return false;
     }
     unsigned int n_blocks = matrix_size / blocksize;
-    bool success = true;
 
     // Init cuda stuff
 
@@ -1447,6 +1325,7 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
     // possible race condition with unloading of previous loop
     // not sure
+    cudaErrchk(cudaStreamWaitEvent(stream[stream_memload_before], unload[n_blocks-2]));
     cudaErrchk(cudaMemcpyAsync(inv_diagblk_small_d[stream_memload_before],
                 reinterpret_cast<const complex_d*>(inv_diagblk_h  + (n_blocks-2)*blocksize*blocksize),
                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
@@ -1659,7 +1538,6 @@ bool rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         }
     }
 
-    return success;
 }
 
 

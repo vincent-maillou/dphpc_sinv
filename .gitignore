@@ -174,5 +174,7 @@ src/dphpc_sinv/*.o
 **/.vscode/
 **/dense_rgf
 **/sparse_rgf
+**/benchmark_batched_retarded_main
+**/benchmark_retarded_main
 **/batched_dense_rgf
 **/*.nsys-rep

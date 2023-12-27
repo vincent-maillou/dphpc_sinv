@@ -55,8 +55,7 @@ void rgf_retarded_fits_gpu_memory(
     cudaErrchk(cudaMalloc((void**)&inv_lowerblk_d, blocksize * (off_diag_size) * sizeof(complex_d)));
 
     // create right hand side identity matrix
-    complex_h* identity_h;
-    cudaErrchk(cudaMallocHost((void**)&identity_h, blocksize * blocksize * sizeof(complex_h)));
+    complex_h* identity_h = new complex_h[blocksize * blocksize];
 
     for(unsigned int i = 0; i < blocksize * blocksize; i++){
         identity_h[i] = 0.0;
@@ -286,6 +285,9 @@ void rgf_retarded_fits_gpu_memory(
     if(info_d){
         cudaErrchk(cudaFree(info_d));
     }
+    if(identity_h){
+        delete[] identity_h;
+    }
 }
 
 
@@ -374,8 +376,7 @@ void rgf_retarded_fits_gpu_memory_with_copy_compute_overlap(
 
 
     // create right hand side identity matrix
-    complex_h* identity_h;
-    cudaErrchk(cudaMallocHost((void**)&identity_h, blocksize * blocksize * sizeof(complex_h)));
+    complex_h* identity_h = new complex_h[blocksize * blocksize];
     complex_d* identity_d = NULL;
     complex_d* identity_cpy_d = NULL;
     cudaErrchk(cudaMalloc((void**)&identity_d, blocksize * blocksize * sizeof(complex_d)));
@@ -732,7 +733,9 @@ void rgf_retarded_fits_gpu_memory_with_copy_compute_overlap(
             cudaErrchk(cudaEventDestroy(unload[i]));
         }
     }
-
+    if(identity_h){
+        delete[] identity_h;
+    }
 }
 
 void rgf_retarded_does_not_fit_gpu_memory(
@@ -788,8 +791,7 @@ void rgf_retarded_does_not_fit_gpu_memory(
     cudaErrchk(cudaMalloc((void**)&inv_lowerblk_d, blocksize * blocksize * sizeof(complex_d)));
 
     // create right hand side identity matrix
-    complex_h* identity_h;
-    cudaErrchk(cudaMallocHost((void**)&identity_h, blocksize * blocksize * sizeof(complex_h)));
+    complex_h* identity_h = new complex_h[blocksize * blocksize];
 
     for(unsigned int i = 0; i < blocksize * blocksize; i++){
         identity_h[i] = 0.0;
@@ -1068,6 +1070,9 @@ void rgf_retarded_does_not_fit_gpu_memory(
     if(info_d){
         cudaErrchk(cudaFree(info_d));
     }
+    if(identity_h){
+        delete[] identity_h;
+    }
 }
 
 
@@ -1159,8 +1164,7 @@ void rgf_retarded_does_not_fit_gpu_memory_with_copy_compute_overlap(
 
 
     // create right hand side identity matrix
-    complex_h* identity_h;
-    cudaErrchk(cudaMallocHost((void**)&identity_h, blocksize * blocksize * sizeof(complex_h)));
+    complex_h* identity_h = new complex_h[blocksize * blocksize];
     complex_d* identity_d = NULL;
     complex_d* identity_cpy_d = NULL;
     cudaErrchk(cudaMalloc((void**)&identity_d, blocksize * blocksize * sizeof(complex_d)));
@@ -1537,7 +1541,9 @@ void rgf_retarded_does_not_fit_gpu_memory_with_copy_compute_overlap(
             cudaErrchk(cudaEventDestroy(unload[i]));
         }
     }
-
+    if(identity_h){
+        delete[] identity_h;
+    }
 }
 
 

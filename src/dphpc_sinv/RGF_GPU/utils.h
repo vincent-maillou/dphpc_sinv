@@ -61,20 +61,23 @@ void sparse_to_dense(
     int matrice_size);
 
 template<typename T>
-void copy_array(
-    T *array,
-    T *copy,
+bool assert_array_magnitude(
+    T *array_test,
+    T *array_ref,
+    double abstol,
+    double reltol,
     int size);
 
 template<typename T>
-bool assert_same_array(
-    T *array1,
-    T *array2,
-    double epsilon,
-    int size);
+void transform_diagblk(
+    T *matrix_diagblk,
+    T *matrix_diagblk_h,
+    unsigned int blocksize,
+    unsigned int matrix_size);
 
-bool are_equals(
-    std::complex<double> *A,
-    std::complex<double> *B,
-    unsigned int matrice_size, 
-    unsigned int blocksize);
+template<typename T>
+void transform_offblk(
+    T *matrix_offblk,
+    T *matrix_offblk_h,
+    unsigned int blocksize,
+    unsigned int off_diag_size);

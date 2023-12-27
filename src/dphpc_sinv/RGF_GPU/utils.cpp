@@ -189,54 +189,86 @@ template void sparse_to_dense<double>(double *dense_matrix,
     int *indptr,
     int matrice_size);
 
+
 template<typename T>
-void copy_array(
-    T *array,
-    T *copy,
+bool assert_array_magnitude(
+    T *array_test,
+    T *array_ref,
+    double abstol,
+    double reltol,
     int size)
+{
+    double sum_difference = 0.0;
+    double sum_ref = 0.0;
+    for (int i = 0; i < size; i++) {
+        sum_difference += std::abs(array_test[i] - array_ref[i])*std::abs(array_test[i] - array_ref[i]);
+        sum_ref += std::abs(array_ref[i])*std::abs(array_ref[i]);
+
+    }
+    sum_difference = std::sqrt(sum_difference);
+    sum_ref = std::sqrt(sum_ref);
+    if (sum_difference > reltol * sum_ref + abstol) {
+        return false;
+    }
+    return true;
+}
+template bool assert_array_magnitude<std::complex<double>>(
+    std::complex<double> *array_test,
+    std::complex<double> *array_ref,
+    double abstol,
+    double reltol,
+    int size);
+
+template<typename T>
+void transform_diagblk(
+    T *matrix_diagblk,
+    T *matrix_diagblk_h,
+    unsigned int blocksize,
+    unsigned int matrix_size)
 {
     #pragma omp parallel for
-    for (int i = 0; i < size; i++) {
-        copy[i] = array[i];
+    for(unsigned int i = 0; i < blocksize * matrix_size; i++){
+        // block index
+        int k = i / (blocksize * blocksize);
+        // index inside block
+        int h = i % (blocksize * blocksize);
+        // row inside block
+        int m = h % blocksize;
+        // col inside block
+        int n = h / blocksize;
+        matrix_diagblk_h[i] = matrix_diagblk[m*matrix_size + k*blocksize + n];
     }
 }
-template void copy_array<double>(double *array, double *copy, int size);
-template void copy_array<int>(int *array, int *copy, int size);
-template void copy_array<std::complex<double>>(std::complex<double> *array, std::complex<double> *copy, int size);
+template void transform_diagblk<std::complex<double>>(
+    std::complex<double> *matrix_diagblk,
+    std::complex<double> *matrix_diagblk_h,
+    unsigned int blocksize,
+    unsigned int matrix_size);
 
 template<typename T>
-bool assert_same_array(
-    T *array1,
-    T *array2,
-    double epsilon,
-    int size)
+void transform_offblk(
+    T *matrix_offblk,
+    T *matrix_offblk_h,
+    unsigned int blocksize,
+    unsigned int off_diag_size)
 {
-    for (int i = 0; i < size; i++) {
-        if ( std::abs(array1[i] - array2[i]) > epsilon) {
-            std::printf("Arrays are not the same at index %d\n", i);
-            return false;
-        }
-    }
-    return true;
-}
-template bool assert_same_array<double>(double *array1, double *array2, double epsilon, int size);
-template bool assert_same_array<int>(int *array1, int *array2, double epsilon, int size);
-template bool assert_same_array<std::complex<double>>(std::complex<double> *array1, std::complex<double> *array2, double epsilon, int size);
+    #pragma omp parallel for
+    for(unsigned int i = 0; i < blocksize * off_diag_size; i++){
+        // block index
+        int k = i / (blocksize * blocksize);
+        // index inside block
+        int h = i % (blocksize * blocksize);
+        // row inside block
+        int m = h % blocksize;
+        // col inside block
+        int n = h / blocksize;
+        matrix_offblk_h[i] = matrix_offblk[m*off_diag_size + k*blocksize + n];
 
-
-bool are_equals(
-    std::complex<double> *A,
-    std::complex<double> *B,
-    unsigned int matrice_size, 
-    unsigned int blocksize)
-{
-    for(unsigned int i = 0; i < blocksize; i++){
-        for(unsigned int j = 0; j < matrice_size; j++){
-            if (std::abs(A[i*matrice_size+j] - B[i*matrice_size+j]) > 1e-10) {
-                std::cout << "A[" << i << "][" << j << "] = " << A[i * matrice_size + j] << std::endl;
-                return false;
-            }
-        }
     }
-    return true;
 }
+template void transform_offblk<std::complex<double>>(
+    std::complex<double> *matrix_offblk,
+    std::complex<double> *matrix_offblk_h,
+    unsigned int blocksize,
+    unsigned int off_diag_size);
+

@@ -1,4 +1,5 @@
-#include "lesser_greater_retarded.h"
+// Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
+#include "single_lesser_greater_retarded.h"
 #include "batched_lesser_greater_retarded.h"
 #include "cudaerrchk.h"
 

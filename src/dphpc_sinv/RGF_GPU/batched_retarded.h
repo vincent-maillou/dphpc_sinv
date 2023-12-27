@@ -16,7 +16,7 @@
 using complex_h = std::complex<double>;
 using complex_d = cuDoubleComplex; //cuda::complex_h;
 
-void rgf_multiple_energy_points_for_loop(
+void rgf_retarded_for(
     unsigned int blocksize,
     unsigned int matrix_size,
     unsigned int batch_size,
@@ -27,7 +27,7 @@ void rgf_multiple_energy_points_for_loop(
     complex_h **batch_inv_upperblk_h,
     complex_h **batch_inv_lowerblk_h);
 
-void rgf_batched(
+void rgf_retarded_batched(
     unsigned int blocksize,
     unsigned int matrix_size,
     unsigned int batch_size,

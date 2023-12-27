@@ -166,6 +166,8 @@ cython_debug/
 
 src/dphpc_sinv/main
 **/main
+**/test_main
+**/test
 src/dphpc_sinv/*.o
 **/*.o
 .vscode/

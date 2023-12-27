@@ -7,25 +7,36 @@ EIGENROOT = /usr/scratch/mont-fort17/almaeder/libraries/eigen/
 CXXFLAGS = -O3 -Wall -Wextra -fopenmp -std=c++14 -I${EIGENROOT} -I${CUDA_ROOT}/include
 NVCCFLAGS = -arch=sm_60 -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -std=c++14 -Xcompiler -fopenmp -I${CUDA_ROOT}/include
 LDFLAGS = -L"${CUDA_ROOT}/lib64" -lcuda -lcudart -lcusolver -lcublas -lcusparse 
-SOURCES= main.cpp lesser_greater_retarded.cpp batched_lesser_greater_retarded.cpp utils.cpp batched_geam.cu
+SOURCES = main.cpp lesser_greater_retarded.cpp batched_lesser_greater_retarded.cpp utils.cpp batched_geam.cu
+SOURCES_TEST = test_main.cpp single_lesser_greater_retarded.cpp single_lesser_greater.cpp single_retarded.cpp batched_lesser_greater_retarded.cpp batched_lesser_greater.cpp batched_retarded.cpp utils.cpp batched_geam.cu
 
 CPP_SOURCES = $(filter %.cpp, $(SOURCES))
 CU_SOURCES = $(filter %.cu, $(SOURCES))
+CPP_SOURCES_TEST = $(filter %.cpp, $(SOURCES_TEST))
+CU_SOURCES_TEST = $(filter %.cu, $(SOURCES_TEST))
 
 CPP_OBJ_FILES=$(CPP_SOURCES:.cpp=.o)
 CU_OBJ_FILES =$(CU_SOURCES:.cu=.o)
+CPP_OBJ_FILES_TEST=$(CPP_SOURCES_TEST:.cpp=.o)
+CU_OBJ_FILES_TEST =$(CU_SOURCES_TEST:.cu=.o)
+
 BINARY = main
 
+# TOODO build folder and source folder...
 
 .PHONY: all
 all: $(BINARY)
 
-# todo make a nice makefile
-# create a nice makefile which compiles all the files to a binary
-# and cleans up the mess afterwards
-# with build folder and stuff
 $(BINARY): $(CPP_OBJ_FILES) $(CU_OBJ_FILES)
 	$(CXX) $(CXXFLAGS) $(CPP_OBJ_FILES) $(CU_OBJ_FILES) -o $@ $(LDFLAGS)
+
+.PHONY: test
+test: test_main
+	python test_matrix_generation/generate_batched_dense.py -ms 6 -bls 2 -bas 3
+	./test_main
+
+test_main: $(CPP_OBJ_FILES_TEST) $(CU_OBJ_FILES_TEST)
+	$(CXX) $(CXXFLAGS) $(CPP_OBJ_FILES_TEST) $(CU_OBJ_FILES_TEST) -o $@ $(LDFLAGS)
 
 
 # Rule for compiling C++ source files
@@ -40,6 +51,6 @@ $(BINARY): $(CPP_OBJ_FILES) $(CU_OBJ_FILES)
 
 .PHONY: clean
 clean:
-	rm -f $(BINARY) *.o
+	rm -f  *.o test $(BINARY)
 
 	

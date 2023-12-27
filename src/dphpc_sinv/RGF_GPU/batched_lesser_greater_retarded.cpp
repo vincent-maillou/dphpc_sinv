@@ -1,7 +1,7 @@
 // Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #include "batched_lesser_greater_retarded.h"
 
-void rgf_lesser_greater_batched(
+void rgf_lesser_greater_retarded_batched(
     unsigned int blocksize,
     unsigned int matrix_size,
     unsigned int batch_size,
@@ -2430,10 +2430,10 @@ void rgf_lesser_greater_retarded_for(
             // unloading finished
             cudaErrchk(cudaEventRecord(unload_lesser_greater_diag[i], stream[stream_memunload]));
         }
-    }
-    // synchronize all the streams
-    for(int j = 0; j < number_streams; j++){
-        cudaErrchk(cudaStreamSynchronize(stream[j]));
+        // synchronize all the streams
+        for(int j = 0; j < number_streams; j++){
+            cudaErrchk(cudaStreamSynchronize(stream[j]));
+        }        
     }
     // deallocate device memory
     for(int i = 0; i < number_streams; i++){

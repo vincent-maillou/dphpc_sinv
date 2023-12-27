@@ -1,3 +1,4 @@
+# Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as st

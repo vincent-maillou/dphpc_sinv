@@ -1,7 +1,7 @@
 // Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #include "single_retarded.h"
 
-void rgf_dense_matrix_fits_gpu_memory(
+void rgf_retarded_fits_gpu_memory(
     unsigned int blocksize,
     unsigned int matrix_size,
     complex_h *matrix_diagblk_h,
@@ -289,7 +289,7 @@ void rgf_dense_matrix_fits_gpu_memory(
 }
 
 
-void rgf_dense_matrix_fits_gpu_memory_with_copy_compute_overlap(
+void rgf_retarded_fits_gpu_memory_with_copy_compute_overlap(
     unsigned int blocksize,
     unsigned int matrix_size,
     complex_h *matrix_diagblk_h,
@@ -735,7 +735,7 @@ void rgf_dense_matrix_fits_gpu_memory_with_copy_compute_overlap(
 
 }
 
-void rgf_dense_matrix_does_not_fit_gpu_memory(
+void rgf_retarded_does_not_fit_gpu_memory(
     unsigned int blocksize,
     unsigned int matrix_size,
     complex_h *matrix_diagblk_h,
@@ -1071,7 +1071,7 @@ void rgf_dense_matrix_does_not_fit_gpu_memory(
 }
 
 
-void rgf_dense_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
+void rgf_retarded_does_not_fit_gpu_memory_with_copy_compute_overlap(
     unsigned int blocksize,
     unsigned int matrix_size,
     complex_h *matrix_diagblk_h,

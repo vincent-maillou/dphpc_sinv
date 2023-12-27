@@ -2,6 +2,7 @@
 
 import matrix_utils
 import numpy as np
+import argparse
 
 SEED = 8000
 MAT_SIZE = 5408
@@ -18,6 +19,17 @@ BATCHSIZE = 3
 PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="Matrix generation")
+    parser.add_argument("-ms", "--mat_size", default=MAT_SIZE, required=False)
+    parser.add_argument("-bls", "--blocksize", default=BLOCKSIZE, required=False)
+    parser.add_argument("-bas", "--batchsize", default=BATCHSIZE, required=False)
+    parser.add_argument("-ptf", "--path_to_file", default=PATH_TO_FILE, required=False)
+    args = parser.parse_args()
+    MAT_SIZE = args.mat_size
+    BLOCKSIZE = args.blocksize
+    BATCHSIZE = args.batchsize
+    PATH_TO_FILE = args.path_to_file
 
     filename = "batched_matrix_parameters.txt"
     matrix_utils.write_matrix_parameters_batched(

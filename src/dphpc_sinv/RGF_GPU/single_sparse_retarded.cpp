@@ -1,7 +1,7 @@
 // Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #include "single_sparse_retarded.h"
 
-bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
+void rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     unsigned int blocksize,
     unsigned int matrix_size,
     int* diag_nnz,
@@ -22,10 +22,8 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
 {
     if(matrix_size % blocksize != 0){
         printf("Error: matrix_size is not a multiple of blocksize\n");
-        return false;
     }
     unsigned int n_blocks = matrix_size / blocksize;
-    bool success = true;
 
     // Init cuda stuff
 
@@ -603,8 +601,8 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
                 (blocksize+1) * sizeof(int), cudaMemcpyHostToDevice, stream[stream_memload_before]));
 
 
-    // possible race condition with unloading of previous loop
-    // not sure
+    cudaErrchk(cudaStreamWaitEvent(stream[stream_compute_before], unload[n_blocks-2]));
+
     cudaErrchk(cudaMemcpyAsync(inv_diagblk_small_d[stream_memload_before],
                 reinterpret_cast<const complex_d*>(inv_diagblk_h  + (n_blocks-2)*blocksize*blocksize),
                 blocksize * blocksize * sizeof(complex_d), cudaMemcpyHostToDevice, stream[stream_memload_before]));
@@ -916,7 +914,6 @@ bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
         }
     }
 
-    return success;
 }
 
 int main() {

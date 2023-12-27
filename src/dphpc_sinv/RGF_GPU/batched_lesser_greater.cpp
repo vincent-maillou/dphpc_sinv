@@ -2400,10 +2400,10 @@ void rgf_lesser_greater_for(
             // unloading finished
             cudaErrchk(cudaEventRecord(unload_diag[i], stream[stream_memunload]));
         }
-    }
-    // synchronize all the streams
-    for(int j = 0; j < number_streams; j++){
-        cudaErrchk(cudaStreamSynchronize(stream[j]));
+        // synchronize all the streams
+        for(int j = 0; j < number_streams; j++){
+            cudaErrchk(cudaStreamSynchronize(stream[j]));
+        }  
     }
     // deallocate device memory
     for(int i = 0; i < number_streams; i++){
@@ -3682,7 +3682,8 @@ void rgf_lesser_greater_batched_without_hostmalloc(
     // synchronize all the streams
     for(int j = 0; j < number_streams; j++){
         cudaErrchk(cudaStreamSynchronize(stream[j]));
-    }
+    }  
+
     // deallocate device memory
     for(int i = 0; i < number_streams; i++){
         if (stream[i]) {
@@ -3783,7 +3784,6 @@ void rgf_lesser_greater_batched_without_hostmalloc(
         if(greater_inv_diagblk_small_d[i]){
             cudaErrchk(cudaFree(greater_inv_diagblk_small_d[i]));
         }
-
     }
 
 

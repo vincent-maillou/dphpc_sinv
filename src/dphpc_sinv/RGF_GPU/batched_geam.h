@@ -1,3 +1,4 @@
+// Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #pragma once
 #include <cuda.h>
 #include <cublas_v2.h>

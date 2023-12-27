@@ -1,7 +1,7 @@
 // Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #include "batched_retarded.h"
 
-void rgf_multiple_energy_points_for_loop(
+void rgf_retarded_for(
     unsigned int blocksize,
     unsigned int matrix_size,
     unsigned int batch_size,
@@ -477,7 +477,7 @@ void rgf_multiple_energy_points_for_loop(
 
 }
 
-void rgf_batched(
+void rgf_retarded_batched(
     unsigned int blocksize,
     unsigned int matrix_size,
     unsigned int batch_size,

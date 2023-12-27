@@ -12,7 +12,7 @@
 #include <cusparse.h>
 #include "cudaerrchk.h"
 
-bool rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
+void rgf_sparse_matrix_does_not_fit_gpu_memory_with_copy_compute_overlap(
     unsigned int blocksize,
     unsigned int matrix_size,
     int* diag_nnz,

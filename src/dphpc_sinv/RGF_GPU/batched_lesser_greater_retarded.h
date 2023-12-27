@@ -1,3 +1,4 @@
+// Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
 #pragma once
 
 #include <stdio.h>
@@ -16,7 +17,7 @@
 using complex_h = std::complex<double>;
 using complex_d = cuDoubleComplex;
 
-void rgf_lesser_greater_batched(
+void rgf_lesser_greater_retarded_batched(
     unsigned int blocksize,
     unsigned int matrix_size,
     unsigned int batch_size,

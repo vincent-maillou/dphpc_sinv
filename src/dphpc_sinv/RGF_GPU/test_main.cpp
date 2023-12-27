@@ -1097,6 +1097,64 @@ int main() {
             }
         }
 
+        rgf_retarded_batched_strided(blocksize, matrix_size, batch_size,
+                                    batch_system_matrices_diagblk_h,
+                                    batch_system_matrices_upperblk_h,
+                                    batch_system_matrices_lowerblk_h,
+                                    batch_retarded_inv_matrices_diagblk_h,
+                                    batch_retarded_inv_matrices_upperblk_h,
+                                    batch_retarded_inv_matrices_lowerblk_h);
+
+
+        norm_retarded_diagblk = 0.0;
+        norm_retarded_upperblk = 0.0;
+        norm_retarded_lowerblk = 0.0;
+        diff_retarded_diagblk = 0.0;
+        diff_retarded_upperblk = 0.0;
+        diff_retarded_lowerblk = 0.0;
+
+        for(unsigned int i = 0; i < n_blocks; i++){
+            for(unsigned j =  0; j < 1 * blocksize * blocksize; j++){
+                norm_retarded_diagblk += std::abs(batch_retarded_inv_matrices_diagblk_ref[i][j]) * std::abs(batch_retarded_inv_matrices_diagblk_ref[i][j]);
+                diff_retarded_diagblk += std::abs(batch_retarded_inv_matrices_diagblk_h[i][j] - batch_retarded_inv_matrices_diagblk_ref[i][j]) *
+                    std::abs(batch_retarded_inv_matrices_diagblk_h[i][j] - batch_retarded_inv_matrices_diagblk_ref[i][j]);
+            }
+
+        }
+        for(unsigned int i = 0; i < n_blocks - 1; i++){
+            for(unsigned int j =  0; j < 1 * blocksize * blocksize; j++){
+                norm_retarded_upperblk += std::abs(batch_retarded_inv_matrices_upperblk_ref[i][j]) * std::abs(batch_retarded_inv_matrices_upperblk_ref[i][j]);
+                diff_retarded_upperblk += std::abs(batch_retarded_inv_matrices_upperblk_h[i][j] - batch_retarded_inv_matrices_upperblk_ref[i][j]) *
+                    std::abs(batch_retarded_inv_matrices_upperblk_h[i][j] - batch_retarded_inv_matrices_upperblk_ref[i][j]);
+                norm_retarded_lowerblk += std::abs(batch_retarded_inv_matrices_lowerblk_ref[i][j]) * std::abs(batch_retarded_inv_matrices_lowerblk_ref[i][j]);
+                diff_retarded_lowerblk += std::abs(batch_retarded_inv_matrices_lowerblk_h[i][j] - batch_retarded_inv_matrices_lowerblk_ref[i][j]) *
+                    std::abs(batch_retarded_inv_matrices_lowerblk_h[i][j] - batch_retarded_inv_matrices_lowerblk_ref[i][j]);
+            }
+        }
+        if(diff_retarded_diagblk/norm_retarded_diagblk > reltol || diff_retarded_upperblk/norm_retarded_upperblk > reltol || diff_retarded_lowerblk/norm_retarded_lowerblk > reltol){
+            std::cout << diff_retarded_diagblk/norm_retarded_diagblk << std::endl;
+            std::cout << diff_retarded_upperblk/norm_retarded_upperblk << std::endl;
+            std::cout << diff_retarded_lowerblk/norm_retarded_lowerblk << std::endl;
+            printf("FAILED BATCHED retarded strided\n");
+            not_failed = false;
+        }
+
+        // set outputs to zero
+        for(unsigned int i = 0; i < n_blocks; i++){
+            for(unsigned int batch = 0; batch < batch_size; batch++){
+                for(unsigned int j = 0; j < blocksize * blocksize; j++){
+                    batch_retarded_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                }
+            }
+        }
+        for(unsigned int i = 0; i < n_blocks-1; i++){
+            for(unsigned int batch = 0; batch < batch_size; batch++){
+                for(unsigned int j = 0; j < blocksize * blocksize; j++){
+                    batch_retarded_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                    batch_retarded_inv_matrices_lowerblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                }
+            }
+        }
 
         //free batched memory
         for(unsigned int i = 0; i < n_blocks; i++){

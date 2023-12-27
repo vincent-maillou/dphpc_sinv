@@ -37,3 +37,14 @@ void rgf_retarded_batched(
     complex_h **batch_inv_diagblk_h,
     complex_h **batch_inv_upperblk_h,
     complex_h **batch_inv_lowerblk_h);
+
+void rgf_retarded_batched_strided(
+    unsigned int blocksize,
+    unsigned int matrix_size,
+    unsigned int batch_size,
+    complex_h **batch_diagblk_h,
+    complex_h **batch_upperblk_h,
+    complex_h **batch_lowerblk_h,
+    complex_h **batch_inv_diagblk_h,
+    complex_h **batch_inv_upperblk_h,
+    complex_h **batch_inv_lowerblk_h);

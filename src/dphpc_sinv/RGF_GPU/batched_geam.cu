@@ -1,16 +1,5 @@
 #include "batched_geam.h"
 
-#define cublasErrchk(ans) { cublasAssert((ans), __FILE__, __LINE__); }
-inline void cublasAssert(cublasStatus_t code, const char *file, int line, bool abort=true)
-{
-   if (code != CUBLAS_STATUS_SUCCESS) 
-   {
-        //Did not find a counter part to cudaGetErrorString in cublas
-        std::printf("CUBLASassert: %s %s %d\n", cudaGetErrorString((cudaError_t)code), file, line);
-        if (abort) exit(code);
-   }
-}
-
 __global__ void quatrexblasZgeamBatched_C_C_kernel(
     int m, int n,
     cuDoubleComplex alpha,

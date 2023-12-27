@@ -1,5 +1,5 @@
 // Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
-#include "dense_rgf.h"
+#include "single_retarded.h"
 
 void rgf_dense_matrix_fits_gpu_memory(
     unsigned int blocksize,

@@ -12,10 +12,10 @@ PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
 # BLOCKSIZE = 100
 # BATCHSIZE = 20
 # PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
-# MAT_SIZE = 6
-# BLOCKSIZE = 2
-# BATCHSIZE = 3
-# PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
+MAT_SIZE = 6
+BLOCKSIZE = 2
+BATCHSIZE = 3
+PATH_TO_FILE = "/usr/scratch/mont-fort17/almaeder/rgf_test/"
 
 if __name__ == "__main__":
 

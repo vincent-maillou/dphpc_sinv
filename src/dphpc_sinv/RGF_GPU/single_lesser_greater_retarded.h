@@ -1,16 +1,14 @@
+// Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
+#pragma once
 #include <stdio.h>
-#include <stdlib.h>
 #include <complex>
-#include <iostream>
-
 #include <cuda_runtime_api.h>
 #include <cuda.h>
 #include <cuComplex.h>
 #include <cuda/std/complex>
 #include <cusolverDn.h>
 #include <cublas_v2.h>
-
-#include "utils.h"
+#include "cudaerrchk.h"
 
 using complex_h = std::complex<double>;
 using complex_d = cuDoubleComplex;

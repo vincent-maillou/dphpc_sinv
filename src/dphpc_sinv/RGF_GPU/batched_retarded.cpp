@@ -1,6 +1,5 @@
 // Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
-#include "batched_dense_rgf.h"
-
+#include "batched_retarded.h"
 
 void rgf_multiple_energy_points_for_loop(
     unsigned int blocksize,

@@ -1,6 +1,7 @@
 // Copyright 2023 under ETH Zurich DPHPC project course. All rights reserved.
-
 #pragma once
+#include <stdio.h>
+#include <complex>
 #include <cuda_runtime_api.h>
 #include <cuda.h>
 #include <cuComplex.h>
@@ -10,6 +11,7 @@
 #include <cuda_runtime.h>
 #include "utils.h"
 #include "cudaerrchk.h"
+
 // both should be equivalent, thus reinterpret_cast should be fine
 using complex_h = std::complex<double>;
 using complex_d = cuDoubleComplex; //cuda::complex_h;

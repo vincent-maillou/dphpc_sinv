@@ -3,6 +3,7 @@
 #include <cublas_v2.h>
 #include <cstdio>
 #include <cuComplex.h>
+#include "cudaerrchk.h"
 
 cublasStatus_t quatrexblasZgeamBatched(
     cublasHandle_t handle,

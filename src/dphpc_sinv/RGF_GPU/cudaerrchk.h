@@ -3,6 +3,7 @@
 #include <cuda.h>
 #include <cusolverDn.h>
 #include <cublas_v2.h>
+#include <cusparse.h>
 
 #define cudaErrchk(ans) { cudaAssert((ans), __FILE__, __LINE__); }
 inline void cudaAssert(cudaError_t code, const char *file, int line, bool abort=true)
@@ -34,6 +35,17 @@ inline void cublasAssert(cublasStatus_t code, const char *file, int line, bool a
    {
         //Did not find a counter part to cudaGetErrorString in cublas
         std::printf("CUBLASassert: %s %s %d\n", cudaGetErrorString((cudaError_t)code), file, line);
+        if (abort) exit(code);
+   }
+}
+
+#define cusparseErrchk(ans) { cusparseAssert((ans), __FILE__, __LINE__); }
+inline void cusparseAssert(cusparseStatus_t code, const char *file, int line, bool abort=true)
+{
+   if (code != CUSPARSE_STATUS_SUCCESS) 
+   {
+        //Did not find a counter part to cudaGetErrorString in cusolver
+        fprintf(stderr,"CUSPARSEassert: %s %s %d\n", cudaGetErrorString((cudaError_t)code), file, line);
         if (abort) exit(code);
    }
 }

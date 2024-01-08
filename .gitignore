@@ -1,5 +1,6 @@
 *.txt
 *.o
+*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -170,3 +171,18 @@ src/dphpc_sinv/PSR/PSR_1
 .vscode/settings.json
 .vscode/settings.json
 .vscode/settings.json
+
+src/dphpc_sinv/main
+**/main
+**/test_main
+**/test
+src/dphpc_sinv/*.o
+**/*.o
+.vscode/
+**/.vscode/
+**/dense_rgf
+**/sparse_rgf
+**/benchmark_batched_retarded_main
+**/benchmark_retarded_main
+**/batched_dense_rgf
+**/*.nsys-rep

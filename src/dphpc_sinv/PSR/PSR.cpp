@@ -2171,11 +2171,11 @@ void produceSchurCentral_2(Eigen::MatrixXcd A,
               G.block(bot_rowindice, bot_rowindiceCol, blocksize, blocksize) *
               L.block(bot_rowindice, botm1_rowindiceCol, blocksize, blocksize));
 
-    // G.block(botm1_rowindice, bot_rowindiceCol, blocksize, blocksize) =
-    //     -1 * (U.block(botm1_rowindice, bot_rowindiceCol, blocksize, blocksize) *
-    //           G.block(bot_rowindice, bot_rowindiceCol, blocksize, blocksize) +
-    //           U.block(botm1_rowindice, top_rowindiceCol, blocksize, blocksize) *
-    //           G.block(top_rowindice, bot_rowindiceCol, blocksize, blocksize));
+    G.block(botm1_rowindice, bot_rowindiceCol, blocksize, blocksize) =
+        -1 * (U.block(botm1_rowindice, bot_rowindiceCol, blocksize, blocksize) *
+              G.block(bot_rowindice, bot_rowindiceCol, blocksize, blocksize) +
+              U.block(botm1_rowindice, top_rowindiceCol, blocksize, blocksize) *
+              G.block(top_rowindice, bot_rowindiceCol, blocksize, blocksize));
 
     for (int i = bottom_blockrow - 2; i > top_blockrow; --i) {
         int i_rowindice = i * blocksize;

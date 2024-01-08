@@ -10,7 +10,8 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Hello from process " << rank << " of " << size << std::endl;
 
-    std::string test_folder = "/home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/test_matrices/120_8_3/";
+    //std::string test_folder = "/home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/test_matrices/120_8_3/";
+    std::string test_folder = "/home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/";
 
     const int N = 120; // Change this to the desired size of your NxN matrix
     const int blocksize = 8; // Change this to the desired blocksize
@@ -30,7 +31,8 @@ int main(int argc, char *argv[]) {
     // Memory allocation for each "process"
     std::complex<double>* A = new std::complex<double>[N * N];
 
-    load_matrix(test_folder + "A_full.bin", A, N, N);
+    //load_matrix(test_folder + "A_full.bin", A, N, N);
+    load_matrix(test_folder + "matrix_0_lowerblk.bin", A, N, N);
 
 
     Eigen::MatrixXcd eigenA_read_in = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A, N, N);

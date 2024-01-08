@@ -162,21 +162,24 @@ if __name__ == "__main__":
     matrix_upper_blk = extract_offdiagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE, 1)
     matrix_lower_blk = extract_offdiagonal_blocks(matrix, MAT_SIZE, BLOCKSIZE, -1)
     
-    matrix_diag_blk = extract_diagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE)
-    matrix_upper_blk = extract_offdiagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE, 1)
-    matrix_lower_blk = extract_offdiagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE, -1)
+    #matrix_diag_blk = extract_diagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE)
+    #matrix_upper_blk = extract_offdiagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE, 1)
+    #matrix_lower_blk = extract_offdiagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE, -1)
 
 
     # Save matrices to file
     #path_to_file = "../../tests/tests_cases/"
     path_to_file = "./src/dphpc_sinv/PSR/"
+
+    filename = "A_full.bin"
+    write_matrix_to_file(path_to_file+filename, matrix, MAT_SIZE, 1)
     
     filename = "matrix_0_diagblk.bin"
-    write_matrix_to_file(path_to_file+filename, matrix, MAT_SIZE, 1)
+    write_matrix_to_file(path_to_file+filename, matrix_diag_blk, MAT_SIZE, 1)
     filename = "matrix_0_upperblk.bin"
-    write_matrix_to_file(path_to_file+filename, matrix, MAT_SIZE, 1)
+    write_matrix_to_file(path_to_file+filename, matrix_upper_blk, MAT_SIZE, 1)
     filename = "matrix_0_lowerblk.bin"
-    write_matrix_to_file(path_to_file+filename, matrix, MAT_SIZE, 1)
+    write_matrix_to_file(path_to_file+filename, matrix_lower_blk, MAT_SIZE, 1)
     
     filename = "matrix_0_inverse_diagblk.bin"
     write_matrix_to_file(path_to_file+filename, inv_matrix, MAT_SIZE, 1)

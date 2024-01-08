@@ -30,12 +30,40 @@ int main(int argc, char *argv[]) {
 
     // Memory allocation for each "process"
     std::complex<double>* A = new std::complex<double>[N * N];
+    std::complex<double>* A_diagblk = new std::complex<double>[n_blocks * blocksize * blocksize];
+    std::complex<double>* A_upperblk = new std::complex<double>[(n_blocks-1) * blocksize * blocksize];
+    std::complex<double>* A_lowerblk = new std::complex<double>[(n_blocks-1) * blocksize * blocksize];
 
-    //load_matrix(test_folder + "A_full.bin", A, N, N);
-    load_matrix(test_folder + "matrix_0_lowerblk.bin", A, N, N);
-
+    load_matrix(test_folder + "A_full.bin", A, N, N);
+    load_matrix(test_folder + "matrix_0_diagblk.bin", A_diagblk, blocksize, n_blocks * blocksize);
+    load_matrix(test_folder + "matrix_0_upperblk.bin", A_upperblk, blocksize, (n_blocks-1) * blocksize);
+    load_matrix(test_folder + "matrix_0_lowerblk.bin", A_lowerblk, blocksize, (n_blocks-1) * blocksize);
 
     Eigen::MatrixXcd eigenA_read_in = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A, N, N);
+    Eigen::MatrixXcd eigenA_diagblk = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_diagblk, blocksize, n_blocks * blocksize);
+    Eigen::MatrixXcd eigenA_upperblk = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_upperblk, blocksize, (n_blocks-1) * blocksize);
+    Eigen::MatrixXcd eigenA_lowerblk = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_lowerblk, blocksize, (n_blocks-1) * blocksize);
+
+    // if (rank == 0){
+    //     if (eigenA_read_in.block(0, 0, blocksize, blocksize).isApprox(eigenA_diagblk.block(0, 0,blocksize,blocksize))){
+    //         std::cout << "Block 0 0 is equal" << std::endl;
+    //     }
+    //     else {
+    //         std::cout << "Block 0 0 is not equal" << std::endl;
+    //     }
+    //     if (eigenA_read_in.block(0, blocksize, blocksize, blocksize).isApprox(eigenA_upperblk.block(0, 0,blocksize,blocksize))){
+    //         std::cout << "Block 0 1 is equal" << std::endl;
+    //     }
+    //     else {
+    //         std::cout << "Block 0 1 is not equal" << std::endl;
+    //     }
+    //     if (eigenA_read_in.block(blocksize, 0, blocksize, blocksize).isApprox(eigenA_lowerblk.block(0, 0,blocksize,blocksize))){
+    //         std::cout << "Block 1 0 is equal" << std::endl;
+    //     }
+    //     else {
+    //         std::cout << "Block 1 0 is not equal" << std::endl;
+    //     }
+    // }
 
     if (FullSeqTest) {
         auto G_final = psr_seqsolve_fulltest(test_folder,
@@ -51,8 +79,10 @@ int main(int argc, char *argv[]) {
         );
     }
     else {
-        //auto G_final = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, check_result);
-        auto G_final = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, check_result);
+        auto G_final = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in,
+                                                 eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result);
+        // auto G_final = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, \
+        //                                    eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result);
     }   
 
     // Synchonization
@@ -65,8 +95,10 @@ int main(int argc, char *argv[]) {
         if(rank == 0){
             std::cout << "Run: " << i << " ..starting";
         }
-        //auto G_final = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, check_result);
-        auto G_final = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, check_result);
+        auto G_final = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_diagblk,
+                                                 eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result);
+        // auto G_final = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_diagblk, \
+        //                                    eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result);
         MPI_Barrier(MPI_COMM_WORLD);
     }
 

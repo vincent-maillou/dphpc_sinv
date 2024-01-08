@@ -472,6 +472,57 @@ void rgf_for_subsystem(
 
 }
 
+void copy_blocks_to_processA(int partition_blocksize,
+                             int blocksize,
+                             int partitions,
+                             Eigen::MatrixXcd& processA,
+                             Eigen::MatrixXcd block_diag,
+                             Eigen::MatrixXcd block_upper,
+                             Eigen::MatrixXcd block_lower,
+                             int rank)
+{
+    int diag_offset = rank * partition_blocksize; // offset in the diagonal block vector in number of blocks
+    int upper_offset = rank * partition_blocksize; // offset in the upper block vector in number of blocks
+    int lower_offset = std::max((rank - 1) * partition_blocksize + (partition_blocksize - 1), 0); // offset in the lower block vector in number of blocks
+
+    int diag_number = partition_blocksize; // number of blocks to copy from the diagonal block vector
+    int upper_number = partition_blocksize; // number of blocks to copy from the upper block vector
+    if (rank == partitions - 1) {
+        upper_number -= 1;
+    }
+    int lower_number = partition_blocksize; // number of blocks to copy from the lower block vector
+    if (rank == 0) {
+        lower_number -= 1;
+    }
+
+    for (int i = 0; i < partition_blocksize; ++i){
+
+        if(rank == 0) {
+            processA.block(i * blocksize, i * blocksize, blocksize, blocksize) = block_diag.block(0, (i + diag_offset) * blocksize, blocksize, blocksize);
+        } else {
+            processA.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize) = block_diag.block(0, (i + diag_offset) * blocksize, blocksize, blocksize);
+        }
+
+        if (i < upper_number) {
+            if(rank == 0) {
+                processA.block(i * blocksize, (i + 1) * blocksize, blocksize, blocksize) = block_upper.block(0, (i + upper_offset) * blocksize, blocksize, blocksize);
+            }
+            else {
+                processA.block(i * blocksize, (i + 2) * blocksize, blocksize, blocksize) = block_upper.block(0, (i + upper_offset) * blocksize, blocksize, blocksize);
+            }
+        }
+
+        if (i < lower_number) {
+            if(rank == 0) {
+                processA.block((i + 1) * blocksize, i * blocksize, blocksize, blocksize) = block_lower.block(0, (i + lower_offset) * blocksize, blocksize, blocksize);
+            }
+            else {
+                processA.block(i * blocksize, i * blocksize, blocksize, blocksize) = block_lower.block(0, (i + lower_offset) * blocksize, blocksize, blocksize);
+            }
+        }
+    }
+        
+}
 
 void reduce_schur_topleftcorner_gpu(
 	int partition_blocksize,
@@ -2845,6 +2896,9 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
                              int rank,
                              int n_blocks_schursystem,
                              Eigen::MatrixXcd& eigenA_read_in,
+                             Eigen::MatrixXcd eigenA_diagblk,
+                             Eigen::MatrixXcd eigenA_upperblk,
+                             Eigen::MatrixXcd eigenA_lowerblk,
                              bool compare_reference
 ){  
 
@@ -2861,59 +2915,50 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
     int rowSizePartition = partition_blocksize * blocksize;
     int colSizePartition = (partition_blocksize + 2) * blocksize;
     Eigen::MatrixXcd processA;
+    //Eigen::MatrixXcd newprocessA;
     Eigen::MatrixXcd G,L,U;
 
     if (rank == 0) {
-        processA = eigenA2.block(0, 0, rowSizePartition, colSizePartition-blocksize);
+        //newprocessA = eigenA2.block(0, 0, rowSizePartition, colSizePartition-blocksize);
+        processA = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
+        copy_blocks_to_processA(partition_blocksize, blocksize, partitions, processA, eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, rank);
+        // if (processA.isApprox(newprocessA)) {
+        //     std::cout << "Process " << rank << " has correct processA" << std::endl;
+        // }
+        // else {
+        //     std::cout << "Process " << rank << " has incorrect processA" << std::endl;
+        // }
         G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
     }
 
     if (rank > 0 && rank < partitions - 1) {
         int startRowIndex = start_blockrow*blocksize;
         int startColIndex = (start_blockrow-1)*blocksize;
-        processA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition);
+        //newprocessA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition);
+        processA = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition);
+        copy_blocks_to_processA(partition_blocksize, blocksize, partitions, processA, eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, rank);
+        // if (processA.isApprox(newprocessA)) {
+        //     std::cout << "Process " << rank << " has correct processA" << std::endl;
+        // }
+        // else {
+        //     std::cout << "Process " << rank << " has incorrect processA" << std::endl;
+        // }
         G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition);
     }
     if (rank == partitions - 1) {
         int startRowIndex = start_blockrow*blocksize;
         int startColIndex = (start_blockrow-1)*blocksize;
-        processA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition-blocksize);
+        //newprocessA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition-blocksize);
+        processA = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
+        copy_blocks_to_processA(partition_blocksize, blocksize, partitions, processA, eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, rank);
+        // if (processA.isApprox(newprocessA)) {
+        //     std::cout << "Process " << rank << " has correct processA" << std::endl;
+        // }
+        // else {
+        //     std::cout << "Process " << rank << " has incorrect processA" << std::endl;
+        // }
         G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
     }
-
-
-    // Start reduce_schur
-    //std::cout << "Process " << rank << " is reducing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
-
-
-    // ----- Start timing -----
-    MPI_Barrier(MPI_COMM_WORLD);
-    double start_time = MPI_Wtime();
-
-
-
-    if (rank == 0){
-        auto result = reduce_schur_topleftcorner(processA, 0, partition_blocksize, blocksize);
-        L = std::get<0>(result);
-        U = std::get<1>(result);
-    }
-
-    if (rank > 0 && rank < partitions - 1){
-        auto result = reduce_schur_central_2(processA, partition_blocksize, blocksize);
-        L = std::get<0>(result);
-        U = std::get<1>(result);
-    }
-    
-    if (rank == partitions - 1){
-        auto result = reduce_schur_bottomrightcorner_2(processA, partition_blocksize, blocksize);
-        L = std::get<0>(result);
-        U = std::get<1>(result);
-    }
-    // End reduce_schur
-
-    // Start of MPIALLGATHER for reduced_schur_system and inverse of said system
-    Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*n_blocks_schursystem, blocksize*n_blocks_schursystem);
-    A_schur.setZero();
 
     // Start of creating custom MPI datatypes for block sends
     MPI_Datatype subblockType;
@@ -2961,6 +3006,41 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
         }
     }
 
+
+    // Start reduce_schur
+    //std::cout << "Process " << rank << " is reducing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+
+
+    // ----- Start timing -----
+    MPI_Barrier(MPI_COMM_WORLD);
+    double start_time = MPI_Wtime();
+
+
+
+    if (rank == 0){
+        auto result = reduce_schur_topleftcorner(processA, 0, partition_blocksize, blocksize);
+        L = std::get<0>(result);
+        U = std::get<1>(result);
+    }
+
+    if (rank > 0 && rank < partitions - 1){
+        auto result = reduce_schur_central_2(processA, partition_blocksize, blocksize);
+        L = std::get<0>(result);
+        U = std::get<1>(result);
+    }
+    
+    if (rank == partitions - 1){
+        auto result = reduce_schur_bottomrightcorner_2(processA, partition_blocksize, blocksize);
+        L = std::get<0>(result);
+        U = std::get<1>(result);
+    }
+    // End reduce_schur
+
+    // Start of MPIALLGATHER for reduced_schur_system and inverse of said system
+    Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*n_blocks_schursystem, blocksize*n_blocks_schursystem);
+    A_schur.setZero();
+
+    
     MPI_Allgatherv(processA.data(), 1, redschur_blockpatternType, comm_custom_buf, receivecounts, displs,  subblock_ReceiveType, MPI_COMM_WORLD);
     
     unsigned long in_buf_size = (blocksize * blocksize * 6) << 1;
@@ -3124,6 +3204,9 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
                              int rank,
                              int n_blocks_schursystem,
                              Eigen::MatrixXcd& eigenA_read_in,
+                             Eigen::MatrixXcd eigenA_diagblk,
+                             Eigen::MatrixXcd eigenA_upperblk,
+                             Eigen::MatrixXcd eigenA_lowerblk,
                              bool compare_reference
 ){  
     // Initialize a cuda stream
@@ -3153,23 +3236,46 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
     Eigen::MatrixXcd G,L,U;
 
     if (rank == 0) {
-        processA = eigenA_read_in.block(0, 0, rowSizePartition, colSizePartition-blocksize);
+        //newprocessA = eigenA2.block(0, 0, rowSizePartition, colSizePartition-blocksize);
+        processA = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
+        copy_blocks_to_processA(partition_blocksize, blocksize, partitions, processA, eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, rank);
+        // if (processA.isApprox(newprocessA)) {
+        //     std::cout << "Process " << rank << " has correct processA" << std::endl;
+        // }
+        // else {
+        //     std::cout << "Process " << rank << " has incorrect processA" << std::endl;
+        // }
         G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
     }
 
     if (rank > 0 && rank < partitions - 1) {
         int startRowIndex = start_blockrow*blocksize;
         int startColIndex = (start_blockrow-1)*blocksize;
-        processA = eigenA_read_in.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition);
+        //newprocessA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition);
+        processA = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition);
+        copy_blocks_to_processA(partition_blocksize, blocksize, partitions, processA, eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, rank);
+        // if (processA.isApprox(newprocessA)) {
+        //     std::cout << "Process " << rank << " has correct processA" << std::endl;
+        // }
+        // else {
+        //     std::cout << "Process " << rank << " has incorrect processA" << std::endl;
+        // }
         G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition);
     }
     if (rank == partitions - 1) {
         int startRowIndex = start_blockrow*blocksize;
         int startColIndex = (start_blockrow-1)*blocksize;
-        processA = eigenA_read_in.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition-blocksize);
+        //newprocessA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition-blocksize);
+        processA = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
+        copy_blocks_to_processA(partition_blocksize, blocksize, partitions, processA, eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, rank);
+        // if (processA.isApprox(newprocessA)) {
+        //     std::cout << "Process " << rank << " has correct processA" << std::endl;
+        // }
+        // else {
+        //     std::cout << "Process " << rank << " has incorrect processA" << std::endl;
+        // }
         G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
     }
-
 
     // Loading of Matrices to the GPU
     // Since cuda has only Col-Major and our Eigen Matrices also use Col-Major
@@ -3208,42 +3314,7 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
     cudaErrchk(cudaMalloc((void**) &L_gpu, processA.rows() * processA.cols() * sizeof(cuDoubleComplex)));
     cudaErrchk(cudaMalloc((void**) &U_gpu, processA.rows() * processA.cols() * sizeof(cuDoubleComplex)));
 
-
-    // Start reduce_schur
-    //std::cout << "Process " << rank << " is reducing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
-
-
-    // ----- Start timing -----
-    MPI_Barrier(MPI_COMM_WORLD);
-    double start_time = MPI_Wtime();
-
-
-    L = Eigen::MatrixXcd::Zero(processA.rows(), processA.cols());
-    U = Eigen::MatrixXcd::Zero(processA.rows(), processA.cols());
-
-    if (rank == 0){
-        reduce_schur_topleftcorner_gpu(partition_blocksize, blocksize, stream, cusolver_handle, cublas_handle, A_gpu, L_gpu, U_gpu, identity_d, l_dim);
-    }
-
-    if (rank > 0 && rank < partitions - 1){
-        reduce_schur_central_gpu(partition_blocksize, blocksize, stream, cusolver_handle, cublas_handle, A_gpu, L_gpu, U_gpu, identity_d, l_dim);
-    }
-    
-    if (rank == partitions - 1){
-        reduce_schur_bottomrightcorner_gpu(partition_blocksize, blocksize, stream, cusolver_handle, cublas_handle, A_gpu, L_gpu, U_gpu, identity_d, l_dim);
-    }
-
-    cudaErrchk(cudaMemcpy(processA.data(), reinterpret_cast<std::complex<double>*>(A_gpu), processA.rows() * processA.cols() * sizeof(std::complex<double>), cudaMemcpyDeviceToHost));
-    // L and U Matrices on the host are currently still needed for process_schur steps
-    cudaErrchk(cudaMemcpy(L.data(), reinterpret_cast<std::complex<double>*>(L_gpu), processA.rows() * processA.cols() * sizeof(std::complex<double>), cudaMemcpyDeviceToHost));
-    cudaErrchk(cudaMemcpy(U.data(), reinterpret_cast<std::complex<double>*>(U_gpu), processA.rows() * processA.cols() * sizeof(std::complex<double>), cudaMemcpyDeviceToHost));
-    // End reduce_schur
-
-    // Start of MPIALLGATHER for reduced_schur_system and inverse of said system
-    Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*n_blocks_schursystem, blocksize*n_blocks_schursystem);
-    A_schur.setZero();
-
-    // Start of creating custom MPI datatypes for block sends
+        // Start of creating custom MPI datatypes for block sends
     MPI_Datatype subblockType;
     create_subblock_Type(&subblockType, rowSizePartition, blocksize, 1);
 
@@ -3290,6 +3361,41 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
             displs[i] = (displs[i-1] + receivecounts[i-1]);
         }
     }
+
+
+    // Start reduce_schur
+    //std::cout << "Process " << rank << " is reducing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
+
+
+    // ----- Start timing -----
+    MPI_Barrier(MPI_COMM_WORLD);
+    double start_time = MPI_Wtime();
+
+
+    L = Eigen::MatrixXcd::Zero(processA.rows(), processA.cols());
+    U = Eigen::MatrixXcd::Zero(processA.rows(), processA.cols());
+
+    if (rank == 0){
+        reduce_schur_topleftcorner_gpu(partition_blocksize, blocksize, stream, cusolver_handle, cublas_handle, A_gpu, L_gpu, U_gpu, identity_d, l_dim);
+    }
+
+    if (rank > 0 && rank < partitions - 1){
+        reduce_schur_central_gpu(partition_blocksize, blocksize, stream, cusolver_handle, cublas_handle, A_gpu, L_gpu, U_gpu, identity_d, l_dim);
+    }
+    
+    if (rank == partitions - 1){
+        reduce_schur_bottomrightcorner_gpu(partition_blocksize, blocksize, stream, cusolver_handle, cublas_handle, A_gpu, L_gpu, U_gpu, identity_d, l_dim);
+    }
+
+    cudaErrchk(cudaMemcpy(processA.data(), reinterpret_cast<std::complex<double>*>(A_gpu), processA.rows() * processA.cols() * sizeof(std::complex<double>), cudaMemcpyDeviceToHost));
+    // L and U Matrices on the host are currently still needed for process_schur steps
+    cudaErrchk(cudaMemcpy(L.data(), reinterpret_cast<std::complex<double>*>(L_gpu), processA.rows() * processA.cols() * sizeof(std::complex<double>), cudaMemcpyDeviceToHost));
+    cudaErrchk(cudaMemcpy(U.data(), reinterpret_cast<std::complex<double>*>(U_gpu), processA.rows() * processA.cols() * sizeof(std::complex<double>), cudaMemcpyDeviceToHost));
+    // End reduce_schur
+
+    // Start of MPIALLGATHER for reduced_schur_system and inverse of said system
+    Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*n_blocks_schursystem, blocksize*n_blocks_schursystem);
+    A_schur.setZero();
 
     MPI_Allgatherv(processA.data(), 1, redschur_blockpatternType, comm_custom_buf, receivecounts, displs,  subblock_ReceiveType, MPI_COMM_WORLD);
     // End of MPIALLGATHER for reduced_schur_system and inverse of said system

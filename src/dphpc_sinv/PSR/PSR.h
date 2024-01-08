@@ -308,6 +308,9 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
                              int rank,
                              int n_blocks_schursystem,
                              Eigen::MatrixXcd& eigenA_read_in,
+                             Eigen::MatrixXcd eigenA_diagblk,
+                             Eigen::MatrixXcd eigenA_upperblk,
+                             Eigen::MatrixXcd eigenA_lowerblk,
                              bool compare_reference
 );
 
@@ -319,6 +322,9 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
                              int rank,
                              int n_blocks_schursystem,
                              Eigen::MatrixXcd& eigenA_read_in,
+                             Eigen::MatrixXcd eigenA_diagblk,
+                             Eigen::MatrixXcd eigenA_upperblk,
+                             Eigen::MatrixXcd eigenA_lowerblk,
                              bool compare_reference
 );
 

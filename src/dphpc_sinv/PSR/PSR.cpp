@@ -2702,6 +2702,9 @@ Eigen::MatrixXcd psr_solve(int N,
                              int rank,
                              int n_blocks_schursystem,
                              Eigen::MatrixXcd& eigenA_read_in,
+                             Eigen::MatrixXcd eigenA_diagblk,
+                             Eigen::MatrixXcd eigenA_upperblk,
+                             Eigen::MatrixXcd eigenA_lowerblk,
                              bool compare_reference
 ){  
 
@@ -2721,21 +2724,45 @@ Eigen::MatrixXcd psr_solve(int N,
     Eigen::MatrixXcd G,L,U;
 
     if (rank == 0) {
-	processA = eigenA2.block(0, 0, rowSizePartition, colSizePartition-blocksize);
-	G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
+        //newprocessA = eigenA2.block(0, 0, rowSizePartition, colSizePartition-blocksize);
+        processA = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
+        copy_blocks_to_processA(partition_blocksize, blocksize, partitions, processA, eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, rank);
+        // if (processA.isApprox(newprocessA)) {
+        //     std::cout << "Process " << rank << " has correct processA" << std::endl;
+        // }
+        // else {
+        //     std::cout << "Process " << rank << " has incorrect processA" << std::endl;
+        // }
+        G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
     }
 
     if (rank > 0 && rank < partitions - 1) {
-	int startRowIndex = start_blockrow*blocksize;
-	int startColIndex = (start_blockrow-1)*blocksize;
-	processA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition);
-	G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition);
+        int startRowIndex = start_blockrow*blocksize;
+        int startColIndex = (start_blockrow-1)*blocksize;
+        //newprocessA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition);
+        processA = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition);
+        copy_blocks_to_processA(partition_blocksize, blocksize, partitions, processA, eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, rank);
+        // if (processA.isApprox(newprocessA)) {
+        //     std::cout << "Process " << rank << " has correct processA" << std::endl;
+        // }
+        // else {
+        //     std::cout << "Process " << rank << " has incorrect processA" << std::endl;
+        // }
+        G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition);
     }
     if (rank == partitions - 1) {
-	int startRowIndex = start_blockrow*blocksize;
-	int startColIndex = (start_blockrow-1)*blocksize;
-	processA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition-blocksize);
-	G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
+        int startRowIndex = start_blockrow*blocksize;
+        int startColIndex = (start_blockrow-1)*blocksize;
+        //newprocessA = eigenA2.block(startRowIndex, startColIndex, rowSizePartition, colSizePartition-blocksize);
+        processA = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
+        copy_blocks_to_processA(partition_blocksize, blocksize, partitions, processA, eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, rank);
+        // if (processA.isApprox(newprocessA)) {
+        //     std::cout << "Process " << rank << " has correct processA" << std::endl;
+        // }
+        // else {
+        //     std::cout << "Process " << rank << " has incorrect processA" << std::endl;
+        // }
+        G = Eigen::MatrixXcd::Zero(rowSizePartition, colSizePartition-blocksize);
     }
 
 

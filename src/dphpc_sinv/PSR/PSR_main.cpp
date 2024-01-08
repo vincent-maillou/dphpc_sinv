@@ -10,15 +10,18 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Hello from process " << rank << " of " << size << std::endl;
 
-    std::string test_folder = "/home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/test_matrices/120_8_3/";
+    std::string test_folder = "/home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/test_matrices/512_32_16/";
 
-    const int N = 120; // Change this to the desired size of your NxN matrix
-    const int blocksize = 8; // Change this to the desired blocksize
+    const int N = 512; // Change this to the desired size of your NxN matrix
+    const int blocksize = 32; // Change this to the desired blocksize
     int partitions = size; // Change to number of MPI processes
     int num_central_partitions = partitions - 2;
 
+
+
     // Partition Parameters
     int n_blocks = N / blocksize;
+    std::cout << "n_blocks: " << n_blocks << std::endl;
     int partition_blocksize = n_blocks / partitions;
 
     int n_blocks_schursystem = (partitions - 1) * 2;

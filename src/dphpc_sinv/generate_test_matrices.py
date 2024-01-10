@@ -170,16 +170,17 @@ if __name__ == "__main__":
 
     # Save matrices to file
     #path_to_file = "../../tests/tests_cases/"
-    path_to_file = "./src/dphpc_sinv/PSR/"
+    #path_to_file = "./src/dphpc_sinv/PSR/"
+    path_to_file = "/project/s1212/PSR_BENCH/random_matrices"
 
-    filename = "A_full.bin"
+    filename = "A_full_" + str(MAT_SIZE) + "_" + str(BLOCKSIZE) +   ".bin"
     write_matrix_to_file(path_to_file+filename, matrix, MAT_SIZE, 1)
     
-    filename = "matrix_0_diagblk.bin"
+    filename = "matrix_" + str(MAT_SIZE) + "_" + str(BLOCKSIZE) +  "_diagblk.bin"
     write_matrix_to_file(path_to_file+filename, matrix_diag_blk, MAT_SIZE, 1)
-    filename = "matrix_0_upperblk.bin"
+    filename = "matrix_" + str(MAT_SIZE) + "_" + str(BLOCKSIZE) + "_upperblk.bin"
     write_matrix_to_file(path_to_file+filename, matrix_upper_blk, MAT_SIZE, 1)
-    filename = "matrix_0_lowerblk.bin"
+    filename = "matrix_" + str(MAT_SIZE) + "_" + str(BLOCKSIZE) + "_lowerblk.bin"
     write_matrix_to_file(path_to_file+filename, matrix_lower_blk, MAT_SIZE, 1)
     
     filename = "matrix_0_inverse_diagblk.bin"

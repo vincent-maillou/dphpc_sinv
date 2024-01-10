@@ -1,0 +1,11 @@
+#!/bin/bash -l
+#SBATCH --job-name="generate"
+#SBATCH --account="s1212"
+#SBATCH --time=1:00:00
+#SBATCH --nodes=1
+#SBATCH --partition=normal
+#SBATCH --constraint=gpu
+
+
+srun python generate_test_matrices.py -nb 135 -bls 512
+

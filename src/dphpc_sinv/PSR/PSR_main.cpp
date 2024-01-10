@@ -10,10 +10,10 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Hello from process " << rank << " of " << size << std::endl;
 
-    std::string test_folder = "/home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/";
-    //std::string test_folder = "/project/s1212/PSR_BENCH/random_matrices/";
-    //std::string save_folder = "/project/s1212/PSR_BENCH/times/";
-    std::string save_folder = "";
+    //std::string test_folder = "/home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/";
+    std::string test_folder = "/scratch/snx3000/amaeder/PSR_BENCH/random_matrices/";
+    std::string save_folder = "/scratch/snx3000/amaeder/PSR_BENCH/times/";
+    //std::string save_folder = "";
 
     //const int N = 120; // Change this to the desired size of your NxN matrix
     const int N = std::atoi(argv[1]); // Change this to the desired size of your NxN matrix

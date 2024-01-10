@@ -54,6 +54,7 @@ def generateBandedDiagonalMatrix(
         for j in range(MAT_SIZE):
             if i - j >= BLOCKSIZE or j - i >= BLOCKSIZE:
                 A[i, j] = 0
+        A[i, i] += np.sum(np.abs(A[i, :]))
 
     return A
 

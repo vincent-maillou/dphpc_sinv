@@ -146,7 +146,6 @@ def write_matrix_parameters(
     with open(path_to_file, "w") as f:
         f.write(str(matrix_size) + "\n")
         f.write(str(blocksize) + "\n")
-
     
 if __name__ == "__main__":
     # Save matrices to file
@@ -196,14 +195,14 @@ if __name__ == "__main__":
             #matrix_lower_blk = extract_offdiagonal_blocks(inv_matrix, MAT_SIZE, BLOCKSIZE, -1)
 
             rng = np.random.default_rng()
-            matrix_diag_blk = rng.random((BLOCKSIZE, MAT_SIZE), dtype=np.complex128)
-            matrix_upper_blk = rng.random((BLOCKSIZE, MAT_SIZE - BLOCKSIZE), dtype=np.complex128)
-            matrix_lower_blk = rng.random((BLOCKSIZE, MAT_SIZE - BLOCKSIZE), dtype=np.complex128)
+            matrix_diag_blk = rng.random((BLOCKSIZE, MAT_SIZE), dtype=np.float64) + 1j*rng.random((BLOCKSIZE, MAT_SIZE), dtype=np.float64)
+            matrix_upper_blk = rng.random((BLOCKSIZE, MAT_SIZE - BLOCKSIZE), dtype=np.float64) + 1j*rng.random((BLOCKSIZE, MAT_SIZE - BLOCKSIZE), dtype=np.float64)
+            matrix_lower_blk = rng.random((BLOCKSIZE, MAT_SIZE - BLOCKSIZE), dtype=np.float64) + 1j*rng.random((BLOCKSIZE, MAT_SIZE - BLOCKSIZE), dtype=np.float64)
 
             diag_blk = np.diag(10.0 * np.ones(BLOCKSIZE))
 
             # make diag dominant
-            for i in range(BLOCKSIZE):
+            for i in range(NUM_OF_BLOCKS[j]):
                 matrix_diag_blk[:,i*BLOCKSIZE:(i+1)*BLOCKSIZE] += diag_blk
 
 

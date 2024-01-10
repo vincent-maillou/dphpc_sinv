@@ -7,5 +7,5 @@
 #SBATCH --constraint=gpu
 
 
-srun python generate_test_matrices.py -nb 135 -bls 512
+srun python generate_test_matrices.py
 

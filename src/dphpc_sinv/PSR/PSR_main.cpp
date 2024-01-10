@@ -1,5 +1,7 @@
 #include "PSR.h"
 
+
+
 int main(int argc, char *argv[]) {
 
     int rank, size;
@@ -31,8 +33,9 @@ int main(int argc, char *argv[]) {
 
     bool FullSeqTest = false;
     bool check_result = true;
+    int n_segments = 6; // reduce, communicate, invert, copy, produce, total
 
-    double pseudo_time[1];
+    timing_struct pseudo_time(2, 1, n_segments);
 
     // Memory allocation for each "process"
     std::complex<double>* A = new std::complex<double>[N * N];
@@ -90,9 +93,9 @@ int main(int argc, char *argv[]) {
     }
     else {
         auto G_final_gpu = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in,
-                                                 eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result, &pseudo_time[0]);
+                                                 eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result, pseudo_time, 0);
         auto G_final_cpu = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, \
-                                              eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result, &pseudo_time[0]);
+                                              eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result, pseudo_time, 0);
     }   
 
     // Synchonization
@@ -100,16 +103,16 @@ int main(int argc, char *argv[]) {
 
     check_result = false;
     int nruns = 3;
-    double times[2][nruns];
+    timing_struct timing(2, nruns, n_segments);
 
     for (int i = 0; i < nruns; i++) {
         if(rank == 0){
             std::cout << "Run: " << i << " ..starting";
         }
         auto G_final_gpu = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in,
-                                                 eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result, &times[0][i]);
+                                                 eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result, timing, i);
         auto G_final_cpu = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, \
-                                            eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result, &times[1][i]);
+                                            eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result, timing, i);
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
@@ -120,7 +123,14 @@ int main(int argc, char *argv[]) {
             outputFile_times.open(path_times);
             if(outputFile_times.is_open()){
                 for(int i = 0; i < nruns; i++){
-                    outputFile_times << times[j][i] << " ";
+                    for(int k =0; k < n_segments; k++){
+                        outputFile_times << timing.times[j][i][k] << " ";
+                    }
+                    outputFile_times << std::endl;
+                    if(rank == 0){
+                        std::cout << timing.times[j][i][5] << " ";
+                    }
+                    
                 }
                 outputFile_times << '\n';
             }
@@ -128,6 +138,7 @@ int main(int argc, char *argv[]) {
                 std::printf("Error opening file\n");
             }
             outputFile_times.close();
+            std::cout << std::endl;
     }
 
 

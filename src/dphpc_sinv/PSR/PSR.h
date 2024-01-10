@@ -27,6 +27,25 @@
 using complex_h = std::complex<double>;
 using complex_d = cuDoubleComplex;
 
+struct timing_struct {
+
+    double*** times;
+
+    timing_struct(int modes, int runs, int segments) {
+        times = new double**[modes];
+        for (int i = 0; i < modes; i++) {
+            times[i] = new double*[runs];
+            for (int j = 0; j < runs; j++) {
+                times[i][j] = new double[segments];
+            }
+        }
+    }
+
+    ~timing_struct() {
+        delete[] times;
+    }
+};
+
 // Start of additions for cuda impl
 #define cudaErrchk(ans) { cudaAssert((ans), __FILE__, __LINE__); }
 inline void cudaAssert(cudaError_t code, const char *file, int line, bool abort=true)
@@ -298,7 +317,7 @@ Eigen::MatrixXcd psr_solve(int N,
                              int n_blocks_schursystem,
                              Eigen::MatrixXcd& eigenA_read_in,
                              bool compare_reference,
-                             double*
+                             timing_struct ts
 );
 
 Eigen::MatrixXcd psr_solve_customMPI(int N,
@@ -313,7 +332,8 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
                              Eigen::MatrixXcd eigenA_upperblk,
                              Eigen::MatrixXcd eigenA_lowerblk,
                              bool compare_reference,
-                             double*
+                             timing_struct& ts,
+                             int run_no
 );
 
 Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
@@ -328,7 +348,8 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
                              Eigen::MatrixXcd eigenA_upperblk,
                              Eigen::MatrixXcd eigenA_lowerblk,
                              bool compare_reference,
-                             double*
+                             timing_struct& ts,
+                             int run_no
 );
 
 void createblockMatrixType(MPI_Datatype* blockMatrixType, int stride, int blocksize);

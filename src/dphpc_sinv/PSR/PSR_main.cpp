@@ -21,6 +21,17 @@ int main(int argc, char *argv[]) {
 
     for(int i_blocks = 0; i_blocks < 9; ++i_blocks){
         for(int i_size = 0; i_size<4; ++i_size){
+
+            // break depending on size and matrix size
+            double memconsumption = ((4.0/size) * n_blocks_input[i_blocks] * blocksize_input[i_size]) *
+                 ((1.0/size) * n_blocks_input[i_blocks] * blocksize_input[i_size]) * 16.0 / (1e9);
+            int memconsumption_int = std::floor(memconsumption);
+            if(memconsumption_int > 14){
+                std::cout << "Memory consumption too high: " << memconsumption << " GB" << std::endl;
+                std::cout << "n_blocks_input" << "blocksize_input" << n_blocks_input[i_blocks] << " " << blocksize_input[i_size] << std::endl;
+                break;
+            }
+
             //const int N = 120; // Change this to the desired size of your NxN matrix
             const int N = n_blocks_input[i_blocks] * blocksize_input[i_size]; // Change this to the desired size of your NxN matrix
             const int blocksize = blocksize_input[i_size]; // Change this to the desired blocksize

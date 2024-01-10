@@ -2706,7 +2706,7 @@ Eigen::MatrixXcd psr_solve(int N,
                              Eigen::MatrixXcd eigenA_upperblk,
                              Eigen::MatrixXcd eigenA_lowerblk,
                              bool compare_reference,
-                             double* time
+                             double* time[]
 ){  
 
     Eigen::MatrixXcd eigenA2 = eigenA_read_in;
@@ -2928,7 +2928,8 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
                              Eigen::MatrixXcd eigenA_upperblk,
                              Eigen::MatrixXcd eigenA_lowerblk,
                              bool compare_reference,
-                             double* time
+                             timing_struct& ts,
+                             int run_no
 ){  
 
     Eigen::MatrixXcd eigenA2 = eigenA_read_in;
@@ -3064,6 +3065,8 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
         U = std::get<1>(result);
     }
     // End reduce_schur
+    double reduce_schur_time = MPI_Wtime() - start_time;
+    ts.times[1][run_no][0] = reduce_schur_time;
 
     // Start of MPIALLGATHER for reduced_schur_system and inverse of said system
     Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*n_blocks_schursystem, blocksize*n_blocks_schursystem);
@@ -3071,6 +3074,10 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
 
     
     MPI_Allgatherv(processA.data(), 1, redschur_blockpatternType, comm_custom_buf, receivecounts, displs,  subblock_ReceiveType, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double comm_time = MPI_Wtime() - reduce_schur_time - start_time;
+    ts.times[1][run_no][1] = comm_time;
     
     unsigned long in_buf_size = (blocksize * blocksize * 6) << 1;
     fill_reduced_schur_matrix_cd(A_schur, comm_custom_buf, in_buf_size, blocksize, partitions, rank);
@@ -3079,6 +3086,9 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
 
     auto G_schur = A_schur.inverse();
     // End of MPIALLGATHER for reduced_schur_system and inverse of said system
+
+    double invert_time = MPI_Wtime() - comm_time - reduce_schur_time - start_time;
+    ts.times[1][run_no][2] = invert_time;
 
     // Start of writeback of reduced inverse to full G partitions
     if(rank == 0) {
@@ -3116,7 +3126,8 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
     }
     // End of writeback of reduced inverse to full G partitions
 
-
+    double copy_time = MPI_Wtime() - comm_time - reduce_schur_time - invert_time - start_time;
+    ts.times[1][run_no][3] = copy_time;
     // Start of produce_schur
     //std::cout << "Process " << rank << " is producing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
 
@@ -3131,11 +3142,13 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
     }
     
     MPI_Barrier(MPI_COMM_WORLD);
+    double produce_time = MPI_Wtime() - copy_time - comm_time - reduce_schur_time - invert_time - start_time;
+    ts.times[1][run_no][4] = produce_time;
     double end_time = MPI_Wtime();
     // ----- End timing -----
 
     double elapsed_time = end_time - start_time;
-    *time = elapsed_time;
+    ts.times[1][run_no][5] = elapsed_time;
 
     if(compare_reference == false){
         if(rank == 0) {
@@ -3238,7 +3251,8 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
                              Eigen::MatrixXcd eigenA_upperblk,
                              Eigen::MatrixXcd eigenA_lowerblk,
                              bool compare_reference,
-                             double* time
+                             timing_struct& ts,
+                             int run_no
 ){  
     // Initialize a cuda stream
     cudaStream_t stream = NULL;
@@ -3424,13 +3438,19 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
     cudaErrchk(cudaMemcpy(U.data(), reinterpret_cast<std::complex<double>*>(U_gpu), processA.rows() * processA.cols() * sizeof(std::complex<double>), cudaMemcpyDeviceToHost));
     // End reduce_schur
 
+    double reduce_schur_time = MPI_Wtime() - start_time;
+    ts.times[0][run_no][0] = reduce_schur_time;
+
     // Start of MPIALLGATHER for reduced_schur_system and inverse of said system
     Eigen::MatrixXcd A_schur = Eigen::MatrixXcd(blocksize*n_blocks_schursystem, blocksize*n_blocks_schursystem);
     A_schur.setZero();
 
     MPI_Allgatherv(processA.data(), 1, redschur_blockpatternType, comm_custom_buf, receivecounts, displs,  subblock_ReceiveType, MPI_COMM_WORLD);
     // End of MPIALLGATHER for reduced_schur_system and inverse of said system
+    MPI_Barrier(MPI_COMM_WORLD);
 
+    double comm_time = MPI_Wtime() - reduce_schur_time - start_time;
+    ts.times[0][run_no][1] = comm_time;
 
     // Start of Schur Inversion on GPU
 
@@ -3517,6 +3537,9 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
     if(comm_custom_buf){
         cudaFreeHost(comm_custom_buf);
     }
+
+    double invert_time = MPI_Wtime() - comm_time - reduce_schur_time - start_time;
+    ts.times[0][run_no][2] = invert_time;
     // delete[] comm_custom_buf;
 
     //Eigen::MatrixXcd testblock_complete = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>(host_testblock_complete, blocksize, blocksize);
@@ -3634,6 +3657,9 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
     // Start of produce_schur
     //std::cout << "Process " << rank << " is producing blockrows " << start_blockrow << " to " << start_blockrow + partition_blocksize - 1 << std::endl;
 
+    double copy_time = MPI_Wtime() - comm_time - reduce_schur_time - invert_time - start_time;
+    ts.times[0][run_no][3] = copy_time;
+
     if(rank == 0) {
 	    //produceSchurTopLeftCorner(processA, L, U, G, 0, partition_blocksize, blocksize);
         produceSchurTopLeftCorner_gpu(partition_blocksize, blocksize, stream, cusolver_handle, cublas_handle, A_gpu,  G_gpu, L_gpu, U_gpu, identity_d, l_dim);
@@ -3651,11 +3677,13 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
+    double produce_time = MPI_Wtime() - copy_time - comm_time - reduce_schur_time - invert_time - start_time;
+    ts.times[0][run_no][4] = produce_time;
     double end_time = MPI_Wtime();
     // ----- End timing -----
 
     double elapsed_time = end_time - start_time;
-    *time = elapsed_time;
+    ts.times[0][run_no][5] = elapsed_time;
 
     if(compare_reference == false){
         if(rank == 0) {

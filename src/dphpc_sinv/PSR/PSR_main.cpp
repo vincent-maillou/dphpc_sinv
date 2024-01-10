@@ -16,21 +16,40 @@ int main(int argc, char *argv[]) {
     std::string test_folder = "/scratch/snx3000/amaeder/PSR_BENCH/random_matrices/";
     std::string save_folder = "/scratch/snx3000/amaeder/PSR_BENCH/times/";
     //std::string save_folder = "";
-    int n_blocks_input[9] = {3*2, 3*4, 3*8, 3*16, 3*32, 3*64, 3*128, 3*256, 3*512};
-    int blocksize_input[4] = {64, 128, 256, 512};
+    int nb_test = 8;
+    int bs_test = 4;
+    int n_blocks_input[nb_test] = {3*4, 3*8, 3*16, 3*32, 3*64, 3*128, 3*256, 3*512};
+    int blocksize_input[bs_test] = {64, 128, 256, 512};
 
-    for(int i_blocks = 0; i_blocks < 9; ++i_blocks){
-        for(int i_size = 0; i_size<4; ++i_size){
+
+    for(int i_blocks = 0; i_blocks < nb_test; ++i_blocks){
+        for(int i_size = 0; i_size < bs_test; ++i_size){
+            MPI_Barrier(MPI_COMM_WORLD);
+            if(rank == 0){
+                std::cout << "n_blocks_input" << "blocksize_input" << n_blocks_input[i_blocks] << " " << blocksize_input[i_size] << std::endl;
+            }
+            MPI_Barrier(MPI_COMM_WORLD);
+
+            if(n_blocks_input[i_blocks] % size != 0){
+                std::cout << "Number of blocks not divisible by number of processes" << std::endl;
+                break;
+            }
+
 
             // break depending on size and matrix size
             double memconsumption = ((4.0/size) * n_blocks_input[i_blocks] * blocksize_input[i_size]) *
                  ((1.0/size) * n_blocks_input[i_blocks] * blocksize_input[i_size]) * 16.0 / (1e9);
             int memconsumption_int = std::floor(memconsumption);
-            if(memconsumption_int > 14){
+
+            double memconsumption2 = n_blocks_input[i_blocks] * blocksize_input[i_size] * blocksize_input[i_size] * 16.0 / (1e9);
+            if(memconsumption_int > 14 || memconsumption2 > 7 || 3*memconsumption2+memconsumption_int > 30 ){
                 std::cout << "Memory consumption too high: " << memconsumption << " GB" << std::endl;
-                std::cout << "n_blocks_input" << "blocksize_input" << n_blocks_input[i_blocks] << " " << blocksize_input[i_size] << std::endl;
+                std::cout << "Memory consumption2 too high: " << memconsumption2 << " GB" << std::endl;
                 break;
             }
+            std::cout << "Memory consumption: " << memconsumption << " GB" << std::endl;
+            std::cout << "Memory consumption2: " << memconsumption2 << " GB" << std::endl;
+            MPI_Barrier(MPI_COMM_WORLD);
 
             //const int N = 120; // Change this to the desired size of your NxN matrix
             const int N = n_blocks_input[i_blocks] * blocksize_input[i_size]; // Change this to the desired size of your NxN matrix
@@ -117,7 +136,7 @@ int main(int argc, char *argv[]) {
             MPI_Barrier(MPI_COMM_WORLD);
 
             check_result = false;
-            int nruns = 3;
+            int nruns = 22;
             timing_struct timing(2, nruns, n_segments);
 
             for (int i = 0; i < nruns; i++) {

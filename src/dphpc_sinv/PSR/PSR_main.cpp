@@ -10,11 +10,15 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Hello from process " << rank << " of " << size << std::endl;
 
-    //std::string test_folder = "/home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/test_matrices/120_8_3/";
     std::string test_folder = "/home/dleonard/Documents/dphpc_sinv/src/dphpc_sinv/PSR/";
+    //std::string test_folder = "/project/s1212/PSR_BENCH/random_matrices/";
+    //std::string save_folder = "/project/s1212/PSR_BENCH/times/";
+    std::string save_folder = "";
 
-    const int N = 120; // Change this to the desired size of your NxN matrix
-    const int blocksize = 8; // Change this to the desired blocksize
+    //const int N = 120; // Change this to the desired size of your NxN matrix
+    const int N = std::atoi(argv[1]); // Change this to the desired size of your NxN matrix
+    const int blocksize = std::atoi(argv[2]); // Change this to the desired blocksize
+    //const int blocksize = 8; // Change this to the desired blocksize
     int partitions = size; // Change to number of MPI processes
     int num_central_partitions = partitions - 2;
 
@@ -26,21 +30,26 @@ int main(int argc, char *argv[]) {
     // End of Partition Parameters
 
     bool FullSeqTest = false;
-    bool check_result = false;
+    bool check_result = true;
+
+    double pseudo_time[1];
 
     // Memory allocation for each "process"
-    //std::complex<double>* A = new std::complex<double>[N * N];
+    std::complex<double>* A = new std::complex<double>[N * N];
     std::complex<double>* A_diagblk = new std::complex<double>[n_blocks * blocksize * blocksize];
     std::complex<double>* A_upperblk = new std::complex<double>[(n_blocks-1) * blocksize * blocksize];
     std::complex<double>* A_lowerblk = new std::complex<double>[(n_blocks-1) * blocksize * blocksize];
 
-    //load_matrix(test_folder + "A_full.bin", A, N, N);
-    load_matrix(test_folder + "matrix_0_diagblk.bin", A_diagblk, blocksize, n_blocks * blocksize);
-    load_matrix(test_folder + "matrix_0_upperblk.bin", A_upperblk, blocksize, (n_blocks-1) * blocksize);
-    load_matrix(test_folder + "matrix_0_lowerblk.bin", A_lowerblk, blocksize, (n_blocks-1) * blocksize);
+    std::cout<< test_folder + "A_full_" + std::to_string(N) + "_" + std::to_string(blocksize) + ".bin" << std::endl;
+    MPI_Barrier(MPI_COMM_WORLD);
 
-    //Eigen::MatrixXcd eigenA_read_in = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A, N, N);
-    Eigen::MatrixXcd eigenA_read_in; 
+    load_matrix(test_folder + "A_full_" + std::to_string(N) + "_" + std::to_string(blocksize) + ".bin", A, N, N);
+    load_matrix(test_folder + "matrix_" + std::to_string(N) + "_" + std::to_string(blocksize) + "_diagblk.bin", A_diagblk, blocksize, n_blocks * blocksize);
+    load_matrix(test_folder + "matrix_" + std::to_string(N) + "_" + std::to_string(blocksize) + "_upperblk.bin", A_upperblk, blocksize, (n_blocks-1) * blocksize);
+    load_matrix(test_folder + "matrix_" + std::to_string(N) + "_" + std::to_string(blocksize) + "_lowerblk.bin", A_lowerblk, blocksize, (n_blocks-1) * blocksize);
+
+    Eigen::MatrixXcd eigenA_read_in = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A, N, N);
+    //Eigen::MatrixXcd eigenA_read_in; 
     Eigen::MatrixXcd eigenA_diagblk = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_diagblk, blocksize, n_blocks * blocksize);
     Eigen::MatrixXcd eigenA_upperblk = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_upperblk, blocksize, (n_blocks-1) * blocksize);
     Eigen::MatrixXcd eigenA_lowerblk = Eigen::Map<Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(A_lowerblk, blocksize, (n_blocks-1) * blocksize);
@@ -80,10 +89,10 @@ int main(int argc, char *argv[]) {
         );
     }
     else {
-        auto G_final = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in,
-                                                 eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result);
-        // auto G_final = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, \
-        //                                    eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result);
+        auto G_final_gpu = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in,
+                                                 eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result, &pseudo_time[0]);
+        auto G_final_cpu = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, \
+                                              eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result, &pseudo_time[0]);
     }   
 
     // Synchonization
@@ -91,17 +100,36 @@ int main(int argc, char *argv[]) {
 
     check_result = false;
     int nruns = 3;
+    double times[2][nruns];
 
     for (int i = 0; i < nruns; i++) {
         if(rank == 0){
             std::cout << "Run: " << i << " ..starting";
         }
-        auto G_final = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in,
-                                                 eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result);
-        // auto G_final = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_diagblk, \
-        //                                    eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result);
+        auto G_final_gpu = psr_solve_customMPI_gpu(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in,
+                                                 eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result, &times[0][i]);
+        auto G_final_cpu = psr_solve_customMPI(N, blocksize, n_blocks, partitions, partition_blocksize, rank, n_blocks_schursystem, eigenA_read_in, \
+                                            eigenA_diagblk, eigenA_upperblk, eigenA_lowerblk, check_result, &times[1][i]);
         MPI_Barrier(MPI_COMM_WORLD);
     }
+
+    for (int j = 0; j<2; ++j){
+            std::ofstream outputFile_times;
+            std::string path_times = save_folder + "times_" + std::to_string(j) + "_" + std::to_string(n_blocks) +"_" + std::to_string(blocksize)
+                + "_" + std::to_string(size) + "_" + std::to_string(rank) + ".txt";
+            outputFile_times.open(path_times);
+            if(outputFile_times.is_open()){
+                for(int i = 0; i < nruns; i++){
+                    outputFile_times << times[j][i] << " ";
+                }
+                outputFile_times << '\n';
+            }
+            else{
+                std::printf("Error opening file\n");
+            }
+            outputFile_times.close();
+    }
+
 
 
     // if (rank == 0) {
@@ -197,7 +225,7 @@ int main(int argc, char *argv[]) {
     //     std::cout << "matrix norm full: " << A_recv.norm() << std::endl;
     // }
 
-    //delete[] A;
+    delete[] A;
     // MPI_Type_free(&subblockType);
     // MPI_Type_free(&subblockType_resized);
     // MPI_Type_free(&subblockType_2);

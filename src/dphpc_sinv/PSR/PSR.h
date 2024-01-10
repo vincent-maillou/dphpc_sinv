@@ -297,7 +297,8 @@ Eigen::MatrixXcd psr_solve(int N,
                              int rank,
                              int n_blocks_schursystem,
                              Eigen::MatrixXcd& eigenA_read_in,
-                             bool compare_reference
+                             bool compare_reference,
+                             double*
 );
 
 Eigen::MatrixXcd psr_solve_customMPI(int N,
@@ -311,7 +312,8 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
                              Eigen::MatrixXcd eigenA_diagblk,
                              Eigen::MatrixXcd eigenA_upperblk,
                              Eigen::MatrixXcd eigenA_lowerblk,
-                             bool compare_reference
+                             bool compare_reference,
+                             double*
 );
 
 Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
@@ -325,7 +327,8 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
                              Eigen::MatrixXcd eigenA_diagblk,
                              Eigen::MatrixXcd eigenA_upperblk,
                              Eigen::MatrixXcd eigenA_lowerblk,
-                             bool compare_reference
+                             bool compare_reference,
+                             double*
 );
 
 void createblockMatrixType(MPI_Datatype* blockMatrixType, int stride, int blocksize);

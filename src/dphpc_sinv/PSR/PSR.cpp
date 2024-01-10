@@ -2705,7 +2705,8 @@ Eigen::MatrixXcd psr_solve(int N,
                              Eigen::MatrixXcd eigenA_diagblk,
                              Eigen::MatrixXcd eigenA_upperblk,
                              Eigen::MatrixXcd eigenA_lowerblk,
-                             bool compare_reference
+                             bool compare_reference,
+                             double* time
 ){  
 
     Eigen::MatrixXcd eigenA2 = eigenA_read_in;
@@ -2926,7 +2927,8 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
                              Eigen::MatrixXcd eigenA_diagblk,
                              Eigen::MatrixXcd eigenA_upperblk,
                              Eigen::MatrixXcd eigenA_lowerblk,
-                             bool compare_reference
+                             bool compare_reference,
+                             double* time
 ){  
 
     Eigen::MatrixXcd eigenA2 = eigenA_read_in;
@@ -3133,23 +3135,24 @@ Eigen::MatrixXcd psr_solve_customMPI(int N,
     // ----- End timing -----
 
     double elapsed_time = end_time - start_time;
+    *time = elapsed_time;
 
     if(compare_reference == false){
         if(rank == 0) {
             std::cout << " ..took: " << elapsed_time << " s" << std::endl;
         }
 
-        // Write the elapsed time to a file
-        if(rank == 0) {
-            std::ofstream time_file;
+        // // Write the elapsed time to a file
+        // if(rank == 0) {
+        //     std::ofstream time_file;
 
-            // Format a string for the name of the file using the blocksize and the number of blocks
-            std::string filename = "PSR_CPU_bs" + std::to_string(blocksize) + "_nb" + std::to_string(n_blocks) + "_world" + std::to_string(partitions) + ".txt";
+        //     // Format a string for the name of the file using the blocksize and the number of blocks
+        //     std::string filename = "PSR_CPU_bs" + std::to_string(blocksize) + "_nb" + std::to_string(n_blocks) + "_world" + std::to_string(partitions) + ".txt";
 
-            time_file.open(filename, std::ios::app);
-            time_file << "Elapsed time: " << elapsed_time << " s" << std::endl;
-            time_file.close();
-        }
+        //     time_file.open(filename, std::ios::app);
+        //     time_file << "Elapsed time: " << elapsed_time << " s" << std::endl;
+        //     time_file.close();
+        // }
     }
     
 
@@ -3234,7 +3237,8 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
                              Eigen::MatrixXcd eigenA_diagblk,
                              Eigen::MatrixXcd eigenA_upperblk,
                              Eigen::MatrixXcd eigenA_lowerblk,
-                             bool compare_reference
+                             bool compare_reference,
+                             double* time
 ){  
     // Initialize a cuda stream
     cudaStream_t stream = NULL;
@@ -3651,23 +3655,24 @@ Eigen::MatrixXcd psr_solve_customMPI_gpu(int N,
     // ----- End timing -----
 
     double elapsed_time = end_time - start_time;
+    *time = elapsed_time;
 
     if(compare_reference == false){
         if(rank == 0) {
             std::cout << " ..took: " << elapsed_time << " s" << std::endl;
         }
 
-        // Write the elapsed time to a file
-        if(rank == 0) {
-            std::ofstream time_file;
+        // // Write the elapsed time to a file
+        // if(rank == 0) {
+        //     std::ofstream time_file;
 
-            // Format a string for the name of the file using the blocksize and the number of blocks
-            std::string filename = "PSR_GPU_bs" + std::to_string(blocksize) + "_nb" + std::to_string(n_blocks) + "_world" + std::to_string(partitions) + ".txt";
+        //     // Format a string for the name of the file using the blocksize and the number of blocks
+        //     std::string filename = "PSR_GPU_bs" + std::to_string(blocksize) + "_nb" + std::to_string(n_blocks) + "_world" + std::to_string(partitions) + ".txt";
 
-            time_file.open(filename, std::ios::app);
-            time_file << "Elapsed time: " << elapsed_time << " s" << std::endl;
-            time_file.close();
-        }
+        //     time_file.open(filename, std::ios::app);
+        //     time_file << "Elapsed time: " << elapsed_time << " s" << std::endl;
+        //     time_file.close();
+        // }
     }
     
 

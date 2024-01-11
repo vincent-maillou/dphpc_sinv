@@ -20,7 +20,7 @@ CU_OBJ_FILES =$(CU_SOURCES:.cu=.o)
 CPP_OBJ_FILES_TEST=$(CPP_SOURCES_TEST:.cpp=.o)
 CU_OBJ_FILES_TEST =$(CU_SOURCES_TEST:.cu=.o)
 
-BINARY = benchmark_retarded_main
+BINARY = main
 
 # TOODO build folder and source folder...
 

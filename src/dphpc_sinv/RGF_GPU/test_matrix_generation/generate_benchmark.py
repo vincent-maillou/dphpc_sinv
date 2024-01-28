@@ -5,7 +5,7 @@ import numpy as np
 
 
 SEED = 8000
-BATCHSIZE = 1
+BATCHSIZE = 100
 PATH_TO_FILE = "/usr/scratch/mont-fort23/almaeder/rgf_test/"
 
 if __name__ == "__main__":
@@ -15,8 +15,8 @@ if __name__ == "__main__":
     # int n_blocks_input[nb_test] = {3*4, 3*8, 3*16, 3*32, 3*64, 3*128, 3*256, 3*512};
     # int blocksize_input[bs_test] = {64, 128, 256, 512};
 
-    BLOCKSIZES = [64, 128, 256, 512]
-    NUM_OF_BLOCKS = [3*4, 3*8, 3*16, 3*32, 3*64, 3*128, 3*256, 3*512]
+    BLOCKSIZES = [64, 128, 256, 512, 1024]
+    NUM_OF_BLOCKS = [12]
     for BLOCKSIZE in BLOCKSIZES:
         
         MAT_SIZES = [BLOCKSIZE*NUM_OF_BLOCKS[i] for i in range(len(NUM_OF_BLOCKS))]
@@ -28,10 +28,10 @@ if __name__ == "__main__":
         for j, MAT_SIZE in enumerate(MAT_SIZES):
             print("Generating matrix of size " + str(MAT_SIZE))
             # Generate random matrices
-            for i in range(BATCHSIZE):
+            for i in range(1):
                 # print("Generating matrix " + str(i+1) + " of " + str(BATCHSIZE))
 
-
+                print("Generating matrix " + str(i+1) + " of " + str(BATCHSIZE))
                 # print("Generating matrix System Matrix")
                 # system_matrix = matrix_utils.generateBandedMatrix(MAT_SIZE, BLOCKSIZE, SEED) + i * np.eye(MAT_SIZE)
 
@@ -63,3 +63,27 @@ if __name__ == "__main__":
                 filename = ("system_matrix_" + str(i) + "_lowerblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
                 matrix_utils.write_matrix_to_file(
                     PATH_TO_FILE+filename, system_matrix_lowerblk)
+
+                self_energy_lesser_diagblk = rng.random((BLOCKSIZE, MAT_SIZE), dtype=np.float64) + 1j*rng.random((BLOCKSIZE, MAT_SIZE), dtype=np.float64)
+                self_energy_lesser_upperblk = rng.random((BLOCKSIZE, MAT_SIZE - BLOCKSIZE), dtype=np.float64) + 1j*rng.random((BLOCKSIZE, MAT_SIZE - BLOCKSIZE), dtype=np.float64)
+                self_energy_greater_diagblk = rng.random((BLOCKSIZE, MAT_SIZE), dtype=np.float64) + 1j*rng.random((BLOCKSIZE, MAT_SIZE), dtype=np.float64)
+                self_energy_greater_upperblk = rng.random((BLOCKSIZE, MAT_SIZE - BLOCKSIZE), dtype=np.float64) + 1j*rng.random((BLOCKSIZE, MAT_SIZE - BLOCKSIZE), dtype=np.float64)
+
+                for k in range(NUM_OF_BLOCKS[j]):
+                    self_energy_lesser_diagblk[:,k*BLOCKSIZE:(k+1)*BLOCKSIZE] = self_energy_lesser_diagblk[:,k*BLOCKSIZE:(k+1)*BLOCKSIZE] - self_energy_lesser_diagblk[:,k*BLOCKSIZE:(k+1)*BLOCKSIZE].conj().T
+                    self_energy_greater_diagblk[:,k*BLOCKSIZE:(k+1)*BLOCKSIZE] = self_energy_greater_diagblk[:,k*BLOCKSIZE:(k+1)*BLOCKSIZE] - self_energy_greater_diagblk[:,k*BLOCKSIZE:(k+1)*BLOCKSIZE].conj().T
+
+
+                filename = ("self_energy_lesser_" + str(i) + "_diagblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
+                matrix_utils.write_matrix_to_file(
+                    PATH_TO_FILE+filename, self_energy_lesser_diagblk)
+                filename = ("self_energy_lesser_" + str(i) + "_upperblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
+                matrix_utils.write_matrix_to_file(
+                    PATH_TO_FILE+filename, self_energy_lesser_upperblk)
+                
+                filename = ("self_energy_greater_" + str(i) + "_diagblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
+                matrix_utils.write_matrix_to_file(
+                    PATH_TO_FILE+filename, self_energy_greater_diagblk)
+                filename = ("self_energy_greater_" + str(i) + "_upperblk_" + str(MAT_SIZE) + "_"+ str(BLOCKSIZE) + "_" + str(BATCHSIZE) +".bin")
+                matrix_utils.write_matrix_to_file(
+                    PATH_TO_FILE+filename, self_energy_greater_upperblk)

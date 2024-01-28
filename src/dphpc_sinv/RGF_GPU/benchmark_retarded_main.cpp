@@ -45,7 +45,7 @@ int main() {
     int batch = 0;
     int nb_test = 1;
     int bs_test = 1;
-    int n_blocks_input[nb_test] =  {3*256};
+    int n_blocks_input[nb_test] =  {3};
     int blocksize_input[bs_test] = {256};
     int number_of_measurements = 1;
 
@@ -145,61 +145,61 @@ int main() {
             double times_retarded_does_not_fit_gpu_memory_with_copy_compute_overlap[number_of_measurements];
             double time;
 
-            for(int i = 0; i < number_of_measurements; i++){
-                if(memconsumption_int > 7){
-                    std::cout << "break" << std::endl;
-                    break;
-                }
-                std::cout << "fits_gpu_memory Measurement " << i << std::endl;
-                time = -omp_get_wtime();
-                rgf_retarded_fits_gpu_memory(
-                    blocksize, matrix_size,
-                    system_matrix_diagblk_h,
-                    system_matrix_upperblk_h,
-                    system_matrix_lowerblk_h,
-                    retarded_inv_diagblk_h,
-                    retarded_inv_upperblk_h,
-                    retarded_inv_lowerblk_h);
-                time += omp_get_wtime();
-                std::cout << time << std::endl;
-                times_retarded_fits_gpu_memory[i] = time;
-            }
-            for(int i = 0; i < number_of_measurements; i++){
-                if(memconsumption_int > 7){
-                    std::cout << "break" << std::endl;
-                    break;
-                }
-                std::cout << "fits_gpu_memory_with_copy_compute_overlap Measurement " << i << std::endl;
-                time = -omp_get_wtime();
-                rgf_retarded_fits_gpu_memory_with_copy_compute_overlap(
-                    blocksize, matrix_size,
-                    system_matrix_diagblk_h,
-                    system_matrix_upperblk_h,
-                    system_matrix_lowerblk_h,
-                    retarded_inv_diagblk_h,
-                    retarded_inv_upperblk_h,
-                    retarded_inv_lowerblk_h);
-                time += omp_get_wtime();
-                std::cout << time << std::endl;
+            // for(int i = 0; i < number_of_measurements; i++){
+            //     if(memconsumption_int > 7){
+            //         std::cout << "break" << std::endl;
+            //         break;
+            //     }
+            //     std::cout << "fits_gpu_memory Measurement " << i << std::endl;
+            //     time = -omp_get_wtime();
+            //     rgf_retarded_fits_gpu_memory(
+            //         blocksize, matrix_size,
+            //         system_matrix_diagblk_h,
+            //         system_matrix_upperblk_h,
+            //         system_matrix_lowerblk_h,
+            //         retarded_inv_diagblk_h,
+            //         retarded_inv_upperblk_h,
+            //         retarded_inv_lowerblk_h);
+            //     time += omp_get_wtime();
+            //     std::cout << time << std::endl;
+            //     times_retarded_fits_gpu_memory[i] = time;
+            // }
+            // for(int i = 0; i < number_of_measurements; i++){
+            //     if(memconsumption_int > 7){
+            //         std::cout << "break" << std::endl;
+            //         break;
+            //     }
+            //     std::cout << "fits_gpu_memory_with_copy_compute_overlap Measurement " << i << std::endl;
+            //     time = -omp_get_wtime();
+            //     rgf_retarded_fits_gpu_memory_with_copy_compute_overlap(
+            //         blocksize, matrix_size,
+            //         system_matrix_diagblk_h,
+            //         system_matrix_upperblk_h,
+            //         system_matrix_lowerblk_h,
+            //         retarded_inv_diagblk_h,
+            //         retarded_inv_upperblk_h,
+            //         retarded_inv_lowerblk_h);
+            //     time += omp_get_wtime();
+            //     std::cout << time << std::endl;
 
-                times_retarded_fits_gpu_memory_with_copy_compute_overlap[i] = time;
-            }
-            for(int i = 0; i < number_of_measurements; i++){
-                std::cout << "does_not_fit_gpu_memory Measurement " << i << std::endl;
-                time = -omp_get_wtime();
-                rgf_retarded_does_not_fit_gpu_memory(
-                    blocksize, matrix_size,
-                    system_matrix_diagblk_h,
-                    system_matrix_upperblk_h,
-                    system_matrix_lowerblk_h,
-                    retarded_inv_diagblk_h,
-                    retarded_inv_upperblk_h,
-                    retarded_inv_lowerblk_h);
-                time += omp_get_wtime();
-                std::cout << time << std::endl;
+            //     times_retarded_fits_gpu_memory_with_copy_compute_overlap[i] = time;
+            // }
+            // for(int i = 0; i < number_of_measurements; i++){
+            //     std::cout << "does_not_fit_gpu_memory Measurement " << i << std::endl;
+            //     time = -omp_get_wtime();
+            //     rgf_retarded_does_not_fit_gpu_memory(
+            //         blocksize, matrix_size,
+            //         system_matrix_diagblk_h,
+            //         system_matrix_upperblk_h,
+            //         system_matrix_lowerblk_h,
+            //         retarded_inv_diagblk_h,
+            //         retarded_inv_upperblk_h,
+            //         retarded_inv_lowerblk_h);
+            //     time += omp_get_wtime();
+            //     std::cout << time << std::endl;
 
-                times_retarded_does_not_fit_gpu_memory[i] = time;
-            }
+            //     times_retarded_does_not_fit_gpu_memory[i] = time;
+            // }
             for(int i = 0; i < number_of_measurements; i++){
                 std::cout << "does_not_fit_gpu_memory_with_copy_compute_overlap Measurement " << i << std::endl;
                 time = -omp_get_wtime();

@@ -24,9 +24,10 @@ int main() {
     std::string base_path = "/usr/scratch/mont-fort23/almaeder/rgf_test/";
     std::string time_path = "/usr/scratch/mont-fort23/almaeder/rgf_times_batched/";
     int nb_test = 1;
-    int bs_test = 4;
-    int n_blocks_input[nb_test] = {12};
-    int blocksize_input[bs_test] = {64, 128, 256, 512};
+    int bs_test = 2;
+    int n_blocks_input[nb_test] = {3};
+    //int blocksize_input[bs_test] = {64, 128, 256, 512};
+    int blocksize_input[bs_test] = {64, 128};
 
 
     int number_of_measurements = 22;
@@ -37,7 +38,7 @@ int main() {
             unsigned int blocksize = blocksize_input[bs];
             
 
-            double memconsumption = 2* batch_size * (3 * matrix_size * blocksize) * 16.0 / (1e9);
+            double memconsumption = 2.0 * batch_size * (3.0 * matrix_size * blocksize) * 16.0 / (1e9);
             int memconsumption_int = std::floor(memconsumption);
             std::cout << "memconsumption: " << memconsumption_int << std::endl;
 
@@ -46,9 +47,7 @@ int main() {
                 continue;
             }
 
-
             unsigned int n_blocks = matrix_size / blocksize;
-            unsigned int off_diag_size = matrix_size - blocksize;
 
             // Print the matrix parameters
             printf("Matrix parameters:\n");
@@ -57,104 +56,6 @@ int main() {
             printf("    Number of blocks: %d\n", n_blocks);
             printf("    Batch size: %d\n", batch_size);
 
-            complex_h *system_matrices_diagblk_h[batch_size];
-            complex_h *system_matrices_upperblk_h[batch_size];
-            complex_h *system_matrices_lowerblk_h[batch_size];
-            complex_h *self_energy_matrices_lesser_diagblk_h[batch_size];
-            complex_h *self_energy_matrices_lesser_upperblk_h[batch_size];
-            complex_h *self_energy_matrices_greater_diagblk_h[batch_size];
-            complex_h *self_energy_matrices_greater_upperblk_h[batch_size];
-
-            for(unsigned int batch = 0; batch < batch_size; batch++){
-                std::cout << "Loading batch " << batch << std::endl;
-                std::cout << "memconsumption: " << memconsumption_int << std::endl;
-                // Load matrix to invert
-                complex_h* system_matrix_diagblk = (complex_h*) malloc(blocksize * matrix_size * sizeof(complex_h));
-                std::string diagblk_path = base_path + "system_matrix_"+ std::to_string(0) +"_diagblk_"
-                + std::to_string(matrix_size) + "_"+ std::to_string(blocksize) + "_" + std::to_string(batch_size) +
-                ".bin";
-                load_binary_matrix(diagblk_path.c_str(), system_matrix_diagblk, blocksize, matrix_size);
-
-                complex_h* system_matrix_upperblk = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
-                std::string upperblk_path = base_path + "system_matrix_"+ std::to_string(0) +"_upperblk_"
-                + std::to_string(matrix_size) + "_"+ std::to_string(blocksize) + "_" + std::to_string(batch_size) +
-                ".bin";
-                load_binary_matrix(upperblk_path.c_str(), system_matrix_upperblk, blocksize, off_diag_size);
-
-                complex_h* system_matrix_lowerblk = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
-                std::string lowerblk_path = base_path + "system_matrix_"+ std::to_string(0) +"_lowerblk_"
-                + std::to_string(matrix_size) + "_"+ std::to_string(blocksize) + "_" + std::to_string(batch_size) +
-                ".bin";
-                load_binary_matrix(lowerblk_path.c_str(), system_matrix_lowerblk, blocksize, off_diag_size);
-
-                // load the self energy
-                complex_h* self_energy_lesser_diagblk = (complex_h*) malloc(blocksize * matrix_size * sizeof(complex_h));
-                std::string self_energy_lesser_diagblk_path = base_path + "self_energy_lesser_"+ std::to_string(0) +"_diagblk_"
-                + std::to_string(matrix_size) + "_"+ std::to_string(blocksize) + "_" + std::to_string(batch_size) +
-                ".bin";
-                load_binary_matrix(self_energy_lesser_diagblk_path.c_str(), self_energy_lesser_diagblk, blocksize, matrix_size);
-
-                complex_h* self_energy_lesser_upperblk = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
-                std::string self_energy_lesser_upperblk_path = base_path + "self_energy_lesser_"+ std::to_string(0) +"_upperblk_"
-                + std::to_string(matrix_size) + "_"+ std::to_string(blocksize) + "_" + std::to_string(batch_size) +
-                ".bin";
-                load_binary_matrix(self_energy_lesser_upperblk_path.c_str(), self_energy_lesser_upperblk, blocksize, off_diag_size);
-
-
-                complex_h* self_energy_greater_diagblk = (complex_h*) malloc(blocksize * matrix_size * sizeof(complex_h));
-                std::string self_energy_greater_diagblk_path = base_path + "self_energy_greater_"+ std::to_string(0) +"_diagblk_"
-                + std::to_string(matrix_size) + "_"+ std::to_string(blocksize) + "_" + std::to_string(batch_size) +
-                ".bin";
-                load_binary_matrix(self_energy_greater_diagblk_path.c_str(), self_energy_greater_diagblk, blocksize, matrix_size);
-
-                complex_h* self_energy_greater_upperblk = (complex_h*) malloc(blocksize * (off_diag_size) * sizeof(complex_h));
-                std::string self_energy_greater_upperblk_path = base_path + "self_energy_greater_"+ std::to_string(0) +"_upperblk_"
-                + std::to_string(matrix_size) + "_"+ std::to_string(blocksize) + "_" + std::to_string(batch_size) +
-                ".bin";
-                load_binary_matrix(self_energy_greater_upperblk_path.c_str(), self_energy_greater_upperblk, blocksize, off_diag_size);
-
-
-                complex_h* system_matrix_diagblk_h = NULL;
-                complex_h* system_matrix_upperblk_h = NULL;
-                complex_h* system_matrix_lowerblk_h = NULL;
-                complex_h* self_energy_lesser_diagblk_h = NULL;
-                complex_h* self_energy_lesser_upperblk_h = NULL;
-                complex_h* self_energy_greater_diagblk_h = NULL;
-                complex_h* self_energy_greater_upperblk_h = NULL;
-
-                cudaMallocHost((void**)&system_matrix_diagblk_h, blocksize * matrix_size * sizeof(complex_h));
-                cudaMallocHost((void**)&system_matrix_upperblk_h, blocksize * off_diag_size * sizeof(complex_h));
-                cudaMallocHost((void**)&system_matrix_lowerblk_h, blocksize * off_diag_size * sizeof(complex_h));
-                cudaMallocHost((void**)&self_energy_lesser_diagblk_h, blocksize * matrix_size * sizeof(complex_h));
-                cudaMallocHost((void**)&self_energy_lesser_upperblk_h, blocksize * off_diag_size * sizeof(complex_h));
-                cudaMallocHost((void**)&self_energy_greater_diagblk_h, blocksize * matrix_size * sizeof(complex_h));
-                cudaMallocHost((void**)&self_energy_greater_upperblk_h, blocksize * off_diag_size * sizeof(complex_h));
-                transform_diagblk<complex_h>(system_matrix_diagblk, system_matrix_diagblk_h, blocksize, matrix_size);
-                transform_diagblk<complex_h>(self_energy_lesser_diagblk, self_energy_lesser_diagblk_h, blocksize, matrix_size);
-                transform_diagblk<complex_h>(self_energy_greater_diagblk, self_energy_greater_diagblk_h, blocksize, matrix_size);
-                transform_offblk<complex_h>(system_matrix_upperblk, system_matrix_upperblk_h, blocksize, off_diag_size);
-                transform_offblk<complex_h>(system_matrix_lowerblk, system_matrix_lowerblk_h, blocksize, off_diag_size);
-                transform_offblk<complex_h>(self_energy_lesser_upperblk, self_energy_lesser_upperblk_h, blocksize, off_diag_size);
-                transform_offblk<complex_h>(self_energy_greater_upperblk, self_energy_greater_upperblk_h, blocksize, off_diag_size);
-
-                system_matrices_diagblk_h[batch] = system_matrix_diagblk_h;
-                system_matrices_upperblk_h[batch] = system_matrix_upperblk_h;
-                system_matrices_lowerblk_h[batch] = system_matrix_lowerblk_h;
-                self_energy_matrices_lesser_diagblk_h[batch] = self_energy_lesser_diagblk_h;
-                self_energy_matrices_lesser_upperblk_h[batch] = self_energy_lesser_upperblk_h;
-                self_energy_matrices_greater_diagblk_h[batch] = self_energy_greater_diagblk_h;
-                self_energy_matrices_greater_upperblk_h[batch] = self_energy_greater_upperblk_h;
-
-                free(system_matrix_diagblk);
-                free(system_matrix_upperblk);
-                free(system_matrix_lowerblk);
-                free(self_energy_lesser_diagblk);
-                free(self_energy_lesser_upperblk);
-                free(self_energy_greater_diagblk);
-                free(self_energy_greater_upperblk);
-            }
-
-            // transform to batched blocks
             complex_h* batch_system_matrices_diagblk_h[n_blocks];
             complex_h* batch_system_matrices_upperblk_h[n_blocks-1];
             complex_h* batch_system_matrices_lowerblk_h[n_blocks-1];
@@ -170,6 +71,22 @@ int main() {
             complex_h* batch_retarded_inv_matrices_upperblk_h[n_blocks-1];
             complex_h* batch_retarded_inv_matrices_lowerblk_h[n_blocks-1];
 
+            std::string diagblk_path = base_path + "system_matrix_diagblk_" + std::to_string(blocksize) +
+                "_" + std::to_string(batch_size) +
+                ".bin";
+            std::string upperblk_path = base_path + "system_matrix_upperblk_" + std::to_string(blocksize) +
+                "_" + std::to_string(batch_size) +
+                ".bin";
+            std::string lowerblk_path = base_path + "system_matrix_lowerblk_" + std::to_string(blocksize) +
+                "_" + std::to_string(batch_size) +
+                ".bin";
+            std::string self_energy_diagblk_path = base_path + "self_energy_diagblk_"
+                + std::to_string(blocksize) + "_" + std::to_string(batch_size) +
+                ".bin";
+            std::string self_energy_upperblk_path = base_path + "self_energy_upperblk_"
+                + std::to_string(blocksize) + "_" + std::to_string(batch_size) +
+                ".bin";
+            
             for(unsigned int i = 0; i < n_blocks; i++){
                 std::cout << "memconsumption: " << memconsumption_int << std::endl;
                 cudaErrchk(cudaMallocHost((void**)&batch_system_matrices_diagblk_h[i], batch_size * blocksize * blocksize * sizeof(complex_h)));
@@ -178,13 +95,10 @@ int main() {
                 cudaErrchk(cudaMallocHost((void**)&batch_lesser_inv_matrices_diagblk_h[i], batch_size * blocksize * blocksize * sizeof(complex_h)));
                 cudaErrchk(cudaMallocHost((void**)&batch_greater_inv_matrices_diagblk_h[i], batch_size * blocksize * blocksize * sizeof(complex_h)));
                 cudaErrchk(cudaMallocHost((void**)&batch_retarded_inv_matrices_diagblk_h[i], batch_size * blocksize * blocksize * sizeof(complex_h)));
-                for(unsigned int batch = 0; batch < batch_size; batch++){
-                    for(unsigned int j = 0; j < blocksize * blocksize; j++){
-                        batch_system_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = system_matrices_diagblk_h[batch][i * blocksize * blocksize + j];
-                        batch_self_energy_matrices_lesser_diagblk_h[i][batch * blocksize * blocksize + j] = self_energy_matrices_lesser_diagblk_h[batch][i * blocksize * blocksize + j];
-                        batch_self_energy_matrices_greater_diagblk_h[i][batch * blocksize * blocksize + j] = self_energy_matrices_greater_diagblk_h[batch][i * blocksize * blocksize + j];
-                    }
-                }
+                load_binary_array<complex_h>(diagblk_path, batch_system_matrices_diagblk_h[i], blocksize*blocksize*batch_size);
+                load_binary_array<complex_h>(self_energy_diagblk_path, batch_self_energy_matrices_lesser_diagblk_h[i], blocksize*blocksize*batch_size);
+                load_binary_array<complex_h>(self_energy_diagblk_path, batch_self_energy_matrices_greater_diagblk_h[i], blocksize*blocksize*batch_size);
+
             }
             for(unsigned int i = 0; i < n_blocks-1; i++){
                 std::cout << "memconsumption: " << memconsumption_int << std::endl;
@@ -196,14 +110,10 @@ int main() {
                 cudaErrchk(cudaMallocHost((void**)&batch_greater_inv_matrices_upperblk_h[i], batch_size * blocksize * blocksize * sizeof(complex_h)));
                 cudaErrchk(cudaMallocHost((void**)&batch_retarded_inv_matrices_upperblk_h[i], batch_size * blocksize * blocksize * sizeof(complex_h)));
                 cudaErrchk(cudaMallocHost((void**)&batch_retarded_inv_matrices_lowerblk_h[i], batch_size * blocksize * blocksize * sizeof(complex_h)));
-                for(unsigned int batch = 0; batch < batch_size; batch++){
-                    for(unsigned int j = 0; j < blocksize * blocksize; j++){
-                        batch_system_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = system_matrices_upperblk_h[batch][i * blocksize * blocksize + j];
-                        batch_system_matrices_lowerblk_h[i][batch * blocksize * blocksize + j] = system_matrices_lowerblk_h[batch][i * blocksize * blocksize + j];
-                        batch_self_energy_matrices_lesser_upperblk_h[i][batch * blocksize * blocksize + j] = self_energy_matrices_lesser_upperblk_h[batch][i * blocksize * blocksize + j];
-                        batch_self_energy_matrices_greater_upperblk_h[i][batch * blocksize * blocksize + j] = self_energy_matrices_greater_upperblk_h[batch][i * blocksize * blocksize + j];
-                    }
-                }
+                load_binary_array<complex_h>(upperblk_path, batch_system_matrices_upperblk_h[i], blocksize*blocksize*batch_size);
+                load_binary_array<complex_h>(lowerblk_path, batch_system_matrices_lowerblk_h[i], blocksize*blocksize*batch_size);
+                load_binary_array<complex_h>(self_energy_upperblk_path, batch_self_energy_matrices_lesser_upperblk_h[i], blocksize*blocksize*batch_size);
+                load_binary_array<complex_h>(self_energy_upperblk_path, batch_self_energy_matrices_greater_upperblk_h[i], blocksize*blocksize*batch_size);
             }
 
 
@@ -306,15 +216,6 @@ int main() {
                 cudaFreeHost(batch_greater_inv_matrices_upperblk_h[i]);
             }
 
-            for(unsigned int batch = 0; batch < batch_size; batch++){
-                cudaFreeHost(system_matrices_diagblk_h[batch]);
-                cudaFreeHost(system_matrices_upperblk_h[batch]);
-                cudaFreeHost(system_matrices_lowerblk_h[batch]);
-                cudaFreeHost(self_energy_matrices_lesser_diagblk_h[batch]);
-                cudaFreeHost(self_energy_matrices_lesser_upperblk_h[batch]);
-                cudaFreeHost(self_energy_matrices_greater_diagblk_h[batch]);
-                cudaFreeHost(self_energy_matrices_greater_upperblk_h[batch]);
-            }
         }
     }
     return 0;

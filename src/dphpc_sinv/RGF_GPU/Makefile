@@ -7,7 +7,7 @@ EIGENROOT = /usr/scratch/mont-fort17/almaeder/libraries/eigen/
 CXXFLAGS = -O3 -Wall -Wextra -fopenmp -std=c++14 -I${EIGENROOT} -I${CUDA_ROOT}/include
 NVCCFLAGS = -arch=sm_60 -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -O3 -std=c++14 -Xcompiler -fopenmp -I${CUDA_ROOT}/include
 LDFLAGS = -L"${CUDA_ROOT}/lib64" -lcuda -lcudart -lcusolver -lcublas -lcusparse 
-SOURCES = benchmark_batched_lesser_greater_retarded_main.cpp batched_lesser_greater_retarded.cpp single_retarded.cpp utils.cpp batched_geam.cu
+SOURCES = benchmark_single_kernel.cpp batched_lesser_greater_retarded.cpp single_retarded.cpp utils.cpp batched_geam.cu
 SOURCES_TEST = test_main.cpp single_lesser_greater_retarded.cpp single_lesser_greater.cpp single_retarded.cpp batched_lesser_greater_retarded.cpp batched_lesser_greater.cpp batched_retarded.cpp utils.cpp batched_geam.cu
 
 CPP_SOURCES = $(filter %.cpp, $(SOURCES))

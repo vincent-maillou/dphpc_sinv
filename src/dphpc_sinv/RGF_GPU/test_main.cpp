@@ -69,7 +69,7 @@ int main() {
     bool same_array = true;
 
     // has to be tested multiple times to capture if synchronization is faulty
-    for(int k = 0; k < 100; k++){
+    for(int k = 0; k < 1000; k++){
         for(unsigned int batch = 0; batch < batch_size; batch++){
             std::cout << "Batch: " << batch << std::endl;
             
@@ -608,7 +608,7 @@ int main() {
         double diff_retarded_lowerblk = 0.0;
 
         for(unsigned int i = 0; i < n_blocks; i++){
-            for(unsigned j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_lesser_diagblk += std::abs(batch_lesser_inv_matrices_diagblk_ref[i][j]) * std::abs(batch_lesser_inv_matrices_diagblk_ref[i][j]);
                 diff_lesser_diagblk += std::abs(batch_lesser_inv_matrices_diagblk_h[i][j] - batch_lesser_inv_matrices_diagblk_ref[i][j]) *
                     std::abs(batch_lesser_inv_matrices_diagblk_h[i][j] - batch_lesser_inv_matrices_diagblk_ref[i][j]);
@@ -622,7 +622,7 @@ int main() {
 
         }
         for(unsigned int i = 0; i < n_blocks - 1; i++){
-            for(unsigned int j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned int j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_lesser_upperblk += std::abs(batch_lesser_inv_matrices_upperblk_ref[i][j]) * std::abs(batch_lesser_inv_matrices_upperblk_ref[i][j]);
                 diff_lesser_upperblk += std::abs(batch_lesser_inv_matrices_upperblk_h[i][j] - batch_lesser_inv_matrices_upperblk_ref[i][j]) *
                     std::abs(batch_lesser_inv_matrices_upperblk_h[i][j] - batch_lesser_inv_matrices_upperblk_ref[i][j]);
@@ -703,7 +703,7 @@ int main() {
         diff_retarded_lowerblk = 0.0;
 
         for(unsigned int i = 0; i < n_blocks; i++){
-            for(unsigned j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_lesser_diagblk += std::abs(batch_lesser_inv_matrices_diagblk_ref[i][j]) * std::abs(batch_lesser_inv_matrices_diagblk_ref[i][j]);
                 diff_lesser_diagblk += std::abs(batch_lesser_inv_matrices_diagblk_h[i][j] - batch_lesser_inv_matrices_diagblk_ref[i][j]) *
                     std::abs(batch_lesser_inv_matrices_diagblk_h[i][j] - batch_lesser_inv_matrices_diagblk_ref[i][j]);
@@ -717,7 +717,7 @@ int main() {
 
         }
         for(unsigned int i = 0; i < n_blocks - 1; i++){
-            for(unsigned int j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned int j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_lesser_upperblk += std::abs(batch_lesser_inv_matrices_upperblk_ref[i][j]) * std::abs(batch_lesser_inv_matrices_upperblk_ref[i][j]);
                 diff_lesser_upperblk += std::abs(batch_lesser_inv_matrices_upperblk_h[i][j] - batch_lesser_inv_matrices_upperblk_ref[i][j]) *
                     std::abs(batch_lesser_inv_matrices_upperblk_h[i][j] - batch_lesser_inv_matrices_upperblk_ref[i][j]);
@@ -741,6 +741,124 @@ int main() {
             std::cout << diff_retarded_upperblk/norm_retarded_upperblk << std::endl;
             std::cout << diff_retarded_lowerblk/norm_retarded_lowerblk << std::endl;
             printf("FAILED BATCHED lesser greater retarded\n");
+            not_failed = false;
+        }
+
+        // set outputs to zero
+        for(unsigned int i = 0; i < n_blocks; i++){
+            for(unsigned int batch = 0; batch < batch_size; batch++){
+                for(unsigned int j = 0; j < blocksize * blocksize; j++){
+                    batch_lesser_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                    batch_greater_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                    batch_retarded_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                }
+            }
+        }
+        for(unsigned int i = 0; i < n_blocks-1; i++){
+            for(unsigned int batch = 0; batch < batch_size; batch++){
+                for(unsigned int j = 0; j < blocksize * blocksize; j++){
+                    batch_lesser_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                    batch_greater_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                    batch_retarded_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                    batch_retarded_inv_matrices_lowerblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                }
+            }
+        }
+
+        // set outputs to zero
+        for(unsigned int i = 0; i < n_blocks; i++){
+            for(unsigned int batch = 0; batch < batch_size; batch++){
+                for(unsigned int j = 0; j < blocksize * blocksize; j++){
+                    batch_lesser_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                    batch_greater_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                    batch_retarded_inv_matrices_diagblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                }
+            }
+        }
+        for(unsigned int i = 0; i < n_blocks-1; i++){
+            for(unsigned int batch = 0; batch < batch_size; batch++){
+                for(unsigned int j = 0; j < blocksize * blocksize; j++){
+                    batch_lesser_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                    batch_greater_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                    batch_retarded_inv_matrices_upperblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                    batch_retarded_inv_matrices_lowerblk_h[i][batch * blocksize * blocksize + j] = 0.0;
+                }
+            }
+        }
+
+
+        rgf_lesser_greater_retarded_batched_memcpy(blocksize, matrix_size, batch_size,
+                                    batch_system_matrices_diagblk_h,
+                                    batch_system_matrices_upperblk_h,
+                                    batch_system_matrices_lowerblk_h,
+                                    batch_self_energy_matrices_lesser_diagblk_h,
+                                    batch_self_energy_matrices_lesser_upperblk_h,
+                                    batch_self_energy_matrices_greater_diagblk_h,
+                                    batch_self_energy_matrices_greater_upperblk_h,
+                                    batch_lesser_inv_matrices_diagblk_h,
+                                    batch_lesser_inv_matrices_upperblk_h,
+                                    batch_greater_inv_matrices_diagblk_h,
+                                    batch_greater_inv_matrices_upperblk_h,
+                                    batch_retarded_inv_matrices_diagblk_h,
+                                    batch_retarded_inv_matrices_upperblk_h,
+                                    batch_retarded_inv_matrices_lowerblk_h);
+
+        norm_lesser_diagblk = 0.0;
+        norm_lesser_upperblk = 0.0;
+        norm_greater_diagblk = 0.0;
+        norm_greater_upperblk = 0.0;
+        diff_lesser_diagblk = 0.0;
+        diff_lesser_upperblk = 0.0;
+        diff_greater_diagblk = 0.0;
+        diff_greater_upperblk = 0.0;
+        norm_retarded_diagblk = 0.0;
+        norm_retarded_upperblk = 0.0;
+        norm_retarded_lowerblk = 0.0;
+        diff_retarded_diagblk = 0.0;
+        diff_retarded_upperblk = 0.0;
+        diff_retarded_lowerblk = 0.0;
+
+        for(unsigned int i = 0; i < n_blocks; i++){
+            for(unsigned j =  0; j < batch_size *blocksize * blocksize; j++){
+                norm_lesser_diagblk += std::abs(batch_lesser_inv_matrices_diagblk_ref[i][j]) * std::abs(batch_lesser_inv_matrices_diagblk_ref[i][j]);
+                diff_lesser_diagblk += std::abs(batch_lesser_inv_matrices_diagblk_h[i][j] - batch_lesser_inv_matrices_diagblk_ref[i][j]) *
+                    std::abs(batch_lesser_inv_matrices_diagblk_h[i][j] - batch_lesser_inv_matrices_diagblk_ref[i][j]);
+                norm_greater_diagblk += std::abs(batch_greater_inv_matrices_diagblk_ref[i][j]) * std::abs(batch_greater_inv_matrices_diagblk_ref[i][j]);
+                diff_greater_diagblk += std::abs(batch_greater_inv_matrices_diagblk_h[i][j] - batch_greater_inv_matrices_diagblk_ref[i][j]) *
+                    std::abs(batch_greater_inv_matrices_diagblk_h[i][j] - batch_greater_inv_matrices_diagblk_ref[i][j]);
+                norm_retarded_diagblk += std::abs(batch_retarded_inv_matrices_diagblk_ref[i][j]) * std::abs(batch_retarded_inv_matrices_diagblk_ref[i][j]);
+                diff_retarded_diagblk += std::abs(batch_retarded_inv_matrices_diagblk_h[i][j] - batch_retarded_inv_matrices_diagblk_ref[i][j]) *
+                    std::abs(batch_retarded_inv_matrices_diagblk_h[i][j] - batch_retarded_inv_matrices_diagblk_ref[i][j]);
+            }
+
+        }
+        for(unsigned int i = 0; i < n_blocks - 1; i++){
+            for(unsigned int j =  0; j < batch_size *blocksize * blocksize; j++){
+                norm_lesser_upperblk += std::abs(batch_lesser_inv_matrices_upperblk_ref[i][j]) * std::abs(batch_lesser_inv_matrices_upperblk_ref[i][j]);
+                diff_lesser_upperblk += std::abs(batch_lesser_inv_matrices_upperblk_h[i][j] - batch_lesser_inv_matrices_upperblk_ref[i][j]) *
+                    std::abs(batch_lesser_inv_matrices_upperblk_h[i][j] - batch_lesser_inv_matrices_upperblk_ref[i][j]);
+                norm_greater_upperblk += std::abs(batch_greater_inv_matrices_upperblk_ref[i][j]) * std::abs(batch_greater_inv_matrices_upperblk_ref[i][j]);
+                diff_greater_upperblk += std::abs(batch_greater_inv_matrices_upperblk_h[i][j] - batch_greater_inv_matrices_upperblk_ref[i][j]) *
+                    std::abs(batch_greater_inv_matrices_upperblk_h[i][j] - batch_greater_inv_matrices_upperblk_ref[i][j]);
+                norm_retarded_upperblk += std::abs(batch_retarded_inv_matrices_upperblk_ref[i][j]) * std::abs(batch_retarded_inv_matrices_upperblk_ref[i][j]);
+                diff_retarded_upperblk += std::abs(batch_retarded_inv_matrices_upperblk_h[i][j] - batch_retarded_inv_matrices_upperblk_ref[i][j]) *
+                    std::abs(batch_retarded_inv_matrices_upperblk_h[i][j] - batch_retarded_inv_matrices_upperblk_ref[i][j]);
+                norm_retarded_lowerblk += std::abs(batch_retarded_inv_matrices_lowerblk_ref[i][j]) * std::abs(batch_retarded_inv_matrices_lowerblk_ref[i][j]);
+                diff_retarded_lowerblk += std::abs(batch_retarded_inv_matrices_lowerblk_h[i][j] - batch_retarded_inv_matrices_lowerblk_ref[i][j]) *
+                    std::abs(batch_retarded_inv_matrices_lowerblk_h[i][j] - batch_retarded_inv_matrices_lowerblk_ref[i][j]);
+            }
+        }
+
+
+        if(diff_lesser_diagblk/norm_lesser_diagblk > reltol || diff_lesser_upperblk/norm_lesser_upperblk > reltol || diff_greater_diagblk/norm_greater_diagblk > reltol || diff_greater_upperblk/norm_greater_upperblk > reltol || diff_retarded_diagblk/norm_retarded_diagblk > reltol || diff_retarded_upperblk/norm_retarded_upperblk > reltol || diff_retarded_lowerblk/norm_retarded_lowerblk > reltol){
+            std::cout << diff_lesser_diagblk/norm_lesser_diagblk << std::endl;
+            std::cout << diff_lesser_upperblk/norm_lesser_upperblk << std::endl;
+            std::cout << diff_greater_diagblk/norm_greater_diagblk << std::endl;
+            std::cout << diff_greater_upperblk/norm_greater_upperblk << std::endl;
+            std::cout << diff_retarded_diagblk/norm_retarded_diagblk << std::endl;
+            std::cout << diff_retarded_upperblk/norm_retarded_upperblk << std::endl;
+            std::cout << diff_retarded_lowerblk/norm_retarded_lowerblk << std::endl;
+            printf("FAILED BATCHED MEMCPY lesser greater retarded\n");
             not_failed = false;
         }
 
@@ -789,7 +907,7 @@ int main() {
         diff_greater_upperblk = 0.0;
 
         for(unsigned int i = 0; i < n_blocks; i++){
-            for(unsigned j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_lesser_diagblk += std::abs(batch_lesser_inv_matrices_diagblk_ref[i][j]) * std::abs(batch_lesser_inv_matrices_diagblk_ref[i][j]);
                 diff_lesser_diagblk += std::abs(batch_lesser_inv_matrices_diagblk_h[i][j] - batch_lesser_inv_matrices_diagblk_ref[i][j]) *
                     std::abs(batch_lesser_inv_matrices_diagblk_h[i][j] - batch_lesser_inv_matrices_diagblk_ref[i][j]);
@@ -800,7 +918,7 @@ int main() {
 
         }
         for(unsigned int i = 0; i < n_blocks - 1; i++){
-            for(unsigned int j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned int j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_lesser_upperblk += std::abs(batch_lesser_inv_matrices_upperblk_ref[i][j]) * std::abs(batch_lesser_inv_matrices_upperblk_ref[i][j]);
                 diff_lesser_upperblk += std::abs(batch_lesser_inv_matrices_upperblk_h[i][j] - batch_lesser_inv_matrices_upperblk_ref[i][j]) *
                     std::abs(batch_lesser_inv_matrices_upperblk_h[i][j] - batch_lesser_inv_matrices_upperblk_ref[i][j]);
@@ -861,7 +979,7 @@ int main() {
         diff_greater_upperblk = 0.0;
 
         for(unsigned int i = 0; i < n_blocks; i++){
-            for(unsigned j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_lesser_diagblk += std::abs(batch_lesser_inv_matrices_diagblk_ref[i][j]) * std::abs(batch_lesser_inv_matrices_diagblk_ref[i][j]);
                 diff_lesser_diagblk += std::abs(batch_lesser_inv_matrices_diagblk_h[i][j] - batch_lesser_inv_matrices_diagblk_ref[i][j]) *
                     std::abs(batch_lesser_inv_matrices_diagblk_h[i][j] - batch_lesser_inv_matrices_diagblk_ref[i][j]);
@@ -872,7 +990,7 @@ int main() {
 
         }
         for(unsigned int i = 0; i < n_blocks - 1; i++){
-            for(unsigned int j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned int j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_lesser_upperblk += std::abs(batch_lesser_inv_matrices_upperblk_ref[i][j]) * std::abs(batch_lesser_inv_matrices_upperblk_ref[i][j]);
                 diff_lesser_upperblk += std::abs(batch_lesser_inv_matrices_upperblk_h[i][j] - batch_lesser_inv_matrices_upperblk_ref[i][j]) *
                     std::abs(batch_lesser_inv_matrices_upperblk_h[i][j] - batch_lesser_inv_matrices_upperblk_ref[i][j]);
@@ -908,6 +1026,8 @@ int main() {
             }
         }
 
+
+
         rgf_lesser_greater_batched_without_hostmalloc(
             blocksize, matrix_size, batch_size,
             batch_system_matrices_diagblk_h,
@@ -932,7 +1052,7 @@ int main() {
         diff_greater_upperblk = 0.0;
 
         for(unsigned int i = 0; i < n_blocks; i++){
-            for(unsigned j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_lesser_diagblk += std::abs(batch_lesser_inv_matrices_diagblk_ref[i][j]) * std::abs(batch_lesser_inv_matrices_diagblk_ref[i][j]);
                 diff_lesser_diagblk += std::abs(batch_lesser_inv_matrices_diagblk_h[i][j] - batch_lesser_inv_matrices_diagblk_ref[i][j]) *
                     std::abs(batch_lesser_inv_matrices_diagblk_h[i][j] - batch_lesser_inv_matrices_diagblk_ref[i][j]);
@@ -943,7 +1063,7 @@ int main() {
 
         }
         for(unsigned int i = 0; i < n_blocks - 1; i++){
-            for(unsigned int j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned int j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_lesser_upperblk += std::abs(batch_lesser_inv_matrices_upperblk_ref[i][j]) * std::abs(batch_lesser_inv_matrices_upperblk_ref[i][j]);
                 diff_lesser_upperblk += std::abs(batch_lesser_inv_matrices_upperblk_h[i][j] - batch_lesser_inv_matrices_upperblk_ref[i][j]) *
                     std::abs(batch_lesser_inv_matrices_upperblk_h[i][j] - batch_lesser_inv_matrices_upperblk_ref[i][j]);
@@ -996,7 +1116,7 @@ int main() {
         diff_retarded_lowerblk = 0.0;
 
         for(unsigned int i = 0; i < n_blocks; i++){
-            for(unsigned j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_retarded_diagblk += std::abs(batch_retarded_inv_matrices_diagblk_ref[i][j]) * std::abs(batch_retarded_inv_matrices_diagblk_ref[i][j]);
                 diff_retarded_diagblk += std::abs(batch_retarded_inv_matrices_diagblk_h[i][j] - batch_retarded_inv_matrices_diagblk_ref[i][j]) *
                     std::abs(batch_retarded_inv_matrices_diagblk_h[i][j] - batch_retarded_inv_matrices_diagblk_ref[i][j]);
@@ -1004,7 +1124,7 @@ int main() {
 
         }
         for(unsigned int i = 0; i < n_blocks - 1; i++){
-            for(unsigned int j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned int j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_retarded_upperblk += std::abs(batch_retarded_inv_matrices_upperblk_ref[i][j]) * std::abs(batch_retarded_inv_matrices_upperblk_ref[i][j]);
                 diff_retarded_upperblk += std::abs(batch_retarded_inv_matrices_upperblk_h[i][j] - batch_retarded_inv_matrices_upperblk_ref[i][j]) *
                     std::abs(batch_retarded_inv_matrices_upperblk_h[i][j] - batch_retarded_inv_matrices_upperblk_ref[i][j]);
@@ -1055,7 +1175,7 @@ int main() {
         diff_retarded_lowerblk = 0.0;
 
         for(unsigned int i = 0; i < n_blocks; i++){
-            for(unsigned j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_retarded_diagblk += std::abs(batch_retarded_inv_matrices_diagblk_ref[i][j]) * std::abs(batch_retarded_inv_matrices_diagblk_ref[i][j]);
                 diff_retarded_diagblk += std::abs(batch_retarded_inv_matrices_diagblk_h[i][j] - batch_retarded_inv_matrices_diagblk_ref[i][j]) *
                     std::abs(batch_retarded_inv_matrices_diagblk_h[i][j] - batch_retarded_inv_matrices_diagblk_ref[i][j]);
@@ -1063,7 +1183,7 @@ int main() {
 
         }
         for(unsigned int i = 0; i < n_blocks - 1; i++){
-            for(unsigned int j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned int j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_retarded_upperblk += std::abs(batch_retarded_inv_matrices_upperblk_ref[i][j]) * std::abs(batch_retarded_inv_matrices_upperblk_ref[i][j]);
                 diff_retarded_upperblk += std::abs(batch_retarded_inv_matrices_upperblk_h[i][j] - batch_retarded_inv_matrices_upperblk_ref[i][j]) *
                     std::abs(batch_retarded_inv_matrices_upperblk_h[i][j] - batch_retarded_inv_matrices_upperblk_ref[i][j]);
@@ -1114,7 +1234,7 @@ int main() {
         diff_retarded_lowerblk = 0.0;
 
         for(unsigned int i = 0; i < n_blocks; i++){
-            for(unsigned j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_retarded_diagblk += std::abs(batch_retarded_inv_matrices_diagblk_ref[i][j]) * std::abs(batch_retarded_inv_matrices_diagblk_ref[i][j]);
                 diff_retarded_diagblk += std::abs(batch_retarded_inv_matrices_diagblk_h[i][j] - batch_retarded_inv_matrices_diagblk_ref[i][j]) *
                     std::abs(batch_retarded_inv_matrices_diagblk_h[i][j] - batch_retarded_inv_matrices_diagblk_ref[i][j]);
@@ -1122,7 +1242,7 @@ int main() {
 
         }
         for(unsigned int i = 0; i < n_blocks - 1; i++){
-            for(unsigned int j =  0; j < 1 * blocksize * blocksize; j++){
+            for(unsigned int j =  0; j < batch_size *blocksize * blocksize; j++){
                 norm_retarded_upperblk += std::abs(batch_retarded_inv_matrices_upperblk_ref[i][j]) * std::abs(batch_retarded_inv_matrices_upperblk_ref[i][j]);
                 diff_retarded_upperblk += std::abs(batch_retarded_inv_matrices_upperblk_h[i][j] - batch_retarded_inv_matrices_upperblk_ref[i][j]) *
                     std::abs(batch_retarded_inv_matrices_upperblk_h[i][j] - batch_retarded_inv_matrices_upperblk_ref[i][j]);
